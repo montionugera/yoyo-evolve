@@ -1,0 +1,158 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (10ms)
+  ▶ $ sed -n 75,250p src/format/cost/price_audit_tests.rs; echo ----; sed -n 480,640p … ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 155,166p src/format/cost/pr… ✓ (8ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 11.4s (3 ✓)
+
+Write the failing near-miss test first.
+  ╭─ Turn 4 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat >> src/for… (36 lines) ✓ (120ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --lib a_wrong_nonzero 2… ✓ (89ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo a_wrong_nonz… ✓ (15.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test a_wrong_nonzero 2>&1 | … ✓ (14.7s)
+  4 tools completed in 39.7s (4 ✓)
+
+Red as expected. Now the classifier.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 157,166p src/format/cost/pr… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 -c " (3 lines) ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (88 lines) ✓ (25.7s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 44.3s (3 ✓)
+
+Green. Positive control — drop the conjunct, run, restore, in one command:
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; f=src/format/cost/price_audit_test… ✓ (48.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1415,1425p src/format/cost/… ✓ (6ms)
+  2 tools completed in 53.7s (2 ✓)
+
+Failed by name at row (b)'s assertion; restored green. Now step 2: the price.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 805,850p src/agent_builder.… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The preset already says 0.10. So where does the audit's "ours 0.2" come from? Check price_of.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 45,75p src/format/cost/pric… ✓ (9ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Day 224 (ac642878, #1003) already moved the Sonnet 5.5 arm to $0.10. Let me check that the audit's resolver actually reads that value now, and see what that commit cited as its source.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show ac642878 --stat | head -3… ✓ (11ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ d=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.2 | head -1); ls $d $d/src | head…  ▶ $ for u in https://www.anthropic.com/pricing https://docs.anthropic.com/en/docs/ab… ✓ (11ms)
+ ✓ (2.4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 11.6s (3 ✓)
+
+The vendor page is reachable and mentions Sonnet 5.5. Pulling out the actual row:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp; curl -sL -m 20 -A "Mozilla/5.0" -o docs.html https:… (9 lines) ✓ (511ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The vendor's own page says Sonnet 5.5 is $2 in / $10 out / $2.50 / $4 / $0.10, and the prose says "$0.10 USD on Claude Sonnet 5.5". I'll check the column order before relying on it:
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp; python3 - <<'EOF' (9 lines) ✓ (31ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1004 --json state,ti… ✓ (406ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 9.0s (2 ✓)
+
+Both defects are fixed, and the price is now vendor-verified. Let me run the live audit to get an actual reading of the new column and the summary:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 300 cargo test --bin yoyo … ✓ (614ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The live alarm fires with 75 drifted rows. Before I write anything, I need to know whether my conjunct moved any of them, so I'll count which DRIFT rows differ only in cache_read with a nonzero ours:
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 300 ca… (14 lines) ✓ (25.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue list --state open --searc… ✓ (498ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 35.5s (2 ✓)
+
+Nothing open tracks the 75 drifted rows. Fixing them is out of scope, but leaving them only in my notes is how residue gets lost, so I'll file the measurement. First, a sample:
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -E "DRIFT$" /tmp/audit.txt | head -8; grep -E "^price audit:" /tmp/audit.tx… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the full checks:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -1 && carg… ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && echo FMT_O…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -1; cargo … ✓ (17.6s)
+ ✓ (2m 54s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (5m 8s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -E "DRIFT… (18 lines) ✓ (835ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (13 lines) ✓ (42ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 10m 41s (5 ✓, 1 ✗)
+
+Since the only change since the last green run is ARCHITECTURE.md, I'll rerun just the tests that read it:
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -ln "ARCHITECTURE.md" tests/*… ✓ (2m 40s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (24 lines) ✓ (39ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (3 lines) ✓ (1.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1004 --json comments… ✓ (448ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 3m 8s (4 ✓)
+
+Both #1004 defects are fixed and committed (4092ea2a). The Sonnet 5.5 price needed no change: it was already $0.10, and the vendor's own pricing page confirms that.
+
+What changed (src/format/cost/price_audit_tests.rs)
+• `only_cache_read_differs now also requires our cache_read to be 0.0. The cache_read_only` bucket is meant for cells the table leaves at zero. A nonzero cache_read that disagrees with the catalogue now counts as drift.
+• A new classify_row function now produces both the summary buckets and the per-row state column. The column prints match / cache_read_only / DRIFT, so it can no longer disagree with the summary.
+• New test a_wrong_nonzero_cache_read_is_drift_not_the_coverage_gap. It checks three cases: ours 0.0 vs theirs 0.1 → cache_read_only; ours 0.2 vs 0.1 (the row from #1004) → drift; all equal → match. It also runs the #1004 row through the full comparator.
+• Positive control, run as one command: with the new 0.0 check removed, that test failed by name (21/22 passed). Restored, 22/22 pass.
+
+The price
+• The Sonnet 5.5 cache_read had already been changed from 0.2 to 0.10 on Day 224 (`ac642878`, #1003). That change was based on models.dev and Claude Code's changelog, not a vendor source.
+• Checked today against platform.claude.com/docs/en/about-claude/pricing: Sonnet 5.5 is $2 input, $10 output, $2.50 for 5-minute cache writes, $0.10 for cache hits. That matches our values exactly, so I didn't touch src/agent_builder.rs.
+• yoagent 0.25.2 still has no Sonnet 5.5 entry.
+• Because the vendor confirms 0.10, the commit body says Fixes #1004 (the title keeps the harness's "Part of" wording). I also commented on #1004.
+
+Live audit (network), today
+• Result: compared 115, matched 27, drifted 75, cache_read_only 13, unpriced 67 of 182 rows. claude-sonnet-5-5 now shows match.
+• The counts are identical before and after my change. Today's live data has no row with a wrong nonzero cache_read, so for now the fix is only exercised by the offline test.
+• The live audit is `#[ignore]`d, so it can't fail CI either way. The commit says this.
+• The live run still fails on the drift alarm: 75 rows, all there before this task. I filed them as #1012 (openai 22, google 23, zai 13, mistral 9, xai 7, deepseek 1). Most look like broad prefix matches charging a variant model at its base model's price. Fixing them needs each vendor's own pricing page, so I didn't attempt it here.
+
+Docs: In ARCHITECTURE.md, the "Found, not fixed … Filed as #1004" note is now marked superseded, with the fix, the vendor check and #1012 recorded. The classifier description there also mentions the new 0.0 check.
+
+Checks: build, cargo test (0 failures), clippy with -D warnings, and fmt --check all pass.
+  watch: no files changed this turn — skipping

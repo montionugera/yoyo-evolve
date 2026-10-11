@@ -1,0 +1,28 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "user_deny_refusal\|glo… ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 40,90p src/cd_deny.rs; se… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 20 gh issue view 1011 --… ✓ (390ms)
+  ▶ write session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 21.4s (4 ✓)
+
+Verdict: PASS. The diff does what #1010 asked; I wrote the full verdict to session_plan/eval_task_1.md. I didn't re-run the suite (the harness already passed it) or the binary, so this rests on reading the diff, a few greps and one issue lookup.
+
+• **Original check unchanged:** user_deny_refusal still runs the old whole-command match first, with the same refusal wording.
+• **Each part of a compound is now checked:** if the whole command doesn't match, it's split into parts at `;`, `&&`, `|` and so on, but never inside quotes. Leading `VAR=value`, `export`-style keywords and words like if/then are stripped, and each part is matched against the deny patterns.
+• **Indirect program names are refused:** if no part matches and a deny list exists, a command whose program name comes from `$X`, `$(...)` or backticks is refused. The two refusal messages are worded differently and pass the model's text through sanitize_for_display.
+• **No deny list, no change:** an empty deny list returns early, so users without one see the same behaviour as before. This repo's `.yoyo.toml` sets no deny list, so the project's own runs aren't affected.
+• **Tests:** they cover every must-refuse and must-allow case the task listed, plus a heredoc case. They also pin `"$CARGO" build` behaving differently with and without a deny list, and the eval "$(...)" gap as a stated limit.
+• **Every caller goes through the one function:** both bash tools (main agent at `tools.rs:377`, sub-agent at `:1649`) reach `tools::user_deny_refusal` via `cd_deny::effective_user_deny_refusal`. Deny patterns added by /cd count as a deny list, so the $VAR refusal applies to them too, which is consistent.
+• **No unused definitions:** the new function is re-exported and called, and the new keyword list and splitter are both used.
+• Docs: `permissions.md item 1 is rewritten to match the new behaviour, including the eval` limit.
+• **Follow-up issue:** the eval "$(...)" gap is filed as #1011, open with the agent-self label.
+
+Two small things that didn't affect the verdict:
+• **Commit message:** it doesn't cite #1011 (step 6 asked for that); only the test comment does.
+• **`PermissionConfig::check in config.rs`:** it still matches the whole string only. That's harmless because both bash tools refuse earlier through the new function.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
