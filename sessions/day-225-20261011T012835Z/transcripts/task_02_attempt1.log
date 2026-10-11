@@ -1,0 +1,118 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --short | head;…  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -rn "fn save_session\|fn load_session\|f… ✓ (9ms)
+ ✓ (17ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -rn "save_messages()\|restore_messages(\… ✓ (16ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 395,520p src/commands_session.rs; sed … ✓ (4ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 1,20p src/commands_todo.rs; sed -n 55,… ✓ (7ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 497,516p src/commands_session.rs; sed … ✓ (14ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 1128,1152p src/commands_session.rs; gr… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 33.8s (7 ✓)
+
+Session files are a bare message array (agent.save_messages()), so I'll use a sidecar file. Writing the helpers and tests in commands_todo.rs first.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; python3 - <<'EOF' (215 lines) ✓ (19ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the call sites: /save, /load, auto-save on exit (commands_session.rs), and `--save-session` / `--continue` (main.rs).
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; python3 - <<'EOF' (90 lines) ✓ (18ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -rn "continue_session_path()\|AUTO_SAVE_… ✓ (8.2s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "AUTO_SAVE_SESSION_PATH\|DEFAULT_SESS… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 15.5s (3 ✓)
+
+All five paths (/save, /load, auto-save on exit, --save-session, --continue) are wired. Running the new tests, then the positive control.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo commands_todo 2>&1 | gr… ✓ (18.7s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cp src/commands_todo.rs /… (9 lines) ✓ (39.4s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cp src/commands_todo.rs /tmp/todo_bak.rs && s… ✓ (19.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cp src/commands_todo.rs /tmp/todo_bak.rs && s… ✓ (20.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 1m 48s (4 ✓)
+
+Positive control: neutering restore_todos reddens exactly the four restore tests, round-trip included. Restored (0 NEUTERED markers left). Now the docs, then the full gate.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n -i "todo\|/save\|/load\|continue\|aut… ✓ (4ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 38,72p docs/src/features/sessions.md ✓ (2ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; python3 - <<'EOF' (20 lines) ✓ (17ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7.9s (3 ✓)
+
+Let me verify the /todo board claim I just wrote before trusting it.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n '/^pub fn handle_todo_board(/,/^}/p' s… ✓ (5ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -rn "SESSION_PLAN_DIR: " src/ | head -2;… ✓ (10ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 4.3s (2 ✓)
+
+Board tasks live in session_plan/, not .yoyo/. That's a doc error, so I'm fixing it. Then I'll check #1005's done-when list against the refusal text, which still says "tracked in #1005".
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -i 's|- `/todo board` tasks live on disk … ✓ (350ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 33,41p src/commands_todo.rs; sed -n '/… ✓ (10ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "session-only: it lives" -A4 src/comm… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 14.3s (3 ✓)
+
+Replacing the soon-to-be-dead pointer with the true behaviour. The test stays a full-string assert_eq!, and I'm adding a guard against "tracked in #" pointers.
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; python3 - <<'EOF' (16 lines) ✓ (28ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo fmt -- --check && cargo cl… ✓ (2m 45s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test result" | gr… ✓ (4m 16s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7m 10s (3 ✓)
+
+Everything is green: fmt, clippy -D warnings, and all 19 test binaries (including the module-size and neutered-guard gates). Committing.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; git add -A && git commit … (26 lines) ✓ (20ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Your /todo list is now saved with the session and comes back when you resume it. Committed as b9d96863. Format check, clippy with warnings as errors, and the full test suite all pass. I haven't run a real save-and-resume against a live model. Only the new helper functions are unit-tested; the five call sites themselves are not.
+
+How it works: a session file is a bare list of messages, so there's no field to add the todos to. The list goes in a file next to it instead: .yoyo/last-session.json gets .yoyo/last-session.todos.json.
+• **Saved by** /save, auto-save on exit, and --save-session.
+• Restored by `/load and --continue`.
+
+Behaviour:
+• **Loading replaces the current list.** It's session state, which is the reason @danstis gave for not using a standalone file.
+• **IDs carry on:** a new /todo add after a resume never reuses a restored ID.
+• **Old sessions** with no todos file resume with an empty list.
+• **A corrupt todos file** doesn't stop the resume. You get one warning on stderr and an empty list.
+• **Saving an empty list** writes no file and deletes an old one at the same path, so cleared items can't come back. A plain `/save` with no todos still creates only one file.
+
+Tests: I added tests for the full round trip (three items with mixed statuses, checked as a whole list), an old-format session, a corrupt file, and saving an empty list. To check they catch a real failure, I made the restore step do nothing; all four restore tests failed, round trip included. I then put the code back and confirmed no sabotage marker is left.
+
+One change outside the plan: the shell refusal for yoyo todo add said "Persistence across invocations is tracked in #1005". Once this commit closes #1005, that would point users at a closed issue, which is the same mistake fixed on Day 224. It now says the list is saved with the session and comes back on /load or --continue. Its exact-text test was renamed to match, and it now fails if any "tracked in #" pointer comes back.
+
+Docs: docs/src/features/sessions.md describes the todos file and these rules. My first draft said /todo board tasks live under .yoyo/; they're actually in session_plan/, and I fixed that before committing.
+
+The commit message says Fixes #1005 because every save and resume path is covered, so #1005 closes when this is pushed. The issue's third item, reporting back to @danstis in #682, is still owed in the respond phase.
+  watch: no files changed this turn — skipping

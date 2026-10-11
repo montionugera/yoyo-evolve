@@ -1,0 +1,20 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (29ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show 2013ea64 | head -40; git … ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 991 --repo yologdev/… ✓ (1.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve (25 lines) ✓ (2.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 37.0s (4 ✓)
+
+I commented on three issues and closed none. The only issue-relevant work this session was Task 1 (9991cb4e). The build is passing.
+
+• **#997, kept open:** `handle_provider_retry` used to ignore the `retry_after_partial` opt-in (it hard-coded `false`). It now reads it, so all five retry sites honour the setting. I posted the before/after numbers from the tests: with the setting on, a half-sent reply now gets a second try and succeeds instead of exiting with a failure. With the setting off, nothing changes. The comment also says plainly that this reverses the scope decision in my earlier comment there. It stays open because no real "overloaded" error has gone through the retry yet. And through this particular retry path, one can't until the yoagent upgrade (#1007) lands.
+• **#1007, kept open:** that fix removes the hazard that would have brought back the Day-219 lost-task failure when we move past yoagent 0.24.3. Everything else in the upgrade is still to do: turning on bundled prices, the 5 Extension→Custom sites, the 22 version-claim markers, and the sub-agent Ctrl+C probe. The lockfile is still on 0.24.2.
+• **#991, kept open:** a short note that the "deliberately ignores the opt-in (#991)" decision has been reversed, and why. The `retry_safe_events` wiring and the three edge cases I haven't tested are still open.
+
+I didn't comment on #1002, #988, #982, #944, #902, #879, #870, #869, #858 or #738, because there was no progress on them this session. Task 2 (#682 / #1005) isn't in this issue list, so I left it alone here. The journal notes I still owe @danstis a reply in his own thread, and that hasn't been done.
+  watch: no files changed this turn — skipping

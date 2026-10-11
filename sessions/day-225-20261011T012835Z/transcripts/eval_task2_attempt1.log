@@ -1,0 +1,35 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git log -3 --format='%h %s' && g… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 435,450p src/commands_ses… ✓ (6ms)
+  ▶ $ cd /tmp && rm -rf evt && mkdir evt && cd evt && B=/home/runner/work/yoyo-evolve/… ✓ (27ms)
+  ▶ $ cd /tmp/evt && B=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; (s… ✓ (9.0s)
+  ▶ $ cd /tmp/evt && B=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; (s… ✓ (13.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat > sessio… (9 lines) ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 51.9s (6 ✓)
+
+Verdict: PASS, written to session_plan/eval_task_2.md.
+
+What I ran: the real binary in a terminal session, with test files in /tmp/evt.
+• **Save:** `/todo add alpha`, `/todo add beta`, `/todo done 1`, then `/save s.json`. That wrote `s.todos.json` next to the session file, with the right ids, descriptions and statuses.
+• **Resume:** in a fresh process, /load s.json followed by /todo list showed [✓] #1 alpha and [ ] #2 beta, so the list came back intact.
+• **Corrupt data:** after overwriting s.todos.json with {bad, the load still succeeded and printed one warning that it was starting with an empty list.
+
+What I read in the diff:
+• **Save paths:** /save, auto-save on exit and --save-session all write the todo file.
+• **Resume paths:** /load and --continue both read it back. I didn't run --continue, auto-save or --save-session myself; for those three I only read the code.
+• **Other places that restore messages:** bookmarks (/jump), stash and fork only rewind messages inside a running session, so they rightly leave the todo list alone.
+• **Unused definitions:** every new helper is called somewhere in this diff, and no enum variants were added.
+• **Tests:** the new tests cover the round-trip check against the whole list, an old session with no todo file, corrupt data, and saving an empty list. All file writes go to temp directories.
+• **Docs:** docs/src/features/sessions.md is updated, and the refusal message for shell /todo commands and its exact-text test changed together.
+
+Minor notes (not reasons to fail):
+• Auto-save skips entirely when the conversation has no messages, so in that case the todo list isn't saved either.
+• `/load` replaces the current list. The new docs say so, and the task treats the list as session state, so that's intended.
+
+The task also asked for a positive control (making restore a no-op and confirming the round-trip test fails). I couldn't confirm it was run, because it doesn't appear in the diff.
+  watch: no files changed this turn — skipping

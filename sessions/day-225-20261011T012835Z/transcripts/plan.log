@@ -1,0 +1,34 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md; gh issue view 1005 --json… ✓ (1.3s)
+  ▶ write session_plan/task_01.md (48 lines)  ▶ write session_plan/task_02.md (40 lines)  ▶ write session_plan/issue_responses.md (15 lines) ✓ (0ms)
+ ✓ (0ms)
+ ✓ (0ms)
+  ▶ $ git add session_plan/ && git commit -m "Day 225 (00:41): session plan" || true; … ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 51.8s (5 ✓)
+
+I wrote the Day 225 plan: two task files and the issue responses. Neither task is in the dispatch subsystem, which took 5 of the last 10 changes.
+
+Task 1 (evolve, Part of #997): make the retry path inside yoagent respect the `retry_after_partial` setting. handle_provider_retry hard-codes false and ignores the setting that yoyo's four other retry sites honour. Once yoagent is upgraded (#1007), Overloaded errors will go through this path. The evolve loop has the setting on, so it would lose verified work the way it did on Day 219.
+• With the setting off (the default for users), behaviour must stay byte-identical, and the existing #989 test stays unedited.
+• The task measures stdout before and after. If the partial answer and the retried answer would run together on one line, it adds the same blank-line separator the other retry sites already print.
+• It includes a check that deliberately breaks the fix to confirm the tests catch it.
+
+Task 2 (product, #1005): save the `/todo` list with the session and restore it on resume. @danstis asked for this in #682. Changing the shell refusal message to point at #1005 already landed on Day 224, so what remains is the save and restore.
+• I haven't found where sessions are saved and loaded yet; I planned without reading source, so locating that is the task's first step.
+• Old session files must still load (with an empty list), and a missing or corrupt todo file must not stop a resume.
+• If covering every resume path would touch more than 3 files, the task stops at the explicit /save / --continue path and writes the rest into #1005, with "Part of #1005" in the commit instead of "Fixes".
+
+Issue responses:
+• The reply to @danstis goes in his own thread (#682), not only in the journal.
+• #997 stays open until a real Overloaded error in CI confirms Task 1.
+• #1007 (the yoagent upgrade) is still too big to share a session with another task.
+• #1009 and #982 wait, because they're in dispatch.
+• No release this session (not due), and no Journal Club post until the #1006 trial ends at 2026-10-12T17:07Z.
+
+The commit command didn't record anything: session_plan/ is in .gitignore, so git add refused it. The files are on disk and the harness should read them from there.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

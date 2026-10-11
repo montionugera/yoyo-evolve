@@ -1,0 +1,111 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (9ms)
+  ▶ $ cat src/prompt/retry_after_partial.rs; sed -n 940,1030p src/prompt.rs; sed -n 11…  ▶ $ sed -n 1300,1380p src/prompt.rs; sed -n 1730,1790p src/prompt.rs; sed -n 3860,38… ✓ (6ms)
+ ✓ (6ms)
+  ▶ read src/prompt.rs:1330..1380 ✓ (0ms)
+  ▶ $ grep -n "997\|989\|fn \|retry_after_partial\|status\|PARTIAL" tests/print_stdout… ✓ (4ms)
+  ▶ $ grep -n -i "internal\|provider_retry\|ProviderRetry\|is_retryable\|529\|503\|HTT… ✓ (3ms)
+  ▶ read tests/print_stdout_contract.rs:1405..1565 ✓ (0ms)
+  ▶ read tests/print_stdout_contract.rs:878..1003 ✓ (0ms)
+  ▶ read src/prompt.rs:970..995  ▶ read src/prompt/retry_after_partial.rs:1..61 ✓ (0ms)
+ ✓ (0ms)
+  ▶ $ grep -A3 'name = "yoagent"' Cargo.lock; ls -d ~/.cargo/registry/src/*/yoagent-*;… ✓ (22ms)
+  ▶ $ f=$(ls -d ~/.cargo/registry/src/*/yoagent-0.24.2 | head -1); sed -n 60,84p $f/sr… ✓ (7ms)
+  ▶ $ grep -rn "retry_config\|RetryConfig" src/ | grep -v "^.*//" | head; f=$(ls -d ~/… ✓ (11ms)
+  ▶ $ f=$(ls -d ~/.cargo/registry/src/*/yoagent-0.24.2 | head -1); awk 'NR>=393 && NR<… ✓ (14ms)
+  ▶ read tests/print_stdout_contract.rs:200..280 ✓ (0ms)
+  ▶ edit tests/print_stdout_contract.rs (3 → 109 lines)
+        assert_eq!(run.requests, 1, "#989: no retry after streamed text");
+        assert!(!run.success, "#989: the dead turn must exit nonzero");
+  + }
+  + 
+  + // #997 on the ProviderRetry door (Day 225, unblocks the yoagent upgrade #1007).
+  + // The #989 tests above are the opt-in-OFF rows and stay unedited. These run the
+  + // SAME fixtures with `retry_after_partial = true` seeded in the cwd. Why these
+  + // statuses: yoagent 0.24.2 `ProviderError::is_retryable` (retry.rs:69) is
+  + // `RateLimited | Network`, and an SSE `error` event of type `rate_limit_error`
+  + // classifies as `RateLimited`, so yoagent ITSELF retries; yoyo's own loop
+  + // never sees the dying attempt. yoagent >= 0.24.3 moves Anthropic 529 /
+  + // `overloaded_error` onto this same classification, which is why this door
+  + // must honour the opt-in before that upgrade.
+  + 
+  + fn rate_limited_after(partial: &str) -> String {
+  +     sse_partial_then(
+  +         partial,
+  +         Some((
+  +             "error",
+  +             r#"{"type":"error","error":{"type":"rate_limit_error","message":"slow down"}}"#
+  ... (89 more lines)
+  ▶ $ cargo test --test print_stdout_contract opt_in_provider_retry 2>&1 | grep -E "PR… ✓ (1m 33s)
+        assert_eq!(run.requests, 1, "#989: no retry after streamed text");
+        assert!(!run.success, "#989: the dead turn must exit nonzero");
+  + }
+  + 
+  + // #997 on the ProviderRetry door (Day 225, unblocks the yoagent upgrade #1007).
+  + // The #989 tests above are the opt-in-OFF rows and stay unedited. These run the
+  + // SAME fixtures with `retry_after_partial = true` seeded in the cwd. Why these
+  + // statuses: yoagent 0.24.2 `ProviderError::is_retryable` (retry.rs:69) is
+  ... (13 more lines)
+ ✓ (1m 33s)
+  ▶ $ python3 - <<'EOF' (11 lines) ✓ (1m 20s)
+  ▶ $ python3 - <<'EOF' (37 lines) ✓ (17ms)
+  ▶ $ grep -n 'write_stream_text("\\n\\n")\|"\\n\\n"' src/prompt.rs | head; grep -n "a… ✓ (4ms)
+  ▶ $ sed -n 1125,1160p src/prompt.rs; grep -n "fn handle_text_delta\|needs_separator\… ✓ (4ms)
+  ▶ read src/prompt.rs:800..840 ✓ (0ms)
+  ▶ $ grep -n "in_text = false" -B3 src/prompt.rs | head -30 ✓ (3ms)
+  ▶ $ python3 - <<'EOF' (51 lines) ✓ (8.8s)
+  ▶ $ cp src/prompt.rs /tmp/prompt.rs.bak && sed -i 's/if retry_blocked_by_streamed_pa… ✓ (7.6s)
+  ▶ $ cargo clippy --all-targets -- -D warnings 2>&1 | tail -2 && cargo fmt -- --check… ✓ (2m 38s)
+  ▶ $ cargo test 2>&1 | grep -E "test result" | awk '{p+=$4; f+=$6} END {print "passed… ✓ (2m 18s)
+
+────────────────────────────────────────────────────────────────────────────────
+  27 tools completed in 9m 36s (27 ✓)
+
+Green. Now the ARCHITECTURE.md entry.
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "retry_after_partial\|#989\|### src/prompt" ARCHITECTURE.md | head -30 ✓ (4ms)
+  ▶ $ python3 - <<'EOF' (11 lines) ✓ (41ms)
+  ▶ $ python3 - <<'EOF' (9 lines) ✓ (1.7s)
+  ▶ $ git add -A && git commit -q -F - <<'EOF' (24 lines) ✓ (33ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 21.2s (4 ✓)
+
+The positive-control output was cut short in the display, so I'm re-running it to confirm both tests actually went red. The commit message claims they did.
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/prompt.rs /tmp/p.bak && sed -i 's/if retry_blocked_by_streamed_partial(&d… ✓ (15.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The yoagent retry door now honours the retry_after_partial opt-in. It's committed as 9991cb4e, and everything passed: build, the full test suite (6423 passed, 0 failed), clippy with -D warnings, fmt, and tests/harness_logic.sh.
+
+The change: handle_provider_retry in src/prompt.rs used to pass a hard-coded false, so it ignored the opt-in. It now reads it through the same is_retry_after_partial() call the other four retry sites use, with no new config reader. With the opt-in off (the default) nothing changes. The #989 tests that pin that behaviour are unedited and still green.
+
+Measured with the opt-in on, using the same fixtures as the #989 tests. A rate_limit_error mid-stream and a truncated stream are both errors yoagent 0.24.2 retries itself, since its is_retryable covers rate limits and network errors.
+
+| Case | Before | After |
+|---|---|---|
+| Partial text, then a yoagent retry, then success (both fixtures) | stdout "PARTIAL_\n", exit nonzero, 1 request (same as off) | stdout "PARTIAL_\n\nPONG\n", exit 0, 2 requests |
+| Dies before any text | PONG\n, 2 requests | unchanged |
+| Every attempt dies | — | 24 requests (4 yoagent attempts × 6 yoyo attempts), ~70s, exit nonzero, "failed after 6 attempts" |
+
+On the separator: I measured it rather than assuming it. The existing output code already closes the dying line and opens the retried answer with a newline, so a pipe reader sees the two attempts apart, never glued into PARTIAL_PONG. I didn't add any extra separator. All four new tests compare the full stdout with assert_eq!.
+
+Positive control: putting false back (marked NEUTERED) made both opt_in_provider_retry_after_* tests fail by name, and restoring it made them pass. I ran it twice, the second time because the first run's output was cut off. The tree is clean afterwards.
+
+Docs:
+• The old "this door deliberately ignores the opt-in because of #991" sentence in retry_after_partial.rs is now marked superseded, with the reason: #991 hasn't landed, and the upgrade moves Overloaded onto this door.
+• `ARCHITECTURE.md` has the before/after readings.
+• `docs/src/usage/piped-mode.md` no longer says retries inside the provider library are unaffected, and it now states the worst-case cost.
+
+Two caveats:
+• The every-attempt-dies test takes about 70s, which slows down the test suite.
+• The commit says "Part of #997", not "Fixes". #997 should stay open until a live Overloaded run on the upgraded yoagent confirms the fix.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
