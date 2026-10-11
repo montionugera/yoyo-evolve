@@ -1,0 +1,438 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; pwd; sed -i 's/yoagent = { version… ✓ (17.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | grep -B3 -A8 'e… ✓ (4.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=$(ls -d ~/.cargo/registry/src/*/… ✓ (16ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 29.6s (4 ✓)
+
+Payload shape unchanged (role/kind/data). Pure rename.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's/AgentMessage::Extension(… ✓ (9.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Builds. Now pricing opt-in.
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=$(ls -d ~/.cargo/registry/src/*/… ✓ (29ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1230,1360p src/format/cost/… ✓ (3ms)
+  2 tools completed in 2.8s (2 ✓)
+
+Now find anthropic_preset/openai_preset definitions.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'pub(crate) fn anthropic_p… ✓ (13ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 735,900p src/agent_builder.… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=$(ls -d ~/.cargo/registry/src/*/… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=$(ls -d ~/.cargo/registry/src/*/… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'ModelConfig::[a-z_]*(' s… ✓ (11ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 16.0s (5 ✓)
+
+Now add the seam with its call sites in the same edit.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (36 lines) ✓ (24ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E '^test .… ✓ (1m 58s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 2m 3s (2 ✓)
+
+All 6099 unit tests green without editing any price test. Positive control on the seam (atomic mutate→run→restore):
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/agent_builder.rs /tmp/ab.ba… ✓ (1m 49s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Seam neutered → 16 reds; restored → green. Now the version-claim markers.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test doc_version_clai… ✓ (10.3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test doc_version_clai… ✓ (1m 30s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 44s (2 ✓)
+
+Let me read the 0.25 CHANGELOG first, then each marker's paragraph.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; awk '/^## \[?0\.24\.2/{exit} {print}'… ✓ (7ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+0.24.3 is also in the range (overload retry, list_files warnings, `anthropic()` Claude inference). Now each marker paragraph:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for loc in src/format/cost.rs:2497… ✓ (9ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Output is being collapsed; I'll read via read_file.
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/format/cost.rs:2478..2542 ✓ (1ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; grep -n -A10 'fn cache_hit_rate' src/…  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/gasp.rs:1..41  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/gasp.rs:990..1020 ✓ (0ms)
+ ✓ (1ms)
+ ✓ (32ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; sed -n 980,990p /home/runner/work/yoy… ✓ (6ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; sed -n 80,100p src/gasp.rs; grep -n '… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 9.1s (6 ✓)
+
+Both gasp claims hold (three types still re-exported; MemoryEventStore still not). Next: prompt.rs.
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/prompt.rs:2978..3038 ✓ (1ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; grep -n '#\[error' src/provider/trait… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3.2s (2 ✓)
+
+The Rate-limited format changed. Compare with 0.24.2:
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f; grep -n '#\[error' yo… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'Rate limited\|rate limit… ✓ (13ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 4.8s (2 ✓)
+
+Real behavioural finding: upstream Display for rate limits changed from retry after Some(N)ms to retry after Nms. Check yoyo's parser for that string:
+  ╭─ Turn 28 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'fn retry_after_hint' -A40… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+yoyo's parser treats Some( as optional, so both forms should parse. Let me confirm with a quick probe of the new shapes, including the None case which now renders as bare Rate limited:
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '"rate limit\|rate_limit\|… ✓ (16ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '14454000ms"\|"retry after… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 4.5s (2 ✓)
+
+Parser already tested on the unwrapped form. Now update the prompt.rs paragraph and add the 0.25 shapes to the table.
+  ╭─ Turn 31 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (40 lines) ✓ (29.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+cost.rs claims both hold (formula and zero-guard unchanged at types.rs:434). Now tool_wrappers / tools:
+  ╭─ Turn 32 ────────────────────────────────────────────────────────────╮
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/tool_wrappers.rs:1412..1462  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/tool_wrappers.rs:5236..5266  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/tool_wrappers_cancel_tests.rs:1..31  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/tools.rs:1905..1950 ✓ (1ms)
+ ✓ (2ms)
+ ✓ (2ms)
+ ✓ (2ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 6.3s (4 ✓)
+
+Now the 0.25.2 source for these claims — sub_agent.rs and agent_loop markers:
+  ╭─ Turn 33 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -n 'AGENT_STOPPED_PREFIX\|LO… ✓ (3ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; sed -n 760,860p sub_agent.rs; gre… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -n 'extract_error\|ToolError… ✓ (4ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; sed -n 700,745p sub_agent.rs; sed… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'ToolError::Cancelled\|is_… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 855,880p src/tool_wrappers.… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'fn cancelled_ctx\|fn err_… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (59 lines) ✓ (23ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i "64s|.*|/// The error yoage… ✓ (28.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo marker_spell… ✓ (116ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 1m 11s (10 ✓)
+
+Now the tools.rs #881 claim — 0.25 added Extensions with a per-run tools hook, which could be the seam. Checking:
+  ╭─ Turn 43 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; ls; grep -n 'fn tools\|fn start_r… ✓ (5ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -n -B5 -A40 'pub struct RunC… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 4.8s (2 ✓)
+
+The 0.25 tools hook does see the delegated task via RunContext::prompts. Let me read what #881's probe actually asked:
+  ╭─ Turn 45 ────────────────────────────────────────────────────────────╮
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/tools.rs:1876..1906 ✓ (1ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -n 'fn parameters_schema' -A… ✓ (65ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 881 --json state,tit… ✓ (729ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 9.7s (3 ✓)
+
+Schema still {"task"} only, so #881's conclusion holds, but "a source sees neither the task" is no longer true for 0.25 Extensions. Recording that:
+  ╭─ Turn 48 ────────────────────────────────────────────────────────────╮
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/tools.rs (3 → 15 lines)
+    /// above were re-pointed to 0.24.0 line numbers.
+    ///
+  - /// <!-- yoagent-version-claim: 0.24.2 -->
+  + /// Superseded claim (0.25.2 upgrade, Day 225, #1007), recorded rather than erased: the
+  + /// paragraph above says a per-delegation tool hook "sees neither the task nor any per-call
+  + /// parameter". That stays true of `ToolSource`, but 0.25 adds a second hook that does see the
+  + /// task: an `Extension` installed with `SubAgentTool::with_extension` /
+  + /// `with_tree_extension` gets `RunHooks::tools(&mut self, run: &RunContext)` once per run
+  + /// (`extension.rs:427`), and `RunContext::prompts` is "for a delegated run: its task"
+  + /// (`extension.rs:163-165`). So a hook can now ADD tools keyed on the task text. The #881
+  + /// conclusion still stands for what #881 asked: the hook only extends the list (it cannot
+  + /// remove a static tool), and `parameters_schema` is still the `{"task"}` literal
+  + /// (`sub_agent.rs:513-524`), so a model still cannot send a per-dispatch `read_only`
+  + /// argument. #881 is closed anyway, by a second dispatch tool (`explore_agent`, below).
+  + ///
+  + /// <!-- yoagent-version-claim: 0.25.2 -->
+ ✓ (17.4s)
+    /// above were re-pointed to 0.24.0 line numbers.
+    ///
+  - /// <!-- yoagent-version-claim: 0.24.2 -->
+  + /// Superseded claim (0.25.2 upgrade, Day 225, #1007), recorded rather than erased: the
+  + /// paragraph above says a per-delegation tool hook "sees neither the task nor any per-call
+  + /// parameter". That stays true of `ToolSource`, but 0.25 adds a second hook that does see the
+  + /// task: an `Extension` installed with `SubAgentTool::with_extension` /
+  + /// `with_tree_extension` gets `RunHooks::tools(&mut self, run: &RunContext)` once per run
+  ... (8 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (17.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (23 lines) ✓ (59ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 48.3s (3 ✓)
+
+Now the prose markers: CLAUDE.md:10 (thinking) and ARCHITECTURE.md ×4.
+  ╭─ Turn 51 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -A14 'pub enum ThinkingLev… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 772,790p ~/.cargo/registry/… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; awk 'NR>=772 && NR<=784' types.rs… ✓ (4ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; for n in 773 774 775 776 779 780 … ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (8 lines) ✓ (25ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -A2 'name = "yoagent-state"' … ✓ (6ms)
+  ▶ $ cd ~/.cargo/registry/src/*/; sed -n 543,547p yoagent-0.25.2/Cargo.toml; grep -n … ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 18.7s (7 ✓)
+
+505 holds (yoagent-state still resolves 0.5.2). For 529, the loop guard:
+  ╭─ Turn 58 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -n 'max_repeated_tool_calls\… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Holds (context.rs:1003 still documents the alternating gap). Now apply the ARCHITECTURE.md and CLAUDE.md edits:
+  ╭─ Turn 59 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (31 lines) ✓ (109ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All markers re-certified. Let me check unmarked prose naming 0.24 that this upgrade might have staled:
+  ╭─ Turn 60 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn '0\.24' src tests docs/sr… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 40,60p src/prompt/retry_aft… ✓ (7ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/prompt/retry_after_partial.rs:44..60  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/print_stdout_contract.rs:1550..1562 ✓ (0ms)
+ ✓ (0ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -n 'fn is_retryable' -A6 ret… ✓ (4ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -rn 'overloaded' provider/an… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 12.2s (6 ✓)
+
+Confirmed live at 0.25.2. Updating both comments to past tense with the fact:
+  ╭─ Turn 65 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (13 lines) ✓ (20ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '0\.24\.2' src/agent_build… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=1235 && NR<=1250' src/for… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 6.6s (3 ✓)
+
+The display collapses repeated lines; let me use read_file.
+  ╭─ Turn 68 ────────────────────────────────────────────────────────────╮
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/format/cost/price_audit_tests.rs:1235..1251  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/agent_builder.rs:1328..1346 ✓ (0ms)
+ ✓ (1ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 2.4s (2 ✓)
+
+Line 1343's "which yoyo does not use yet" is now false. Checking whether yoyo adopts it:
+  ╭─ Turn 69 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'with_execution_limits' s… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (23ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6.1s (2 ✓)
+
+Both still true at 0.25.2 (no claude_sonnet_5_5/claude_haiku_5_5 constructor, no row in prices.json) — noting the recheck:
+  ╭─ Turn 71 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i '807s/yoagent 0.24.2 ships/… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'has no preset' src/agent_… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i '2138s/… (8 lines) ✓ (25ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7.3s (3 ✓)
+
+Now CHANGELOG, then the full verification suite.
+  ╭─ Turn 74 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,25p CHANGELOG.md ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Before writing the CHANGELOG line, check which bash the sub-agent child actually runs (the task asserts raw BashTool):
+  ╭─ Turn 75 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'BashTool::default\|BashTo… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1712,1730p src/tools.rs ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3.4s (2 ✓)
+
+Confirmed: sub-agent children wrap yoagent's raw BashTool. Any comment there claiming the old kill scope?
+  ╭─ Turn 77 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'orphan\|kills only\|only… ✓ (21ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 414,432p src/tools.rs ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3.5s (2 ✓)
+
+Consistent. CHANGELOG line:
+  ╭─ Turn 79 ────────────────────────────────────────────────────────────╮
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/CHANGELOG.md (2 → 3 lines)
+    ## [Unreleased]
+    
+  + - yoagent 0.24.2 → 0.25.2 (#1007). Sub-agent bash (yoagent's `BashTool`) now kills its whole process group on timeout or cancel, so pipeline stages and background jobs no longer keep running after the child gives up. On Unix the terminal's Ctrl+C no longer reaches a sub-agent's running command directly; it is stopped through the run's cancel instead. Model prices are now opt-in upstream, and yoyo turns on yoagent's bundled price table itself, so `/cost` reads the same preset prices as before.
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo build 2>&1 | ta… ✓ (2ms)
+    ## [Unreleased]
+    
+  + - yoagent 0.24.2 → 0.25.2 (#1007). Sub-agent bash (yoagent's `BashTool`) now kills its whole process group on timeout or cancel, so pipeline stages and background jobs no longer keep running after the child gives up. On Unix the terminal's Ctrl+C no longer reaches a sub-agent's running command directly; it is stopped through the run's cancel instead. Model prices are now opt-in upstream, and yoyo turns on yoagent's bundled price table itself, so `/cost` reads the same preset prices as before.
+ ✓ (2m 30s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test module_size 2>&1… ✓ (165ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 2m 39s (3 ✓)
+
+prompt.rs was already at the edge of its grace band (3892 vs 3792 recorded); my superseded note + two table rows pushed it past. Let me trim my prose first, then see where it lands.
+  ╭─ Turn 81 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (1.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 500,520p tests/module_size.… ✓ (5ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/module_size.rs:500..514 ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 9.2s (3 ✓)
+
+I'll record it in the register with the honest breakdown (I'm not attributing the earlier +100 to anything I haven't checked):
+  ╭─ Turn 84 ────────────────────────────────────────────────────────────╮
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/tests/module_size.rs (2 → 7 lines)
+        // `stream_leading_blank::filter_stdout`; the logic lives in its own module).
+  -     ("src/prompt.rs", 3792),
+  +     // Day 225 (#1007): 3792 -> 3906. +100 had accumulated unrecorded in the
+  +     // grace band since Day 215 (the file sat at exactly 3892, the band's edge);
+  +     // +14 is the yoagent 0.25.2 upgrade: two rate-limit rows pinning 0.25's new
+  +     // `Rate limited` Display shapes in the emission-point table, plus a 3-line
+  +     // superseded note. They belong in that table, so the entry is raised.
+  +     ("src/prompt.rs", 3906),
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo clippy --all-ta… ✓ (4m 10s)
+        // `stream_leading_blank::filter_stdout`; the logic lives in its own module).
+  -     ("src/prompt.rs", 3792),
+  +     // Day 225 (#1007): 3792 -> 3906. +100 had accumulated unrecorded in the
+  +     // grace band since Day 215 (the file sat at exactly 3892, the band's edge);
+  +     // +14 is the yoagent 0.25.2 upgrade: two rate-limit rows pinning 0.25's new
+  +     // `Rate limited` Display shapes in the emission-point table, plus a 3-line
+  +     // superseded note. They belong in that table, so the entry is raised.
+  +     ("src/prompt.rs", 3906),
+ ✓ (6m 49s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6m 53s (2 ✓)
+
+A real integration failure in print_stdout_contract — earlier runs stopped at the first failing binary, so this is the first time it ran on 0.25.2. Reading it:
+  ╭─ Turn 85 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test print_stdout_con… ✓ (1m 12s)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/print_stdout_contract.rs:930..990 ✓ (0ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'RetryConfig\|with_retry'… ✓ (13ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 28s (3 ✓)
+
+yoyo never sets yoagent's RetryConfig, so the default 3 inner retries apply. The Day-225 ProviderRetry tests already faced this for rate_limit_error on 0.24.2 — what did they decide?
+  ╭─ Turn 88 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=1575 && NR<=1720' tests/p… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=1652 && NR<=1680' tests/p… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'const PARTIAL_LINE' tests… ✓ (2m 38s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (65 lines) ✓ (1m 23s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test print_stdout_con… ✓ (1m 9s)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/print_stdout_contract.rs:1000..1016 ✓ (0ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; sed -n 255,272p provider/traits.r… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'low-tier plan' src --inc… ✓ (12ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/prompt_retry.rs:540..600 ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'overloaded\|Overloaded' s… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'diagnose_api_error(' src/… ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'diagnose_api_error' src/*… ✓ (14ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  12 tools completed in 6m 22s (12 ✓)
+
+prompt_retry.rs sits exactly at its register size, so I'll keep the production change small and put the tests in a sibling `_tests.rs` file, following the repo's pattern. How are those wired?
+  ╭─ Turn 100 ───────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn '#\[path = ".*_tests.rs"\… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'mod .*_tests;' src/*.rs … ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 38,43p src/main.rs; sed -n … ✓ (4ms)

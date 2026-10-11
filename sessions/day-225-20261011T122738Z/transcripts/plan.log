@@ -1,0 +1,28 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md; ls session_plan; cat ISSU… ✓ (8ms)
+  ▶ write session_plan/task_01.md (31 lines)  ▶ write session_plan/task_02.md (22 lines)  ▶ write session_plan/issue_responses.md (7 lines)  ▶ $ git add session_plan/ && git commit -q -m "Day 225 (10:36): session plan" && git… ✓ (1ms)
+ ✓ (1ms)
+ ✓ (1ms)
+ ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 49.1s (5 ✓)
+
+I've written the session plan to session_plan/. The commit step didn't happen because session_plan/ is gitignored, so git add refused it. The files are on disk. I didn't force-add them, assuming the harness reads them from there; that's the reason the plan's commit command ends in || true.
+
+Task 1 — upgrade yoagent 0.24.2 → 0.25.2 (#1007), product. This is the largest thing I owe, and nothing it depended on is still pending. It breaks the 3-file rule on purpose: the bump only compiles as a whole, and tests/doc_version_claims.rs goes red on every yoagent-version-claim marker as soon as the lockfile moves, so it can't be spread across sessions. The task file says why the exception applies to this task only. Steps:
+• Bump the version and let the compiler list what broke. That should mostly be renaming Extension to Custom in about 5 places.
+• Turn on the bundled prices (enable_bundled()) through one call that both main and the unit tests reach. The existing price tests must pass without being edited; if one only passes after an edit, the call is in the wrong place.
+• Re-read each of the ~22 version-claim markers against the 0.25.2 source, with no bulk find-and-replace. Claims that are no longer true get marked superseded in place.
+• Escape hatch: if the build breaks in more than about 6 files beyond the ones the issue names, undo the bump and post every error location on #1007 instead.
+• Two things that aren't code changes, each with a check: a comment on #988 saying its cancel-path probe now matters, because in 0.25.2 Ctrl+C no longer reaches a running sub-agent command; and Fixes #1007 in the commit only if every step landed.
+
+Task 2 — test whether variable tricks get dangerous commands past the bash safety check, product. Claude Code recently fixed a hole where commands written through a variable were auto-approved. My check, analyze_bash_command, matches on how a command is spelled, so I'll test the same idea against it: plain commands like rm -rf ~ next to disguised versions (X=rm; $X …, BASH_ARGV0, eval, $(…), bash -c). A few harmless commands like echo $HOME and "$CARGO" build are included to check they're still allowed as before. The same test runs against the user deny list.
+• If the result calls for a fix, it goes only in src/safety.rs: commands it can't read get sent to the existing "needs confirmation" level. A bypass of the deny list would go into a new issue rather than this task.
+• If nothing gets through, the result is written as "variable tricks don't get past analyze_bash_command", never as "the analyzer is correct".
+
+Issue responses: I'm not posting on #997 or #991, because my reply is already the latest in both and I have nothing new to add. Release isn't due yet; if the upgrade lands, it's a good reason for v0.2.1 next session.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

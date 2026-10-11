@@ -1,0 +1,67 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff --stat; git diff tests/pr… ✓ (41ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -rn -i "overloaded" --includ… ✓ (13ms)
+  ▶ edit tests/print_stdout_contract.rs (6 → 12 lines)
+  +     // Superseded claim (0.25.2 upgrade, Day 225, #1007), recorded rather than
+  +     // erased: this asserted stderr contains "Overloaded" — the provider's own
+  +     // message. yoagent 0.25.2 reclassifies the in-stream `overloaded_error`
+  +     // as `RateLimited`, which carries no message (yoagent CHANGELOG: "its
+  +     // text now reads 'Rate limited'"), so the server's text no longer reaches
+  +     // yoyo. The failure is still on stderr, under its new classification.
+        assert!(
+  -         run.stderr.contains("Overloaded"),
+  +         run.stderr.contains("Rate limited"),
+            "stderr carries the failure; stderr={}",
+            run.stderr
+        );
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn '"Overloaded"' tests/ src… ✓ (3m 9s)
+  +     // Superseded claim (0.25.2 upgrade, Day 225, #1007), recorded rather than
+  +     // erased: this asserted stderr contains "Overloaded" — the provider's own
+  +     // message. yoagent 0.25.2 reclassifies the in-stream `overloaded_error`
+  +     // as `RateLimited`, which carries no message (yoagent CHANGELOG: "its
+  +     // text now reads 'Rate limited'"), so the server's text no longer reaches
+  +     // yoyo. The failure is still on stderr, under its new classification.
+        assert!(
+  -         run.stderr.contains("Overloaded"),
+  ... (4 more lines)
+ ✗ (3m 9s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'contains("Overloaded")' … ✓ (10ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 3m 25s (5 ✓, 1 ✗)
+
+Those other two sites already fall back to "error", so they're unaffected. Now the full verification:
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo build 2>&1 | ta… ✓ (1m 15s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (2m 35s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3m 54s (2 ✓)
+
+All 19 test binaries pass, and nothing failed. (The exit 1 is just grep -v finding no non-ok lines.) Now lint and format:
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo clippy --all-targets -- -D w… ✓ (18.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The test failure is fixed. Build, the full test suite (19 test binaries, all passing), clippy with -D warnings, and the format check are all clean.
+
+Why it failed: the yoagent 0.25.2 upgrade changed this behaviour; yoyo's code is fine. The 0.25.2 CHANGELOG says an Anthropic in-stream overloaded_error is now treated as RateLimited. That error type carries no message, so it shows as "Rate limited". The test's last check looked for the provider's own word "Overloaded" in stderr, and that text never reaches yoyo now. The captured stderr confirms it: error: Rate limited and (failed after 6 attempts).
+
+Fix: one edit in tests/print_stdout_contract.rs. In opt_in_every_attempt_dying_after_text_terminates_nonzero_within_the_cap, the check now looks for "Rate limited" instead of "Overloaded". A comment above it records the old assertion as superseded (0.25.2 upgrade, Day 225, #1007) and cites the CHANGELOG entry.
+
+Something you should know: this means editing a test's expected text to match new behaviour. It's justified by yoagent's documented change, not by a guess. The test still checks the same three things it did before:
+• the run fails with a nonzero exit
+• yoyo's own retry cap is reported
+• stderr names the failure
+
+The provider's explanation text is lost, though. yoagent now logs it at WARN instead, so a user seeing this error gets "Rate limited" where they used to get "Overloaded". The other two "Overloaded" checks in the file (lines 788 and 793) also accept a generic "error", so I left them alone.
