@@ -1,0 +1,26 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && B=$(pwd)/target/debug/yoyo; ls -… ✓ (36ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && mkdir -p ses… (9 lines) ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 18.9s (2 ✓)
+
+Verdict: PASS, written to session_plan/eval_task_1.md.
+
+I ran the built binary in a scratch git repo, and all four cases give the results the task expected:
+
+| Command | Output | Exit |
+|---|---|---|
+| find main src | Refusal on stderr naming 'main' 'src' | 2 |
+| find "a b" | Lists dir sp/a b.rs | 0 |
+| bare find | Usage text | 2 |
+| find main | Lists main.rs, same as before | 0 |
+
+• Intent: the diff matches the task. It adds a pure helper find_pattern_from_argv that refuses two or more arguments and passes one through as typed. The find arm now uses it instead of the wrapper that added the literal quotes. Bare find now exits 2, like bare grep, and the REPL /find behaves as before.
+• **Tests:** they cover what the task asked for. There is a table test with full-string comparisons, a near-miss test showing a plain `main` comes back byte-identical, a test that control bytes in arguments are escaped in the refusal, and an integration test that runs the binary.
+• **Forgotten touchpoints:** none. The new helper is called in the same diff, and no enum variants or renames were added.
+• **Docs:** `ARCHITECTURE.md` records the change. One small gap to clean up: the exit-codes paragraph in `docs/src/usage/commands.md` doesn't mention the new exit 2 cases for find. Its closing line, "Other subcommands still exit 0", is now wrong for find. I noted this in the verdict as cleanup rather than failing it, because the task only asked for doc changes if the docs said something about extra arguments.
+  watch: no files changed this turn — skipping

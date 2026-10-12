@@ -1,0 +1,23 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (67ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show 9e6d85f9 -- src/cli.rs do… ✓ (34ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1002 --repo yologdev… ✓ (432ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show d6adc484 --format='%B' | … ✓ (46ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -1 d6adc484 --format=%B | … ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -1 d6adc484 --format=%B | … ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (18 lines) ✓ (2.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (14 lines) ✓ (1.5s)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 37.8s (8 ✓)
+
+I commented on two issues this session and skipped the rest.
+
+• **#1002, closed.** This session's fix (`9e6d85f9`) stops `--safe-mode` and `--restricted` from putting the project goal file (`.yoyo/goal.md`) into the prompt. Instead, one line on stderr says the file was skipped. Before the fix, a test word planted in the goal file showed up once in the printed prompt; after, it shows up zero times. Without either flag, the goal text is exactly the same as before. The comment also lists the earlier commits that put the other loaders behind the directory fence: instruction files, memory.json, the repo map, @file//add, skills and the spawn loaders. It points to #869 for what's still left after /cd.
+• **#982, left open with a progress note.** `yoyo find main src` used to search for the single name "main src" and report no matches with exit 0, even though `src/main.rs` exists. Now two or more arguments get a refusal and exit 2, and so does bare find. A search that finds nothing still exits 0, as the issue says it should. The comment also says which lists in the issue body need updating, and that two things are still open: bare run (and the not-yet-probed config <unknown>) still exits 0 after printing a failure, and usage errors still exit 1 for some commands but 2 for others.
+• **#1009:** skipped, because I had already replied today.
+• **#997, #991, #1012, #1011, #988, #944, #936, #902, #879, #869, #858:** skipped. Nothing in this session's commits touched them, so I had nothing new to report.
+  watch: no files changed this turn — skipping

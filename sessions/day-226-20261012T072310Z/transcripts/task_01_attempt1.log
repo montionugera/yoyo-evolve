@@ -1,0 +1,235 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (11ms)
+  ▶ $ pwd; sed -n 60,130p src/dispatch_sub.rs; sed -n 330,460p src/dispatch_sub.rs ✓ (6ms)
+  ▶ $ grep -n "fn handle_find_status" -A60 src/commands_search.rs | head -90; grep -n … ✓ (5ms)
+  ▶ $ grep -n "fn handle_def_status" -A15 src/commands_search.rs | head -20; cargo bui… ✓ (151ms)
+  ▶ $ B=$PWD/target/debug/yoyo; export NO_COLOR=1 (3 lines) ✓ (48ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 12.8s (5 ✓)
+
+Step 0 matches the assessment on all four readings. Let me look at the existing tests around the arm and integration spawn tests.
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ $ sed -n 1630,1665p src/dispatch_sub.rs; grep -ln '"find"' tests/*.rs; grep -n "SE… ✓ (9ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -ln 'CARGO_BIN_EXE_yoyo' tests/*.rs | head -30; grep -ln '"grep"\|"def"\|"o… ✓ (6ms)
+  ▶ $ grep -n '"grep"\|"def"\|"outline"' tests/integration.rs | head; grep -n "^fn yoy… ✓ (8ms)
+  ▶ $ sed -n 3370,3416p tests/integration.rs; grep -n "fn yoyo_in_dir" -A25 tests/inte… ✓ (7ms)
+  ▶ $ grep -rn "handle_find_status\|fn handle_find\b\|handle_find(" src/ | grep -v "^s… ✓ (13ms)
+  ▶ $ grep -n "find" docs/src/usage/commands.md README.md | grep -iv "finds\|finding\|…  ▶ $ grep -n "^Commands\|yoyo grep\|yoyo find\|find <" src/help_data.rs src/cli.rs | … ✓ (5ms)
+ ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 23.5s (7 ✓)
+
+Docs say find takes a pattern; nothing about extra args. Now the tests (unit table in dispatch_sub.rs, integration in tests/integration.rs).
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/dispatch_sub.rs (2 → 51 lines)
+  +     fn argv(v: &[&str]) -> Vec<String> {
+  +         v.iter().map(|s| s.to_string()).collect()
+  +     }
+  + 
+  +     #[test]
+  +     fn find_pattern_from_argv_table() {
+  +         // #982/#1009: one argv element reaches `/find` verbatim; zero is the
+  +         // handler's usage path (empty pattern); two or more is refused.
+  +         let ok_rows: [(&[&str], &str); 4] = [
+  +             (&[], ""),
+  +             (&["main"], "main"),
+  +             (&["a b"], "a b"),
+  +             (&["say \"hi\""], "say \"hi\""),
+  +         ];
+  +         for (input, want) in ok_rows {
+  +             assert_eq!(
+  +                 find_pattern_from_argv(&argv(input)),
+  +                 Ok(want.to_string()),
+  +                 "input {input:?}"
+  +             );
+  ... (31 more lines)
+  ▶ $ cat >> tests/integration.rs <<'EOF' (44 lines) ✓ (17.6s)
+  +     fn argv(v: &[&str]) -> Vec<String> {
+  +         v.iter().map(|s| s.to_string()).collect()
+  +     }
+  + 
+  +     #[test]
+  +     fn find_pattern_from_argv_table() {
+  +         // #982/#1009: one argv element reaches `/find` verbatim; zero is the
+  +         // handler's usage path (empty pattern); two or more is refused.
+  ... (13 more lines)
+ ✓ (17.6s)
+  2 tools completed in 18.8s (2 ✓)
+
+Expected red. Now the helper, the arm, and the handler's bare-usage status.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/dispatch_sub.rs (1 → 30 lines)
+  + /// The `/find` pattern for `yoyo find <argv…>` (#982, #1009), from the
+  + /// elements after `find`. `/find` takes ONE pattern and has no path argument,
+  + /// so one element is returned verbatim (no `quote_args_as_command` wrapping:
+  + /// that sent `"a b"` with its quotes to the matcher), zero is the empty pattern
+  + /// the handler answers with usage (exit 2), and two or more is refused rather
+  + /// than folded into one pattern (`find main src` used to search `main src`
+  + /// and report a false "No files matching" with exit 0). Shell door only:
+  + /// a REPL `/find a b` is one string and a spaced pattern is legal there.
+  + pub(crate) fn find_pattern_from_argv(rest: &[String]) -> Result<String, String> {
+  +     match rest {
+  +         [] => Ok(String::new()),
+  +         [one] => Ok(one.clone()),
+  +         many => {
+  +             let shown: Vec<String> = many
+  +                 .iter()
+  +                 .map(|a| format!("'{}'", crate::cli::sanitize_for_display(a)))
+  +                 .collect();
+  +             let joined = crate::cli::sanitize_for_display(&many.join(" "));
+  +             Err(format!(
+  +                 "  find takes ONE pattern and has no path argument; got {} arguments: {}.\n  \
+  ... (10 more lines)
+  ▶ edit src/dispatch_sub.rs (4 → 13 lines)
+                "find" => {
+  -                 let input = quote_args_as_command(args);
+  -                 // #982: 1 when a directory could not be read (find(1)'s code).
+  +                 // #1009: argv verbatim, not `quote_args_as_command`. #982: 2 for
+  +                 // extra args or no pattern, 1 when a directory could not be read
+  +                 // (find(1)'s code); no match stays 0.
+  +                 let pattern = match find_pattern_from_argv(&args[2..]) {
+  +                     Ok(p) => p,
+  +                     Err(refusal) => {
+  +                         eprintln!("{refusal}");
+  +                         std::process::exit(crate::commands_search::SEARCH_USAGE_EXIT);
+  +                     }
+  +                 };
+  +                 let input = format!("/find {pattern}");
+                    exit_if_nonzero(crate::commands_search::handle_find_status(&input));
+  ▶ edit src/commands_search.rs (2 → 4 lines)
+            println!("  Examples: /find main, /find .toml, /find test{RESET}\n");
+  -         return 0;
+  +         // #982: a usage error, as bare `grep`/`def`/`outline`; the REPL
+  +         // (`handle_find`) discards the status.
+  +         return SEARCH_USAGE_EXIT;
+ ✓ (17.0s)
+  + /// The `/find` pattern for `yoyo find <argv…>` (#982, #1009), from the
+  + /// elements after `find`. `/find` takes ONE pattern and has no path argument,
+  + /// so one element is returned verbatim (no `quote_args_as_command` wrapping:
+  + /// that sent `"a b"` with its quotes to the matcher), zero is the empty pattern
+  + /// the handler answers with usage (exit 2), and two or more is refused rather
+  + /// than folded into one pattern (`find main src` used to search `main src`
+  + /// and report a false "No files matching" with exit 0). Shell door only:
+  + /// a REPL `/find a b` is one string and a spaced pattern is legal there.
+  ... (13 more lines)
+ ✓ (34.0s)
+                "find" => {
+  -                 let input = quote_args_as_command(args);
+  -                 // #982: 1 when a directory could not be read (find(1)'s code).
+  +                 // #1009: argv verbatim, not `quote_args_as_command`. #982: 2 for
+  +                 // extra args or no pattern, 1 when a directory could not be read
+  +                 // (find(1)'s code); no match stays 0.
+  +                 let pattern = match find_pattern_from_argv(&args[2..]) {
+  +                     Ok(p) => p,
+  ... (7 more lines)
+ ✓ (50.5s)
+            println!("  Examples: /find main, /find .toml, /find test{RESET}\n");
+  -         return 0;
+  +         // #982: a usage error, as bare `grep`/`def`/`outline`; the REPL
+  +         // (`handle_find`) discards the status.
+  +         return SEARCH_USAGE_EXIT;
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 52.4s (3 ✓)
+
+The helper edit landed but isn't visible — let me check where it went.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "fn find_pattern_from_argv\|Exit status for .yoyo risk" src/*.rs src/**/… ✓ (18ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The helper insert didn't persist (odd — the tool reported success). Re-applying it.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ sed -n 80,90p src/dispatch_sub.rs; git diff --stat ✓ (10ms)
+  ▶ $ python3 - <<'EOF' (39 lines) ✓ (12.3s)
+  ▶ $ cargo test find_pattern 2>&1 | grep -E "test |result" ; cargo test --test integr… ✓ (29.2s)
+  ▶ $ cargo test find_pattern 2>&1 | grep -E "^test .*(FAIL|ok)|test result" | grep -v… ✓ (157ms)
+  4 tools completed in 51.2s (4 ✓)
+
+Green. Now the positive control, as one atomic mutate→run→restore command with a NEUTERED marker:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/dispatch_sub.rs /tmp/ds.bak && python3 - <<'EOF' (8 lines) ✓ (1m 2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control reddened exactly the 2+ tests by name (the near-miss stayed green). After restoring: green, and no marker left. Now the after-readings with the same commands as step 0:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ B=$PWD/target/debug/yoyo; export NO_COLOR=1 (3 lines) ✓ (39ms)
+
+All four expected readings match. Full gate:
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cargo fmt -- --check && cargo clippy --all-targets -- -D warnings 2>&1 | tail -2… ✓ (3m 24s)
+  ▶ $ cargo test 2>&1 | grep -E "test result" | grep -vc "0 failed"; cargo test 2>&1 |… ✓ (5m 55s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -n "dispatch_sub" ARCHITECTURE.md | head -5 ✓ (7ms)
+  ▶ $ grep -n "^- \`dispatch_sub.rs\`" ARCHITECTURE.md | cut -c1-200; awk 'NR==FNR{} /… ✓ (8ms)
+  ▶ $ python3 - <<'EOF' (9 lines) ✓ (53ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 9m 33s (5 ✓)
+
+ARCHITECTURE.md is read by some tests, so I'll run the suite once more and then commit.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cargo test 2>&1 | grep -E "test result" | grep -vc " 0 faile… (23 lines) ✓ (2m 54s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Committed. Before I post the residue on #982, I'll check its claim ("bare blame/run/docs still exit 0") against the binary:
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ B=$PWD/target/debug/yoyo; export NO_COLOR=1; T=$(mktemp -d); cd $T; git init -q;… ✓ (153ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1009 --json state,ti… ✓ (732ms)
+  2 tools completed in 3.5s (2 ✓)
+
+Confirmed: bare blame/run/docs still exit 0, and both issues are open. Posting the two comments:
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve (31 lines) ✓ (3.5s)
+
+yoyo find now refuses extra arguments with exit 2 instead of silently folding them into the pattern. A single argument containing a space now reaches the search as-is, with no literal quotes added. It's committed as d6adc484 and goes out with this session's push. Formatting, clippy, build and the full test suite all pass.
+
+I ran the recorded commands with the built binary before and after the change. The "before" readings matched the assessment on all four:
+
+| command | before | after |
+|---|---|---|
+| find main src (in this repo) | No files matching 'main src'., exit 0 | error on stderr naming 'main' 'src' and showing how to quote a spaced name, exit 2 |
+| find zz9 /nonexistent_dir | false "no files" message, exit 0 | same error, exit 2 |
+| find "a b" (with dir sp/a b.rs present) | No files matching '"a b"'., exit 0 | finds dir sp/a b.rs, exit 0 |
+| bare find | usage, exit 0 | same usage text, exit 2 |
+| find main, and a search with no match | exit 0 | unchanged |
+
+What changed:
+• **src/dispatch_sub.rs:** the `find` arm no longer uses `quote_args_as_command`. A new helper, `find_pattern_from_argv`, passes one argument through unchanged, refuses two or more, and treats no arguments as "show usage".
+• **`src/commands_search.rs:** bare usage now returns exit 2, the same way bare grep` does.
+• **Where I departed from the plan:** it said the helper's error for zero arguments should carry the usage text. I left the usage text in the handler instead, so there is only one copy of it. The interactive /find throws away the exit code, so it behaves exactly as before.
+• Tests:
+  • A table test of the helper (0, 1, a spaced argument, an argument with an embedded ", 2 and 3 arguments).
+  • A check that a single plain argument comes back unchanged.
+  • A check that control characters in arguments are escaped in the error.
+  • An end-to-end test in tests/integration.rs, find_refuses_extra_args_and_passes_one_spaced_arg_verbatim.
+• **Test check:** I disabled the two-or-more branch (marked `NEUTERED`) and re-ran, all in one command. The two unit tests and the end-to-end test failed by name and the plain-argument check stayed green. After restoring, everything passed and no marker was left.
+• **ARCHITECTURE.md:** a short note on the change.
+
+One oddity: my first edit adding the helper reported success but wasn't in the file. I added it again and checked with grep before building.
+
+Not done (also listed in the commit message): a real path argument for /find, the other #1009 commands, the interactive /find, and no-match results (still exit 0 by design).
+
+I posted a before/after comment on #1009 and on #982, and gh issue view 1009 --comments shows it. Both comments list what's still left. For #1009, nine other commands still go through quote_args_as_command. For #982, I re-ran bare blame, run and docs today and they still exit 0.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/2 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 1/2 (50.0%) — reactive was 0.0%
+     Surprises (not predicted): src/dispatch_sub.rs, src/commands_search.rs

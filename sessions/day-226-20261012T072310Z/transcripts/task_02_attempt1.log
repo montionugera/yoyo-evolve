@@ -1,0 +1,155 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (20ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2620,2770p src/cli.rs ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn goal_for_prompt\|fn lo… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 55,230p src/commands_goal.r… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 185,200p src/commands_goal.… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "safe_mode" src --include… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1220,1240p src/main.rs; sed… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '"--print-system-prompt"' … ✓ (10.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "goal_for_prompt\b\|goal_… ✓ (14ms)
+  ▶ edit src/commands_goal.rs (1 → 51 lines)
+  + /// The goal's section of the system prompt, ready to append (#1002, safe-mode).
+  + ///
+  + /// `--safe-mode` (and `--restricted`, which implies it) skips the goal file the
+  + /// way it already skips CLAUDE.md/YOYO.md and `.yoyo/memory.json`: a cloned repo
+  + /// can ship `.yoyo/goal.md`, and that text reaches the prompt exactly like
+  + /// project instructions do. It is skipped **out loud** — one stderr note when the
+  + /// file exists — so a user who set a goal is not silently left without it. No
+  + /// goal file means no note. Without safe mode the block is byte-identical to the
+  + /// one `cli.rs` used to assemble inline. `/goal check` is untouched: it is
+  + /// trust-gated separately (#761).
+  + pub fn goal_block_for_prompt(
+  +     restrictions: &crate::config::DirectoryRestrictions,
+  +     safe_mode: bool,
+  + ) -> Option<String> {
+  +     if safe_mode {
+  +         if let Some(note) = goal_safe_mode_note(&goal_base(), crate::format::is_plain_output()) {
+  +             eprintln!("{YELLOW}{note}{RESET}");
+  +         }
+  +         return None;
+  +     }
+  ... (31 more lines)
+  ▶ edit src/cli.rs (6 → 6 lines)
+  -     if let Some(goal) = crate::commands_goal::goal_for_prompt(&dir_restrictions) {
+  -         system_prompt.push_str("\n\n# Current Goal\n\n");
+  -         system_prompt.push_str(&goal);
+  -         system_prompt
+  -             .push_str("\n\n(Set via /goal set. The user is working toward this. Keep it in mind.)");
+  +     // Skipped under --safe-mode like the instruction files and memory.json
+  +     // (#1002), with a stderr note when a goal file exists.
+  +     if let Some(block) = crate::commands_goal::goal_block_for_prompt(&dir_restrictions, safe_mode)
+  +     {
+  +         system_prompt.push_str(&block);
+        }
+ ✓ (3m 55s)
+  + /// The goal's section of the system prompt, ready to append (#1002, safe-mode).
+  + ///
+  + /// `--safe-mode` (and `--restricted`, which implies it) skips the goal file the
+  + /// way it already skips CLAUDE.md/YOYO.md and `.yoyo/memory.json`: a cloned repo
+  + /// can ship `.yoyo/goal.md`, and that text reaches the prompt exactly like
+  + /// project instructions do. It is skipped **out loud** — one stderr note when the
+  + /// file exists — so a user who set a goal is not silently left without it. No
+  + /// goal file means no note. Without safe mode the block is byte-identical to the
+  ... (13 more lines)
+ ✓ (6m 59s)
+  -     if let Some(goal) = crate::commands_goal::goal_for_prompt(&dir_restrictions) {
+  -         system_prompt.push_str("\n\n# Current Goal\n\n");
+  -         system_prompt.push_str(&goal);
+  -         system_prompt
+  -             .push_str("\n\n(Set via /goal set. The user is working toward this. Keep it in mind.)");
+  +     // Skipped under --safe-mode like the instruction files and memory.json
+  +     // (#1002), with a stderr note when a goal file exists.
+  +     if let Some(block) = crate::commands_goal::goal_block_for_prompt(&dir_restrictions, safe_mode)
+  ... (3 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "mod fence_tests" -A12 src… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (83 lines) ✓ (29.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  13 tools completed in 8m 34s (13 ✓)
+
+Now the positive control — atomic mutate → run → restore:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/commands_goal.rs /tmp/cg.ba… ✓ (57.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo commands_goa… ✓ (10.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 14s (2 ✓)
+
+Readings after the fix: --safe-mode 0 + note, --restricted 0 + note, no flag 1 (unchanged), no goal file → silent. Now docs.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rln "safe-mode" docs/src REA… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "safe-mode" docs/src/confi… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,30p docs/src/troubleshoot… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 249,258p src/help.rs ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (36 lines) ✓ (22ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 14.3s (5 ✓)
+
+Let me verify the memory.json claim I just wrote into docs rather than trust the issue comment:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "struct MemoryEntry" -A8 s… ✓ (24ms)
+  ▶ $ cd /tmp/tmp.WAwuMdzrIx/proj; ANTHROPIC_API_KEY=x /home/runner/work/yoyo-evolve/y… ✓ (14ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn memory_file_path" -A6 … ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 415,440p src/context.rs; gr… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 6.8s (4 ✓)
+
+My fixture used the wrong key (memories vs entries). Fixing the fixture:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp/tmp.WAwuMdzrIx/proj; echo '{"entries":[{"note":"MEMTOKEN_55","timestamp"… ✓ (23ms)
+
+Docs claim confirmed (memory and CLAUDE.md: 0 under --safe-mode, present without). Now the full gate and the issue's latest comment:
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo clippy --all-ta…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1002 --comments 2>&1… ✓ (1.1s)
+ ✓ (6m 49s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --s… (13 lines) ✓ (24ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7m 4s (3 ✓)
+
+--safe-mode (and --restricted, which turns it on) now keeps .yoyo/goal.md out of the system prompt and prints one line on stderr saying so. Committed as 9e6d85f9 with Fixes #1002. fmt, clippy with -D warnings, build and the full test suite all pass.
+
+Before and after, using a test project whose .yoyo/goal.md holds a unique token, checked with --print-system-prompt:
+
+| run | before | after |
+|---|---|---|
+| --safe-mode | 1 hit | 0, plus the stderr note |
+| --restricted | not measured before the fix | 0, plus the stderr note |
+| no flag | 1 | 1 (the goal section is unchanged byte for byte) |
+| no goal file | — | no note, in either mode |
+
+The note reads: ⚠ goal file .yoyo/goal.md not loaded into the prompt — --safe-mode skips project-authored text (/goal show still reads it). With plain output it uses no special symbols.
+
+What changed:
+• **Code:** a new `goal_block_for_prompt(restrictions, safe_mode)` in `src/commands_goal.rs` now builds the goal section of the prompt. `src/cli.rs` passes `safe_mode` to it instead of assembling the section inline.
+• Tests:
+  • With safe mode on, the goal section is dropped. A guard in the same test first confirms the file does load without safe mode, so the test can't pass on an empty fixture.
+  • With safe mode off, the section is pinned with a full-string assert_eq!.
+  • The note names both the file and the flag.
+  • No goal file means no note.
+• **Sabotage check:** I disabled the safe-mode branch with a `NEUTERED` marker and restored it in one command. Exactly `safe_mode_drops_the_goal_block` failed, by name; after the restore all 62 goal tests pass and no marker is left.
+• Docs: `troubleshooting/common-issues.md and troubleshooting/safety.md now list the instruction files, memory.json and the goal file as skipped. Before writing that, I checked that memory.json and CLAUDE.md really give 0 hits under --safe-mode. My first memory test was invalid because I used the wrong JSON key (memories instead of entries`); with the correct key, the note shows up without the flag and is gone with it.
+
+Left alone on purpose:
+• `/goal check` is unchanged because it is already gated by project trust (#761). The commit says so.
+• `/doctor` still lists fenced skill directories on the terminal. That output never goes to the model, so it isn't residue.
+• The repository-structure map is still added to the prompt under --safe-mode. That is outside this task, and I didn't touch it.
+• The `--safe-mode line in --help` doesn't mention the goal file. That line is broader wording I didn't change.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/2 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/2 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/commands_goal.rs, src/cli.rs
