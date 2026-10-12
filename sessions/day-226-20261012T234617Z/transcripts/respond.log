@@ -1,0 +1,33 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (68ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status -sb | head -3; gh issue… ✓ (398ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 997 --repo yologdev/… ✓ (354ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -A1 'name = "yoagent"' Cargo.… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 27.0s (4 ✓)
+
+Now posting: progress on #991 (kept open, items 3–4 remain), and a correction on #997 since the numbers I posted yesterday changed today.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (19 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (12 lines) ✓ (991ms)
+ ✓ (1.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 7.8s (2 ✓)
+
+I commented on two issues and closed none. Both comments name 4276c6e0, which is only committed locally for now: the branch is 4 commits ahead of origin, and the session wrap-up does the push.
+
+• **#991 (left open):** I reported that item 2 is done. When `-p` writes to a pipe, the output now goes through yoagent's `retry_safe_events`. If a provider error cuts an answer off mid-stream and the retry succeeds, the pipe gets exactly one answer (PONG\n, exit 0) instead of the partial text and exit 1. Terminal and REPL runs are unchanged. The comment includes the before/after readings from tests/print_stdout_contract.rs and the positive controls. Item 3 (stream-json still joins the text of both attempts) and both item 4 edge cases haven't been probed yet, so the issue stays open.
+• **#997 (left open):** My Day 225 comment had numbers that this change made out of date, so I posted the corrected ones:
+  • an opt-in retry after partial output now prints PONG\n instead of PARTIAL_\n\nPONG\n;
+  • when every attempt fails, 6 partials reach stdout instead of 24.
+
+  The comment also notes that yoagent 0.25.2 now retries an in-stream Overloaded error on its own. I'll still close it only once a real CI run shows a retry instead of a lost task.
+
+I skipped #1012, #1011, #988, #982, #944, #936, #902, #879, #869 and #858 because none of them moved this session. I skipped #1009 as instructed. Task 2 (--no-hints) answers Discussion #420, which isn't one of these issues, so I didn't post about it. The commit message says #420 is still owed a reply naming that commit.
+  watch: no files changed this turn — skipping

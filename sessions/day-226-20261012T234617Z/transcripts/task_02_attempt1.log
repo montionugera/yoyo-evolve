@@ -1,0 +1,78 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --short | head; grep -n… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 40,65p src/cli.rs; sed -n 2… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn config_flag" -B5 -A30 … ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1340,1400p src/config.rs; s… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "unknown.*key\|KNOWN_KEYS… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,80p src/commands_config_g… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "retry_after_partial" --i… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn '"--continue-on-silence"\… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 695,705p src/cli.rs; sed -n… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1055,1070p src/config.rs; s… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1680,1740p src/help.rs ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (173 lines) ✓ (38ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2470,2520p src/format/mod.r… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -i "hint\|tip" docs/src/us… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "no_bell\|continue_on_sile… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 196,206p docs/src/usage/rep… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (16 lines) ✓ (20.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1036,1090p src/format/mod.r… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  18 tools completed in 1m 35s (18 ✓)
+
+Examples are accurate. Now the full test suite.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (2m 12s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test module_size 2>&1… ✓ (184ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff src/cli.rs src/config.rs … ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (27 lines) ✓ (1.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo clippy --all-targets -- -D w… ✓ (3m 55s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (3m 21s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test hints 2>&1 | grep -E "h… ✓ (464ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 9m 58s (7 ✓)
+
+Positive control (atomic mutate → run → restore):
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/config.rs /tmp/config.bak &… ✓ (1m 1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Restored and green. Committing (via -F so the backticks in the title aren't shell-substituted):
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/msg… (29 lines) ✓ (26ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show --stat HEAD | tail -9 ✓ (13ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 11.2s (2 ✓)
+
+I built the off switch I promised in Discussion #420 on Day 84, and committed it as 1780f826. Build, all tests (6495 passed, 0 failed), clippy with -D warnings and the fmt check all pass.
+
+What changed
+• **The switch:** `--no-hints` on the command line or `hints = false` in `.yoyo.toml` turns off the dim tip printed after a REPL turn. If either one says off, hints are off. There is no --hints to force them back on.
+• **Default unchanged:** with neither set, hints still show, and an invalid value like hints = maybe also leaves them on. A test pins both.
+• **Where the gate is:** src/repl.rs skips the hint print when the switch is set. I didn't change contextual_hint itself.
+• Project config: a project .yoyo.toml with hints = false is honoured without the trust check, because turning a nudge off grants nothing. There's a test for this using the real config parser, and a comment saying why.
+• **`yoyo config get hints:** now answers "not set in config file (using default)" with exit 0, instead of saying hints` isn't a config key.
+• **Docs:** `--help`, `docs/src/usage/repl.md` and the sample config in `docs/src/getting-started/installation.md` now document it. They also say it doesn't affect the dimmed suggestions you see while typing a slash command.
+
+Beyond the task's file list: I also edited src/config.rs (the config parser, the list of settable keys and the true/false check), src/help.rs (that's where the --help text lives, not cli.rs) and the installation doc. The task's own steps needed these.
+
+Checks
+• I ran a sabotage test: forcing the config parser to always say "hints on" made both config tests fail. I put the code back in the same command and they passed again.
+• The one-line gate in src/repl.rs has no test of its own, because it sits inside the interactive loop.
+• The file-size test was failing at first because cli.rs and config.rs had grown too much. I shortened my comments instead of raising the recorded limits. cli.rs is now 100 lines over its limit, which is the maximum the test allows, so the next addition to that file will fail it.
+
+The commit body includes "Discussion #420: owed a reply naming this commit", so the social session can post the reply in @barneysspeedshop's thread. That reply hasn't been posted yet.
+  watch: no files changed this turn — skipping

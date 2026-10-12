@@ -1,0 +1,103 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~ 2>/dev/null; cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --sho… ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=~/.cargo/registry/src/*/yoagent-…  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/prompt/retry_after_partial.rs ✓ (1ms)
+ ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=$(echo ~/.cargo/registry/src/*/y… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=$(echo ~/.cargo/registry/src/*/y… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 960,1030p src/prompt.rs; gr… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 280,345p src/prompt.rs; sed… ✓ (7ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/prompt.rs:1080..1190 ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l tests/print_stdout_contract.… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^fn \|^async fn \|#\[test… ✓ (4ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/print_stdout_contract.rs:1440..1740 ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1785,1800p tests/print_stdo… ✓ (6ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; grep -rn "StopReason::Aborted" --… ✓ (6ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/src; sed -n 700,735p agent_loop.rs; se… ✓ (7ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/print_stdout_contract.rs:650..1000 ✓ (2ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/print_stdout_contract.rs:748..948 ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "MessageUpdate {" -A8 ~/.c… ✓ (25ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; F=$(echo ~/.ca… (5 lines) ✓ (22ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/src/prompt/retry_safe_pipe.rs (331 lines) ✓ (1m 38s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (44 lines) ✓ (11.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -3; cargo … ✓ (233ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo retry_safe_p… ✓ (17.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "ProviderRetry {" src | g… ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; T=$(echo ~/.cargo/registry/src/*/y… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (24 lines) ✓ (30.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 900 cargo test --test prin… ✓ (1m 56s)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/tests/print_stdout_contract.rs:1800..1875 ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "start_stall_stub\|run_yoy… ✓ (8ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  28 tools completed in 8m 1s (28 ✓)
+
+Now edit the SIGINT harness: the stub reports when it has flushed the partial, and the run waits for that plus a grace period.
+  ╭─ Turn 28 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (89 lines) ✓ (28ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (68 lines) ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (133 lines) ✓ (26ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 900 cargo test --test prin… ✓ (1m 19s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/prompt.rs /tmp/prompt.bak; … ✓ (5.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's/RetrySafeGate::new(retry… ✓ (5.0s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 2m 20s (6 ✓)
+
+The comment ate the semicolon; redo the control with the marker placed safely.
+  ╭─ Turn 34 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's/RetrySafeGate::new(retry… ✓ (11.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 -c " (4 lines) ✓ (12.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -i "partial\|retry" docs/s… ✓ (8ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 32.4s (3 ✓)
+
+Now update docs: retry_after_partial.rs doc comment, piped-mode.md, ARCHITECTURE.md.
+  ╭─ Turn 37 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (45 lines) ✓ (57ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (20 lines) ✓ (20.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 1500 cargo test 2>&1 | gre… ✓ (3m 35s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 1500 cargo test 2>&1 | gre… ✓ (3m 8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/msg… (42 lines) ✓ (54ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show --sta… (16 lines) ✓ (1.7s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 7m 41s (6 ✓)
+
+When yoyo -p writes to a pipe and the provider retries after text has already streamed, the retry now goes through: stdout gets the answer once and the exit code is 0. It's committed as 4276c6e0. Build, the full cargo test run, clippy with -D warnings, fmt check and tests/harness_logic.sh all pass.
+
+What changed: on a single-shot run (-p, or piped stdin without --print) where stdout is a pipe, yoyo now reads the agent's events through yoagent's RetrySafeEvents filter. The new file is src/prompt/retry_safe_pipe.rs. The terminal, the REPL, --print/json and stream-json don't use the filter, so they behave exactly as before.
+
+One thing I had to add: the filter holds each attempt's text until the attempt ends, and a final failure arrives without its text. On its own that would have lost the partial answer in two cases where yoyo keeps it today: a turn whose last attempt fails, and Ctrl+C (#993). So the gate keeps a copy of the current attempt's text and gives it back in both places. Turning the Ctrl+C part off makes the SIGINT test fail with empty stdout, which confirms it is needed.
+
+The old abort: handle_provider_retry's abort can't be reached on the filtered path, but I didn't remove it. It still runs on a terminal and in the REPL with stdout piped.
+
+| Case (plain -p to a pipe, assert_eq! on stdout bytes) | Before | After |
+|---|---|---|
+| Partial text, then rate_limit_error, then success | "PARTIAL_\n", exit 1, 1 request | "PONG\n", exit 0, 2 requests |
+| Retry before any text | "PONG\n", exit 0 | same; this test already passed before the change |
+| Every attempt dies after text (new test) | "PARTIAL_\n", exit 1, 1 request | "PARTIAL_\n", exit 1, 4 requests |
+
+The stub errors are rate_limit_error and a cut-off stream, because those map to the two error types yoagent's is_retryable retries.
+
+Costs:
+• **Slower output on a pipe:** text now arrives once per message instead of token by token.
+• **More requests when everything fails:** if every attempt fails, yoagent's three retries now run silently before the run gives up. That means 4 requests instead of 1 and some backoff time.
+
+Tests whose expectations changed: 7 existing tests in tests/print_stdout_contract.rs pinned the old behaviour. I updated their expectations rather than deleting them and recorded the old readings next to each. They are the two #989 tests, two of the three opt-in retry tests (the third, retry before text, was unchanged), both opt-in "every attempt dies" tests (24 partials → 6) and armed_doors_keep_streamed_partial… (1 request → 4). The SIGINT harness also had to change. It used to wait for text on stdout, which is now held until the signal arrives. It now waits for the stub to report that it has sent the text, then waits 1.5 seconds. That fixed delay could make it flaky on a heavily loaded CI machine.
+
+Positive controls, run one at a time and restored (no NEUTERED markers left):
+• Turning the filter off makes 3 yoagent_retry_* tests fail by name, while the retry-before-text test stays green.
+• Removing the Ctrl+C flush makes the SIGINT test fail ("" instead of the partial).
+
+I updated the doc comment in src/prompt/retry_after_partial.rs to the present tense, naming the call site. docs/src/usage/piped-mode.md and ARCHITECTURE.md are updated too. I commented on #991 with what landed. Items 3 (stream-json collected_text) and 4 (the two edge cases) are still open there.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
