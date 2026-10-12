@@ -814,9 +814,16 @@ fn armed_doors_keep_streamed_partial_answer_when_turn_dies_mid_stream() {
             "[{door}] #976: exactly one copy of the partial; stderr={}",
             run.stderr
         );
+        // #991 (Day 226): the in-stream `overloaded_error` is a
+        // yoagent-retried `RateLimited` (0.24.3+), and behind
+        // `retry_safe_events` those 3 retries print nothing, so they are now
+        // let through: 1 + 3 requests. Only the FINAL failure's partial
+        // reaches the pipe, and yoyo's own loop still refuses to retry it.
+        // Superseded expectation, recorded rather than erased: 1 request
+        // (Day 216-226), when yoyo aborted yoagent's first retry.
         assert_eq!(
-            run.requests, 1,
-            "[{door}] #976: no retry after streamed text"
+            run.requests, 4,
+            "[{door}] #991: yoagent's silent retries, then no yoyo retry after streamed text"
         );
         assert!(
             run.stderr
@@ -929,11 +936,15 @@ fn opt_in_retries_after_streamed_partial_and_succeeds() {
         "#997: the retry succeeded, so exit 0; stderr={}",
         run.stderr
     );
+    // #991 (Day 226): the in-stream `overloaded_error` is a yoagent-retried
+    // `RateLimited` since 0.24.3, so this death is now retried INSIDE yoagent,
+    // behind `retry_safe_events`: the partial never reaches the pipe.
+    // Superseded expectation, recorded rather than erased: Day 225 pinned
+    // "PARTIAL_ANSWER_7Q\n\n\nPONG\n" (partial once, separator, answer).
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
-        "PARTIAL_ANSWER_7Q\n\n\nPONG\n",
-        "#997: the partial once (already in the pipe), the retry path's existing blank-line \
-         separator, then the answer; stderr={}",
+        OPT_IN_ANSWER,
+        "#991: only the successful attempt reaches the pipe; stderr={}",
         run.stderr
     );
     assert!(
@@ -978,6 +989,9 @@ fn opt_in_death_before_text_still_yields_exactly_the_answer() {
 /// worst case `opt_in_provider_retry_every_attempt_dying_still_exits_nonzero`
 /// already pins for `rate_limit_error`, as `retry_after_partial.rs` predicted.
 /// Opt-in only: with the default (off) the #989 rows above stay at 1 request.
+/// (Superseded Day 226, #991: the default rows now take 4 requests — yoagent's
+/// retries are held by `retry_safe_events` and let through — and this row
+/// carries 6 partials, one per yoyo attempt, not 24.)
 #[test]
 fn opt_in_every_attempt_dying_after_text_terminates_nonzero_within_the_cap() {
     let run = run_opt_in(vec![sse_dies_mid_stream_body_with(PARTIAL_LINE)]);
@@ -991,10 +1005,14 @@ fn opt_in_every_attempt_dying_after_text_terminates_nonzero_within_the_cap() {
         "bounded: 4 yoagent attempts x 6 yoyo attempts; stderr={}",
         run.stderr
     );
+    // #991 (Day 226): one partial per YOYO attempt (6), not per request (24,
+    // Day 225's reading, superseded rather than erased): yoagent's own retries
+    // are held and dropped by `retry_safe_events`; each final failure keeps
+    // its partial once.
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
-        [PARTIAL_LINE; 24].join("\n\n"),
-        "the cost of the opt-in at its worst: one partial per request; stderr={}",
+        [PARTIAL_LINE; 6].join("\n\n"),
+        "the cost of the opt-in at its worst: one partial per yoyo attempt; stderr={}",
         run.stderr
     );
     assert!(
@@ -1529,6 +1547,7 @@ fn yoagent_retry_after_429_before_text_yields_one_clean_answer() {
 /// Partial text, then a mid-stream `rate_limit_error` SSE event: yoagent
 /// retries (RateLimited) after `PARTIAL_` already streamed (risk B).
 /// Measured Day 218: stdout="PARTIAL_\n\nPONG\n", exit 0, requests=2.
+/// #991 (Day 226): this IS the case #991 changes; see `assert_partial_retry_reading`.
 #[test]
 fn yoagent_retry_after_partial_rate_limit_does_not_duplicate_stdout() {
     let first = sse_partial_then(
@@ -1547,6 +1566,8 @@ fn yoagent_retry_after_partial_rate_limit_does_not_duplicate_stdout() {
 /// Partial text, then the connection closes with no terminator: yoagent reads
 /// `StreamEnded` as `Network` and retries (risk B, second spelling).
 /// Measured Day 218: stdout="PARTIAL_\n\nPONG\n", exit 0, requests=2.
+/// (`Network` is in yoagent 0.25.2's `is_retryable`, retry.rs:70, like
+/// `RateLimited`; that is why both spellings reach yoagent's retry.)
 #[test]
 fn yoagent_retry_after_truncated_stream_does_not_duplicate_stdout() {
     let first = sse_partial_then("PARTIAL_", None);
@@ -1555,22 +1576,72 @@ fn yoagent_retry_after_truncated_stream_does_not_duplicate_stdout() {
     assert_partial_retry_reading(&run);
 }
 
+/// #991, the third row of the task: EVERY attempt dies after text, default
+/// (no opt-in). yoagent retries 3 times behind `retry_safe_events` (nothing
+/// printed), the final failure's partial reaches the pipe ONCE, and yoyo's own
+/// loop refuses to retry text already written (#976). Before #991 the reading
+/// was the same stdout after 1 request (yoyo aborted yoagent's first retry).
+#[test]
+fn yoagent_retry_every_attempt_dying_after_text_prints_the_partial_once() {
+    let run = probe_run(vec![rate_limited_after("PARTIAL_")]);
+    assert!(run.stub_hit, "anti-vacuous: stub never received a POST");
+    assert!(!run.success, "every attempt failed; stderr={}", run.stderr);
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout),
+        "PARTIAL_\n",
+        "#991: the final partial once, the retried copies never; stderr={}",
+        run.stderr
+    );
+    assert_eq!(
+        run.requests, 4,
+        "1 + RetryConfig::default's 3, then no yoyo retry; stderr={}",
+        run.stderr
+    );
+    assert!(
+        run.stderr
+            .contains("not retrying: part of the answer was already written"),
+        "#976: stderr says why yoyo did not retry; stderr={}",
+        run.stderr
+    );
+}
+
 fn assert_partial_retry_reading(run: &Run) {
     let stdout = String::from_utf8_lossy(&run.stdout).into_owned();
     assert!(run.stub_hit, "anti-vacuous: stub never received a POST");
-    // The #976 policy, applied to yoagent's retry: a pipe that already holds
-    // the attempt's text gets ONE copy, no second request, and a nonzero exit.
+    // #991 (Day 226): `-p` to a pipe reads through yoagent's
+    // `retry_safe_events`, so the retried attempt's `PARTIAL_` never reaches
+    // the pipe and the retry is let through: one answer, exit 0.
+    // Superseded expectation, recorded rather than erased: from Day 219 (#989)
+    // to Day 226 this pinned stdout == "PARTIAL_\n", requests == 1 and a
+    // nonzero exit, because yoyo aborted yoagent's retry once text was on the
+    // pipe. That abort was the right policy while the bytes were already
+    // written; behind the filter they never are, so the retry is safe.
     assert_eq!(
-        stdout, "PARTIAL_\n",
-        "#989: exactly one copy of the partial; requests={} stderr={}",
+        stdout, RETRY_ANSWER,
+        "#991: only the successful attempt reaches the pipe; requests={} stderr={}",
         run.requests, run.stderr
     );
-    assert_eq!(run.requests, 1, "#989: no retry after streamed text");
-    assert!(!run.success, "#989: the dead turn must exit nonzero");
+    assert_eq!(
+        run.requests, 2,
+        "#991: yoagent's retry is let through; stderr={}",
+        run.stderr
+    );
+    assert!(
+        run.success,
+        "#991: the recovered turn exits 0; stderr={}",
+        run.stderr
+    );
+    assert!(
+        !run.stderr
+            .contains("not retrying: part of the answer was already written"),
+        "#991: no skip note, nothing was written; stderr={}",
+        run.stderr
+    );
 }
 
 // #997 on the ProviderRetry door (Day 225, unblocks the yoagent upgrade #1007).
-// The #989 tests above are the opt-in-OFF rows and stay unedited. These run the
+// The #989 tests above are the opt-in-OFF rows (their expectations changed
+// Day 226 for #991; the superseded readings are recorded in place). These run the
 // SAME fixtures with `retry_after_partial = true` seeded in the cwd. Why these
 // statuses: yoagent 0.24.2 `ProviderError::is_retryable` (retry.rs:69) is
 // `RateLimited | Network`, and an SSE `error` event of type `rate_limit_error`
@@ -1630,10 +1701,14 @@ fn opt_in_provider_retry_after_partial_succeeds_with_attempts_separated() {
         "#997: retry succeeded, exit 0; stderr={}",
         run.stderr
     );
+    // #991 (Day 226): behind `retry_safe_events` the retried attempt never
+    // reaches the pipe, so opted in or not, stdout is the answer alone.
+    // Superseded expectation, recorded rather than erased: Day 225 pinned
+    // "PARTIAL_\n\nPONG\n" here (the dying partial, a blank line, the answer).
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
-        "PARTIAL_\n\nPONG\n",
-        "#997: partial once, a blank line, then the answer; stderr={}",
+        RETRY_ANSWER,
+        "#991: only the successful attempt reaches the pipe; stderr={}",
         run.stderr
     );
     assert!(
@@ -1653,9 +1728,13 @@ fn opt_in_provider_retry_after_truncated_stream_succeeds_with_attempts_separated
     ]);
     assert_eq!(run.requests, 2, "stderr={}", run.stderr);
     assert!(run.success, "stderr={}", run.stderr);
+    // #991 (Day 226): behind `retry_safe_events` the retried attempt never
+    // reaches the pipe, so opted in or not, stdout is the answer alone.
+    // Superseded expectation, recorded rather than erased: Day 225 pinned
+    // "PARTIAL_\n\nPONG\n" here (the dying partial, a blank line, the answer).
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
-        "PARTIAL_\n\nPONG\n",
+        RETRY_ANSWER,
         "stderr={}",
         run.stderr
     );
@@ -1686,9 +1765,13 @@ fn opt_in_provider_retry_every_attempt_dying_still_exits_nonzero() {
         "4 yoagent x 6 yoyo; stderr={}",
         run.stderr
     );
+    // #991 (Day 226): yoagent's three retries per yoyo attempt are held and
+    // dropped; only each yoyo attempt's FINAL failure keeps its partial, so
+    // one copy per yoyo attempt (6), not per request (24, Day 225's reading,
+    // superseded rather than erased).
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
-        ["PARTIAL_\n"; 24].join("\n"),
+        ["PARTIAL_\n"; 6].join("\n"),
         "stderr={}",
         run.stderr
     );
@@ -1786,9 +1869,10 @@ fn stream_json_retry_after_429_before_text_yields_clean_answer() {
 
 /// A stub that streams `partial` as one text delta and then STALLS: it never
 /// sends `content_block_stop`/`message_stop` and holds the connection open, so
-/// the turn is still in flight when the test sends SIGINT.
+/// the turn is still in flight when the test sends SIGINT. The third value
+/// counts responses whose partial text has been written and flushed.
 #[cfg(unix)]
-fn start_stall_stub(partial: &str) -> (u16, Arc<AtomicUsize>) {
+fn start_stall_stub(partial: &str) -> (u16, Arc<AtomicUsize>, Arc<AtomicUsize>) {
     let text = serde_json::to_string(partial).unwrap();
     let body = sse_events(vec![
         (
@@ -1810,11 +1894,14 @@ fn start_stall_stub(partial: &str) -> (u16, Arc<AtomicUsize>) {
     let port = listener.local_addr().unwrap().port();
     let hit = Arc::new(AtomicUsize::new(0));
     let hit_thread = Arc::clone(&hit);
+    let sent = Arc::new(AtomicUsize::new(0));
+    let sent_thread = Arc::clone(&sent);
     thread::spawn(move || {
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else { continue };
             let body = body.clone();
             let hit = Arc::clone(&hit_thread);
+            let sent = Arc::clone(&sent_thread);
             thread::spawn(move || {
                 let mut reader = BufReader::new(stream.try_clone().unwrap());
                 let mut request_line = String::new();
@@ -1846,12 +1933,13 @@ fn start_stall_stub(partial: &str) -> (u16, Arc<AtomicUsize>) {
                 let _ = stream.write_all(head.as_bytes());
                 let _ = stream.write_all(body.as_bytes());
                 let _ = stream.flush();
+                sent.fetch_add(1, Ordering::SeqCst);
                 // Stall: hold the stream open, never finish the message.
                 thread::sleep(Duration::from_secs(120));
             });
         }
     });
-    (port, hit)
+    (port, hit, sent)
 }
 
 #[cfg(unix)]
@@ -1862,12 +1950,23 @@ struct SigintRun {
     stub_hit: bool,
 }
 
-/// Run `yoyo <extra>` against the stall stub. Wait (no fixed sleep) until
-/// `wait_for` appears on the child's stdout, then send SIGINT and collect.
+/// Run `yoyo <extra>` against the stall stub. Wait until the stub has flushed
+/// the partial text, then a grace period for yoyo to read it, then send SIGINT
+/// and collect.
+///
+/// Superseded harness, recorded rather than erased (Day 226, #991): this used
+/// to wait (no fixed sleep) until `wait_for` appeared on the child's STDOUT.
+/// A `-p` run whose stdout is a pipe now reads through yoagent's
+/// `retry_safe_events`, which holds an attempt's text until the attempt ends,
+/// so a stalled attempt puts nothing on the pipe before the signal: the text
+/// reaches stdout only because Ctrl+C flushes what the gate holds. Waiting on
+/// stdout would wait forever. The stub-side flag plus `SIGINT_GRACE` is the
+/// readiness signal left (localhost bytes, parsed in microseconds).
 #[cfg(unix)]
-fn run_yoyo_sigint(extra: &[&str], partial: &str, wait_for: &str) -> SigintRun {
+fn run_yoyo_sigint(extra: &[&str], partial: &str) -> SigintRun {
     use std::sync::Mutex;
-    let (port, hit) = start_stall_stub(partial);
+    const SIGINT_GRACE: Duration = Duration::from_millis(1500);
+    let (port, hit, sent) = start_stall_stub(partial);
     let home = tempfile::tempdir().unwrap();
     let cwd = tempfile::tempdir().unwrap();
     let base_url = format!("http://127.0.0.1:{port}/v1");
@@ -1926,13 +2025,14 @@ fn run_yoyo_sigint(extra: &[&str], partial: &str, wait_for: &str) -> SigintRun {
     });
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
-        if String::from_utf8_lossy(&out.lock().unwrap()).contains(wait_for) {
+        if sent.load(Ordering::SeqCst) > 0 {
+            thread::sleep(SIGINT_GRACE);
             break;
         }
         if Instant::now() > deadline || child.try_wait().unwrap().is_some() {
             let _ = child.kill();
             panic!(
-                "streamed text never reached stdout before SIGINT; stdout={:?} stderr={}",
+                "the stub never sent the partial text before SIGINT; stdout={:?} stderr={}",
                 String::from_utf8_lossy(&out.lock().unwrap()),
                 String::from_utf8_lossy(&err.lock().unwrap())
             );
@@ -1969,10 +2069,12 @@ fn run_yoyo_sigint(extra: &[&str], partial: &str, wait_for: &str) -> SigintRun {
 
 /// #993: `-p` cut short by SIGINT keeps the streamed text on stdout and
 /// nothing else, writes the interrupt note to stderr, and exits 130.
+/// Since #991 (Day 226) the text is held by the retry-safe gate until the
+/// interrupt, so this also pins that Ctrl+C flushes the held text exactly once.
 #[cfg(unix)]
 #[test]
 fn sigint_during_print_prompt_exits_130_with_note_on_stderr() {
-    let run = run_yoyo_sigint(&["-p", "hi"], PARTIAL_LINE, PARTIAL_LINE);
+    let run = run_yoyo_sigint(&["-p", "hi"], PARTIAL_LINE);
     assert!(run.stub_hit, "anti-vacuous: stub never received a POST");
     let stdout = String::from_utf8_lossy(&run.stdout).into_owned();
     eprintln!(

@@ -54,6 +54,19 @@ pub(super) fn should_retry_after_partial(
 /// That upgrade landed Day 225 (#1007): 0.25.2's `ProviderError::classify`
 /// sends 529 and in-stream `overloaded_error` to the retried `RateLimited`
 /// (`provider/traits.rs:299-306`, `:435`), so the reclassification is live.
+///
+/// #991 (Day 226): on a single-shot run whose stdout is an unreserved pipe,
+/// `handle_prompt_events` (`src/prompt.rs`) reads its events through
+/// `retry_safe_pipe::RetrySafeGate`, i.e. yoagent's `RetrySafeEvents`, so a
+/// yoagent-retried attempt never reaches the pipe and its `ProviderRetry` arm
+/// skips `handle_provider_retry` entirely (`!gate.is_filtering() && ...`):
+/// on that path this door neither aborts nor reads the opt-in, because there
+/// is nothing on the pipe to duplicate. The paragraph above (the opt-in on
+/// this door, `PARTIAL_\n\nPONG\n`) now describes only the paths the gate
+/// does not cover: a terminal (where `should_retry_after_partial` allows the
+/// retry anyway) and the REPL with stdout piped. yoyo's OWN four retry sites
+/// still consult this rule on every path: the gate hands a final failure its
+/// partial text back, so a pipe that holds it is still not retried by default.
 pub(super) fn retry_after_partial_allowed(
     opted_in: bool,
     stdout_is_terminal: bool,

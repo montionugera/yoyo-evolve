@@ -16,6 +16,7 @@ use crate::session::{ChangeKind, SessionChanges};
 mod cancel_mid_tool_tests;
 mod interrupt;
 mod retry_after_partial;
+mod retry_safe_pipe;
 pub use interrupt::{mark_single_shot, was_interrupted};
 mod stream_external_servers;
 mod stream_session_restored;
@@ -1074,10 +1075,13 @@ async fn handle_prompt_events(
     model: &str,
 ) -> PromptResult {
     let mut state = PromptEventState::new();
+    // #991: a single-shot run writing to a pipe reads through yoagent's
+    // retry_safe filter; everything else (TTY, REPL, --print/json) is unchanged.
+    let mut gate = retry_safe_pipe::RetrySafeGate::new(retry_safe_pipe::retry_safe_pipe_live());
 
     loop {
         tokio::select! {
-            event = rx.recv() => {
+            event = gate.next(&mut rx) => {
                 let Some(event) = event else { break };
                 match event {
                     AgentEvent::ToolExecutionStart {
@@ -1142,8 +1146,11 @@ async fn handle_prompt_events(
                     // here too: a pipe that already holds this attempt's text must
                     // not receive a second attempt. The stream-json door is
                     // handled separately (its own event loop).
+                    // #991: behind the retry-safe gate the retried attempt never
+                    // reached stdout (nor `collected_text`), so there is nothing
+                    // to abort for and nothing to truncate.
                     AgentEvent::ProviderRetry { error, .. } => {
-                        if state.handle_provider_retry(&error) {
+                        if !gate.is_filtering() && state.handle_provider_retry(&error) {
                             agent.abort();
                         }
                     }
@@ -1194,6 +1201,12 @@ async fn handle_prompt_events(
                 // Stop spinner if still running
                 if let Some(s) = state.spinner.take() { s.stop(); }
                 agent.abort();
+                // #991/#993: text the retry-safe gate still holds was produced
+                // before the interrupt; keep it, as the unfiltered stream did.
+                let held = gate.take_held_text();
+                if !held.is_empty() {
+                    state.handle_message_update_text(&held);
+                }
                 if state.in_text {
                     write_stream_text("\n");
                 }
