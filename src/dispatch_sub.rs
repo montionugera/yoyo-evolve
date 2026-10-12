@@ -377,7 +377,12 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "run" => {
-                let input = quote_args_as_command(args);
+                // #1009: ONE element is a verbatim `sh -c` line; 2+ keep the wrapper
+                // (`run echo "a  b"`). A lone spaced path now splits: `"'a b.sh'"`.
+                let input = match &args[2..] {
+                    [one] => format!("/run {one}"),
+                    _ => quote_args_as_command(args),
+                };
                 if let Some(outcome) = crate::commands_run::handle_run_with_status(&input) {
                     exit_if_failed(outcome);
                 }

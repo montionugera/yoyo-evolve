@@ -3181,6 +3181,99 @@ fn git_blame_of_a_committed_file_still_exits_zero() {
     assert!(!stdout.contains("Not in a git repository"));
 }
 
+/// Run `yoyo run <args>` in `dir` (stdin null) and return (exit, stdout with
+/// the `(Nms)` timing normalised to `(Nms)`, stderr). Timing is the only
+/// non-deterministic byte in `/run`'s output, so normalising it lets the
+/// near-miss guards below compare whole strings with `assert_eq!`.
+fn yoyo_run_in(dir: &std::path::Path, args: &[&str]) -> (Option<i32>, String, String) {
+    let mut argv = vec!["run"];
+    argv.extend_from_slice(args);
+    let out = yoyo_cmd()
+        .args(&argv)
+        .current_dir(dir)
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .output()
+        .expect("run yoyo");
+    let raw = String::from_utf8_lossy(&out.stdout).to_string();
+    let mut norm = String::new();
+    let mut rest = raw.as_str();
+    while let Some(i) = rest.find(" (") {
+        norm.push_str(&rest[..i + 2]);
+        rest = &rest[i + 2..];
+        let digits = rest.chars().take_while(|c| c.is_ascii_digit()).count();
+        if digits > 0 && rest[digits..].starts_with("ms)") {
+            norm.push('N');
+            rest = &rest[digits..];
+        }
+    }
+    norm.push_str(rest);
+    (
+        out.status.code(),
+        norm,
+        String::from_utf8_lossy(&out.stderr).to_string(),
+    )
+}
+
+#[test]
+fn run_single_quoted_argument_is_a_shell_command_line() {
+    // #1009: `yoyo run "echo a b"` reached sh as the one word `"echo a b"`
+    // and failed with `sh: 1: echo a b: not found`, exit 127.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (code, stdout, stderr) = yoyo_run_in(dir.path(), &["echo a b"]);
+    assert_eq!(code, Some(0), "stdout={stdout} stderr={stderr}");
+    assert_eq!(stdout, "a b\n  ✓ exit 0 (Nms)\n\n");
+    assert_eq!(stderr, "");
+}
+
+#[test]
+fn run_single_argument_keeps_the_commands_exit_status() {
+    // 6d84deff's exit mirroring, now reachable for a one-element command
+    // line: `exit 3` used to be the word `"exit 3"` (127), it now exits 3.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (code, stdout, stderr) = yoyo_run_in(dir.path(), &["exit 3"]);
+    assert_eq!(code, Some(3), "stdout={stdout} stderr={stderr}");
+    let (code, _, _) = yoyo_run_in(dir.path(), &["false"]);
+    assert_eq!(code, Some(1));
+}
+
+#[test]
+fn run_multiple_arguments_keep_the_quoting_wrapper() {
+    // Near miss for #1009: two or more argv elements still go through the
+    // wrapper, which preserves the double space inside one element.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (code, stdout, stderr) = yoyo_run_in(dir.path(), &["echo", "a  b"]);
+    assert_eq!(code, Some(0), "stderr={stderr}");
+    assert_eq!(stdout, "a  b\n  ✓ exit 0 (Nms)\n\n");
+    assert_eq!(stderr, "");
+    let (code, stdout, stderr) = yoyo_run_in(dir.path(), &["echo", "hi"]);
+    assert_eq!(code, Some(0), "stderr={stderr}");
+    assert_eq!(stdout, "hi\n  ✓ exit 0 (Nms)\n\n");
+    assert_eq!(stderr, "");
+}
+
+#[test]
+fn run_single_spaced_path_is_word_split_like_sh_c() {
+    // The trade #1009's fix makes, pinned: one element naming a spaced path
+    // used to execute that path; it is now a command line, so the shell
+    // splits it (as `sh -c "./my script.sh"` would). Quoting inside the
+    // argument still runs the path.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("my script.sh");
+    std::fs::write(&script, "#!/bin/sh\necho spaced-script-ran\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let (code, stdout, _) = yoyo_run_in(dir.path(), &["./my script.sh"]);
+    assert_eq!(code, Some(127), "stdout={stdout}");
+    assert!(!stdout.contains("spaced-script-ran"), "stdout={stdout}");
+    let (code, stdout, stderr) = yoyo_run_in(dir.path(), &["'./my script.sh'"]);
+    assert_eq!(code, Some(0), "stdout={stdout} stderr={stderr}");
+    assert_eq!(stdout, "spaced-script-ran\n  ✓ exit 0 (Nms)\n\n");
+}
+
 /// A temp git repo with `plain.rs` and `a b.rs` committed, git confined to it.
 fn blame_fixture_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");

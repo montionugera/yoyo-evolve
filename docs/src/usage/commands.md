@@ -17,7 +17,7 @@ All commands start with `/`. Type `/help` inside yoyo to see the full list.
 > | `yoyo test` | Run project test suite |
 > | `yoyo tree` | Show project directory tree |
 > | `yoyo map` | Show project symbol map |
-> | `yoyo run` | Run a shell command (e.g. `yoyo run cargo clippy`) |
+> | `yoyo run` | Run a shell command (e.g. `yoyo run cargo clippy`). A single quoted argument is run as a shell command line, like `sh -c`: `yoyo run "echo a b"` prints `a b`; to run one path with a space in it, quote it inside: `yoyo run "'my script.sh'"` |
 > | `yoyo diff` | Show git diff (e.g. `yoyo diff --staged`) |
 > | `yoyo commit` | Commit staged changes (e.g. `yoyo commit "fix typo"`) |
 > | `yoyo review` | AI-powered code review (non-interactive, pipeable to files/CI) |
