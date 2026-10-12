@@ -1,0 +1,180 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat src/cd_config_note.rs ✓ (6ms)
+ ✓ (14ms)
+  ▶ read src/cd_config_note.rs:1..41  ▶ read src/cd_config_note.rs:120..420 ✓ (0ms)
+ ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "cd_config_note\|cd_deny\|…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 90,215p src/tool_wrappers.r… ✓ (13ms)
+ ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn check_path" -A60 src/c… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1418,1470p src/dispatch.rs;… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1436,1468p src/dispatch.rs;… ✓ (4ms)
+  ▶ read src/dispatch.rs:1434..1470 ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn resolve_cd_target" -A2… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p tests/global_state_ra… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p tests/global_state_ra… ✓ (3ms)
+  ▶ read tests/global_state_races.rs (70 lines) ✓ (0ms)
+  ▶ read src/cd_config_note.rs:40..120 ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  15 tools completed in 1m 12s (15 ✓)
+
+Now the edits. First the enum, sections and classification.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (31 lines) ✓ (19ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (51 lines) ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (22 lines) ✓ (21ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 20.0s (3 ✓)
+
+Now the list, resolution, and refusal functions, after deny_entries.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/cd_config_note.rs (1 → 68 lines)
+  + /// The `[directories] deny` entries `/cd` applies, resolved against `target`
+  + /// NOW: a relative `deny = ["secrets"]` means `<target>/secrets`, and must keep
+  + /// meaning that after a later `/cd` moves the process cwd elsewhere. Absolute
+  + /// and `~` entries are kept as written (`check_path` expands `~` itself).
+  + pub(crate) fn dir_deny_entries(target: &Path, reading: &CdConfigReading) -> Vec<String> {
+  +     let CdConfigReading::Sets(_, _, dir_deny) = reading else {
+  +         return Vec::new();
+  +     };
+  +     dir_deny
+  +         .iter()
+  +         .map(|e| {
+  +             if e.starts_with('~') || Path::new(e).is_absolute() {
+  +                 e.clone()
+  +             } else {
+  +                 target.join(e).to_string_lossy().into_owned()
+  +             }
+  +         })
+  +         .collect()
+  + }
+  + 
+  ... (48 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (27 lines) ✓ (15.7s)
+  + /// The `[directories] deny` entries `/cd` applies, resolved against `target`
+  + /// NOW: a relative `deny = ["secrets"]` means `<target>/secrets`, and must keep
+  + /// meaning that after a later `/cd` moves the process cwd elsewhere. Absolute
+  + /// and `~` entries are kept as written (`check_path` expands `~` itself).
+  + pub(crate) fn dir_deny_entries(target: &Path, reading: &CdConfigReading) -> Vec<String> {
+  +     let CdConfigReading::Sets(_, _, dir_deny) = reading else {
+  +         return Vec::new();
+  +     };
+  ... (13 more lines)
+ ✓ (24.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's/CdConfigReading::Sets(ve… ✓ (26.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 56.4s (3 ✓)
+
+Expected failures, all from deliberate wording/label changes. Updating those tests in place and adding the new ones.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (48 lines) ✓ (21ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (147 lines) ✓ (28.0s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 59.1s (2 ✓)
+
+Green. Now the positive control, atomic mutate→test→restore:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/cd_conf… (9 lines) ✓ (54.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control reddened exactly the two refusal tests by name; restored, no marker remains. Now the module doc and user docs.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (33 lines) ✓ (30ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Seven production check_path sites outside the two guards still read only the startup fence. They go in the residue. Full gate:
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo build 2>&1 | ta… ✓ (3m 45s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (2m 31s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6m 21s (2 ✓)
+
+All green: 6456 passed, 0 failed, clippy and fmt clean, module-size gate passes (tool_wrappers +6, dispatch +2). Committing:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (29 lines) ✓ (16ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Before I post the residue publicly, let me confirm what config_resolve.rs:119 actually is:
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 105,125p src/config_resolve… ✓ (360ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+That one is test code, so my commit overcounted: there are 6 production readers, not 7. The commit hasn't been pushed, so I'll amend it:
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -1 --f… (14 lines) ✓ (28ms)
+
+Now the residue comment on #869. It has no denied patterns quoted as commands, so it won't trip the hard-deny guard.
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (11 lines) ✓ (777ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+I cited the pre-amend hash in that comment. Correcting it:
+  ╭─ Turn 28 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; h=$(git rev-parse --short=8 HEAD);… ✓ (1.2s)
+
+After /cd, the file tools (yours and sub-agents') now refuse paths under the new directory's [directories] deny entries for the rest of the session. Before this, only its [permissions] deny applied (to bash, since Day 218). It's committed as 863e2ae5 ("Part of #869"), not pushed yet. Build, all 6456 tests, clippy with -D warnings, fmt check and the module-size gate all pass.
+
+How it works
+• **Relative entries:** `deny = ["secrets"]` is turned into `<that dir>/secrets` at the moment of the `/cd`, so it keeps pointing there after a later `/cd`. A test covers this, including that secrets/key.txt relative to the current working directory is not refused.
+• **Matching:** the check reuses the existing startup matcher (`DirectoryRestrictions::check_path`), so symlinks, wildcards and paths that can't be resolved behave exactly as they do at startup. There's no second matcher.
+• **Guards:** `tool_wrappers.rs` has exactly two places that check the `path` argument, and both now check the startup fence first, then the `/cd` list. A deliberately weak source test pins that count at 2.
+• **The list:** it only grows and is never cleared, and a new `/cd` appends to it. With an empty list the guard gives exactly the same results as before (full-equality test). The list, the refusal function and all tests live in cd_config_note.rs. tool_wrappers.rs grew 6 lines and dispatch.rs grew 2.
+• **The `/cd warning** now says [directories] deny is applied to the file tools and that bash never reads it. It also names [directories] allow as still not applied. I updated the four affected existing tests in place without weakening any, and a [directories]`-deny-only config still prints the yellow warning.
+• **Positive control:** I made the refusal always return `None`, and exactly the two refusal tests failed by name. I restored it in the same command, and no sabotage marker remains.
+• Docs: the "After /cd" section of docs/src/configuration/permissions.md already described this behaviour, so I rewrote it.
+
+Still not done (posted on #869):
+• **Not reloaded on /cd:** `[directories] allow` (it would have to be combined with the startup allow list, which is a design decision), `[permissions] allow`, hooks, MCP servers and skills.
+• **Not checked against the /cd list:** 6 places outside the file tools still check paths against the startup fence only: `@path` mentions and `/add`, the project-context loaders, and code in commands_project.rs, commands_rename.rs, commands_map.rs and commands_goal.rs. So a file in a /cd-denied directory is refused by read_file but can still be pulled in with an @-mention. That's the obvious next slice.
+
+Two corrections I made to my own write-up:
+• The first commit message said 7 places still use only the startup fence. One of those was a test helper, so I amended the commit to say 6.
+• The issue comment first cited the commit hash from before the amend. I edited it to 863e2ae5.
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --short | head; git log… ✓ (10ms)
+
+────────────────────────────────────────────────────────────────────────────────
+
+This task has nothing left to do, so I'm stopping rather than starting new work.
+
+• **State:** the working tree is clean. Commit `863e2ae5` is on `main` and the branch is 3 commits ahead of `origin/main`; I haven't pushed, since the harness does that after the session. No sabotage markers (NEUTERED, SABOTAGE, DO NOT COMMIT) are left in the three files I touched.
+• **Checks:** build, all 6456 tests, clippy with -D warnings, the fmt check and the module-size gate passed before the commit.
+• **Issue:** the leftover work is written down on #869, the issue it belongs to. The commit says "Part of #869", so the issue stays open.
+
+The obvious next step is to make the 6 other places that check paths also check the /cd deny list: @path mentions and /add, the project-context loaders, and code in commands_project.rs, commands_rename.rs, commands_map.rs and commands_goal.rs. Right now a file in a /cd-denied directory is refused by read_file but can still be pulled in with an @-mention. I didn't start this because the brief limited this task to three files and said to work on nothing else. It touches six other files, so it should be planned as its own task under #869, and it can call the new path_guard_refusal function.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/cd_config_note.rs

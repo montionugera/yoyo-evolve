@@ -1,0 +1,242 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; wc -l src/smart_edit.rs; g… ✓ (6ms)
+  ▶ read src/smart_edit.rs:360..585  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; f=$(ls -d ~/.cargo/registry/src/*/yoagent-0.2… ✓ (2ms)
+ ✓ (8ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "smart_edit" ARCHITECTURE.md; sed -n … ✓ (9ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; ls ~/.cargo/registry/src/*/yoagent-0.25.2/src… ✓ (5ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "pub struct\|impl Default\|pub fn new… ✓ (13ms)
+  ▶ write src/smart_edit_crlf_tests.rs (200 lines) ✓ (1m 43s)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 2m 32s (7 ✓)
+
+Now the production code: stubs-first is unnecessary since the positive control will show the red; implementing.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ edit src/smart_edit.rs (1 → 45 lines)
+  + /// Appended to a not-found error when the target file uses CRLF line endings,
+  + /// so the model does not misdiagnose the miss (it never sees `\r`).
+  + const CRLF_NOT_FOUND_NOTE: &str = "\n\nNote: this file uses CRLF (\\r\\n) line endings. A multi-line \
+  +      old_text written with \\n is already retried with \\r\\n, so the mismatch is in the text itself.";
+  + 
+  + /// Spell every bare `\n` as `\r\n`; an existing `\r\n` is never doubled.
+  + fn bare_lf_to_crlf(s: &str) -> String {
+  +     s.replace("\r\n", "\n").replace('\n', "\r\n")
+  + }
+  + 
+  + /// The CRLF rule: when `file` does not contain `old` literally, but does contain
+  + /// it with each bare `\n` spelled `\r\n`, return `(old, new)` spelled that way.
+  + /// The literal match always wins (`None`), as does an `old` with no bare `\n`.
+  + fn crlf_adapted_edit(file: &str, old: &str, new: &str) -> Option<(String, String)> {
+  +     if file.contains(old) {
+  +         return None;
+  +     }
+  +     let old_crlf = bare_lf_to_crlf(old);
+  +     if old_crlf == old || !file.contains(old_crlf.as_str()) {
+  +         return None;
+  ... (25 more lines)
+  ▶ edit src/smart_edit.rs (2 → 12 lines)
+        ) -> Result<yoagent::types::ToolResult, yoagent::types::ToolError> {
+  +         // CRLF files: a multi-line old_text the model wrote with `\n` is retried
+  +         // as `\r\n` (only multi-line edits can need it, so only they read the file).
+  +         let multi_line = params
+  +             .get("old_text")
+  +             .and_then(|v| v.as_str())
+  +             .is_some_and(|s| s.contains('\n'));
+  +         let params = match multi_line.then(|| read_capped(&params)).flatten() {
+  +             Some(file) => crlf_adapted_params(&params, &file).unwrap_or(params),
+  +             None => params,
+  +         };
+            match self.inner.execute(params.clone(), ctx.clone()).await {
+  ▶ edit src/smart_edit.rs (2 → 5 lines)
+  -                 let augmented = self.augment_not_found_error(&msg, &params);
+  +                 let mut augmented = self.augment_not_found_error(&msg, &params);
+  +                 if read_capped(&params).is_some_and(|f| f.contains("\r\n")) {
+  +                     augmented.push_str(CRLF_NOT_FOUND_NOTE);
+  +                 }
+                    Err(
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; tail -3 src/smart_edit.rs; grep -n "tempfile"… ✓ (14.8s)
+  -                 let augmented = self.augment_not_found_error(&msg, &params);
+  +                 let mut augmented = self.augment_not_found_error(&msg, &params);
+  +                 if read_capped(&params).is_some_and(|f| f.contains("\r\n")) {
+  +                     augmented.push_str(CRLF_NOT_FOUND_NOTE);
+  +                 }
+                    Err(
+ ✓ (14.8s)
+ ✓ (29.9s)
+  + /// Appended to a not-found error when the target file uses CRLF line endings,
+  + /// so the model does not misdiagnose the miss (it never sees `\r`).
+  + const CRLF_NOT_FOUND_NOTE: &str = "\n\nNote: this file uses CRLF (\\r\\n) line endings. A multi-line \
+  +      old_text written with \\n is already retried with \\r\\n, so the mismatch is in the text itself.";
+  + 
+  + /// Spell every bare `\n` as `\r\n`; an existing `\r\n` is never doubled.
+  + fn bare_lf_to_crlf(s: &str) -> String {
+  +     s.replace("\r\n", "\n").replace('\n', "\r\n")
+  ... (13 more lines)
+ ✓ (45.0s)
+        ) -> Result<yoagent::types::ToolResult, yoagent::types::ToolError> {
+  +         // CRLF files: a multi-line old_text the model wrote with `\n` is retried
+  +         // as `\r\n` (only multi-line edits can need it, so only they read the file).
+  +         let multi_line = params
+  +             .get("old_text")
+  +             .and_then(|v| v.as_str())
+  +             .is_some_and(|s| s.contains('\n'));
+  +         let params = match multi_line.then(|| read_capped(&params)).flatten() {
+  ... (4 more lines)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "fn read_capped\|fn crlf_adapted\|Wra… ✓ (4ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; git diff --stat; grep -rn "fn read_capped" sr… ✓ (12ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 50.3s (6 ✓)
+
+The parallel edits raced on the same file and the first was lost. Re-applying it serially.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/smart_edit.rs (1 → 45 lines)
+  + /// Appended to a not-found error when the target file uses CRLF line endings,
+  + /// so the model does not misdiagnose the miss (it never sees `\r`).
+  + const CRLF_NOT_FOUND_NOTE: &str = "\n\nNote: this file uses CRLF (\\r\\n) line endings. A multi-line \
+  +      old_text written with \\n is already retried with \\r\\n, so the mismatch is in the text itself.";
+  + 
+  + /// Spell every bare `\n` as `\r\n`; an existing `\r\n` is never doubled.
+  + fn bare_lf_to_crlf(s: &str) -> String {
+  +     s.replace("\r\n", "\n").replace('\n', "\r\n")
+  + }
+  + 
+  + /// The CRLF rule: when `file` does not contain `old` literally, but does contain
+  + /// it with each bare `\n` spelled `\r\n`, return `(old, new)` spelled that way.
+  + /// The literal match always wins (`None`), as does an `old` with no bare `\n`.
+  + fn crlf_adapted_edit(file: &str, old: &str, new: &str) -> Option<(String, String)> {
+  +     if file.contains(old) {
+  +         return None;
+  +     }
+  +     let old_crlf = bare_lf_to_crlf(old);
+  +     if old_crlf == old || !file.contains(old_crlf.as_str()) {
+  +         return None;
+  ... (25 more lines)
+ ✓ (16.9s)
+  + /// Appended to a not-found error when the target file uses CRLF line endings,
+  + /// so the model does not misdiagnose the miss (it never sees `\r`).
+  + const CRLF_NOT_FOUND_NOTE: &str = "\n\nNote: this file uses CRLF (\\r\\n) line endings. A multi-line \
+  +      old_text written with \\n is already retried with \\r\\n, so the mismatch is in the text itself.";
+  + 
+  + /// Spell every bare `\n` as `\r\n`; an existing `\r\n` is never doubled.
+  + fn bare_lf_to_crlf(s: &str) -> String {
+  +     s.replace("\r\n", "\n").replace('\n', "\r\n")
+  ... (13 more lines)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; git diff src/smart_edit.rs | grep '^[+-]' | g… ✓ (4ms)
+  ▶ edit src/smart_edit.rs (2 → 5 lines)
+  -                 let augmented = self.augment_not_found_error(&msg, &params);
+  +                 let mut augmented = self.augment_not_found_error(&msg, &params);
+  +                 if read_capped(&params).is_some_and(|f| f.contains("\r\n")) {
+  +                     augmented.push_str(CRLF_NOT_FOUND_NOTE);
+  +                 }
+                    Err(
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cat >> src/smart_edit.rs … (7 lines) ✓ (2m 17s)
+  -                 let augmented = self.augment_not_found_error(&msg, &params);
+  +                 let mut augmented = self.augment_not_found_error(&msg, &params);
+  +                 if read_capped(&params).is_some_and(|f| f.contains("\r\n")) {
+  +                     augmented.push_str(CRLF_NOT_FOUND_NOTE);
+  +                 }
+                    Err(
+ ✗ (2m 17s)
+    │ Command timed out after 120s
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; tail -5 src/smart_edit.rs; timeout 550 cargo … ✓ (139ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 2m 42s (4 ✓, 1 ✗)
+
+All 13 green. Positive control, serially and atomically: neuter crlf_adapted_edit → run → restore.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cp src/smart_edit.rs /tmp/se.bak && sed -i 's… ✓ (51.0s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cp src/smart_edit.rs /tmp/se.bak && sed -i 's… ✓ (26.2s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cp src/smart_edit.rs /tmp/se.bak && sed -i 's… ✓ (26.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ edit ARCHITECTURE.md (1 → 2 lines)
+    - `smart_edit.rs` — SmartEditTool: fuzzy matching for edit_file errors, whitespace-only auto-fix retry, nearest-match line-number hints
+  +   - **Day 226 — CRLF files.** The model never sees `\r`, so on a CRLF file a multi-line `old_text` arrives with bare `\n` and yoagent 0.25.2's `EditFileTool` (a literal `content.matches(old_text)`, no line-ending handling — checked, so there was no upstream branch to reuse) answered `old_text not found`, after which the model misdiagnosed the cause. Rule, in the pure `crlf_adapted_edit(file, old, new)`: if the file does **not** contain `old` literally but does contain it with every **bare** … [yoyo: 918 more bytes elided — diff lines are capped at 500 bytes]
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo fmt -- --check && echo FMT… ✓ (8ms)
+    - `smart_edit.rs` — SmartEditTool: fuzzy matching for edit_file errors, whitespace-only auto-fix retry, nearest-match line-number hints
+  +   - **Day 226 — CRLF files.** The model never sees `\r`, so on a CRLF file a multi-line `old_text` arrives with bare `\n` and yoagent 0.25.2's `EditFileTool` (a literal `content.matches(old_text)`, no line-ending handling — checked, so there was no upstream branch to reuse) answered `old_text not found`, after which the model misdiagnosed the cause. Rule, in the pure `crlf_adapted_edit(file, old, new)`: if the file does **not** contain `old` literally but does contain it with every **bare** … [yoyo: 918 more bytes elided — diff lines are capped at 500 bytes]
+ ✓ (18.2s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 2m 19s (5 ✓)
+
+Before the full test run, let me verify the auto-fix claim I just wrote rather than leave it unchecked.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 310,330p src/smart_edit.rs; sed -n 353… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Confirmed by reading (not by a test): extract_matched_text joins .lines() with \n, and the auto-fix retries self.inner directly, bypassing the CRLF adaptation. I'll say that precisely.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ edit ARCHITECTURE.md (1 → 1 lines)
+  - The whitespace auto-fix path still joins lines with `\n`, so it does not fire on CRLF files.
+  + The whitespace auto-fix path is untouched: by reading (not by a test), `extract_matched_text` re-joins `.lines()` with `\n` and retries `self.inner` directly, bypassing the adaptation, so a whitespace-only miss on a CRLF file still falls through to the augmented error.
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep -E "^test … ✓ (8ms)
+  - The whitespace auto-fix path still joins lines with `\n`, so it does not fire on CRLF files.
+  + The whitespace auto-fix path is untouched: by reading (not by a test), `extract_matched_text` re-joins `.lines()` with `\n` and retries `self.inner` directly, bypassing the adaptation, so a whitespace-only miss on a CRLF file still falls through to the augmented error.
+ ✓ (1m 46s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; timeout 300 cargo test --test orphan_modules … ✓ (241ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 56s (3 ✓)
+
+The orphan gate matches mod NAME by file stem and doesn't read #[path]. Renaming the module to match the stem (no register entry needed).
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -i 's/^mod crlf_tests;$/mod smart_edit_cr… ✓ (5m 41s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; timeout 300 cargo test --test module_size 2>&… ✓ (18.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6m 4s (2 ✓)
+
+Everything passes: full cargo test (19 suites, 0 failed), clippy -D warnings, fmt check, the module-size gate (smart_edit.rs is now 1977 lines, under 2000), and neutered_guards. Committing.
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; git add -A && git commit … (7 lines) ✓ (43ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+On a CRLF file, edit_file now applies a multi-line edit when the old_text was written with plain \n, and the result keeps the file's \r\n endings. Committed as d8b84d41. Build, the full cargo test, clippy with -D warnings, fmt --check, the module-size gate and the neutered-guards check all pass.
+
+Step 0: yoagent 0.25.2's EditFileTool looks for old_text as an exact string and does nothing about line endings. There was no CRLF handling upstream to reuse, so the fix lives in yoyo's wrapper, SmartEditTool.
+
+The fix (in `src/smart_edit.rs`, which is now 1977 lines, under the 2000 cap):
+• **The rule:** a new function, `crlf_adapted_edit`, handles one case. If the file doesn't contain `old_text` as written, but does contain it once every bare `\n` becomes \r\n, both old_text and new_text are converted that way before the real tool runs.
+• **An exact match always wins.** A \r\n that's already there is never turned into \r\r\n.
+• **When it runs:** the file is only read when old_text spans more than one line, and only under the existing 100KB size limit.
+• **The error message:** if an edit still fails on a CRLF file, one extra line in the error tells the model the file uses `\r\n` endings. This is meant to stop the wrong guess the morning's test run produced.
+
+Tests: all in the new file src/smart_edit_crlf_tests.rs, all comparing exact bytes, and the end-to-end ones run through yoagent's real edit_file:
+• The g.txt case from the morning's run now ends up exactly ALPHA\r\nBETA\r\ngamma\r\n.
+• A replacement with more lines than the original gets \r\n on every line.
+• Cases that must be left alone are left alone: LF files, single-line edits, old_text already in \r\n, and a mixed file where the LF part matches exactly.
+• The extra CRLF line appears in the error for a CRLF file and not for an LF file.
+
+Sabotage check: I forced the function to always return None, in one command run on its own and then restored. Exactly the 5 tests that cover the conversion failed, including the g.txt case; all the leave-alone cases stayed green. Nothing marked NEUTERED was left in the file.
+
+Two things that tripped me up:
+• I made three edits to smart_edit.rs in parallel and they overwrote each other, so two were lost and I re-applied them one at a time.
+• The orphan-modules check finds modules by file name and ignores #[path]. So the test module is declared as mod smart_edit_crlf_tests;, not the crlf_tests name the plan suggested.
+
+Limits (also written into ARCHITECTURE.md):
+• Only `\r\n files are handled. Old Mac files that end lines with \r` alone are not.
+• The existing whitespace auto-fix calls the inner tool directly and joins lines with \n. So a whitespace-only mismatch on a CRLF file still falls through to the normal error. I found this by reading the code; no test covers it.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/2 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/2 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/smart_edit_crlf_tests.rs, src/smart_edit.rs
