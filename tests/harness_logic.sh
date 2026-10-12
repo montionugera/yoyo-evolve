@@ -830,6 +830,44 @@ if require "save_reverted_task_diff extracted" "$SAVE_FN"; then
         "$(grep -c -F 'save_reverted_task_diff "$PRE_TASK_SHA" "task${TASK_NUM}_reverted"' "$SCRIPT")" "1"
 fi
 
+# ── yoagent's own skill, matched to Cargo.lock (setup_yoagent_skill) ─────────
+# Offline: a fixture Cargo.lock, a fake CARGO_HOME, pre-seeded tag checkouts,
+# and `cargo` stubbed out, so no case reaches the network. Each case prints the
+# skill flags the function appended (or "none") and its exit status.
+YS_FN=$(awk '/^setup_yoagent_skill\(\) \{/,/^\}/' "$SCRIPT")
+ys_case() { # $1 = lock yoagent version ("" = no yoagent), $2 = registry|clone|none, $3 = disabled?
+    ( set -euo pipefail; d=$(mktemp -d); cd "$d"
+      if [ -n "$1" ]; then printf '[[package]]\nname = "yoagent"\nversion = "%s"\n' "$1" > Cargo.lock
+      else printf '[[package]]\nname = "serde"\nversion = "1.0.0"\n' > Cargo.lock; fi
+      export CARGO_HOME="$d/cargo"; mkdir -p "$CARGO_HOME/registry/src/idx"
+      export YOYO_EXTERNAL_SKILLS_DIR="$d/ext"
+      tag="v$1"; [ "$1" = "0.25.2" ] && tag="v0.25.3"
+      case "$2" in
+        registry) mkdir -p "$CARGO_HOME/registry/src/idx/yoagent-$1/skills/yoagent"
+                  echo x > "$CARGO_HOME/registry/src/idx/yoagent-$1/skills/yoagent/SKILL.md" ;;
+        clone)    mkdir -p "$d/ext/yoagent-$tag/skills/yoagent"
+                  echo x > "$d/ext/yoagent-$tag/skills/yoagent/SKILL.md" ;;
+      esac
+      [ "${3:-}" = disabled ] && export YOYO_YOAGENT_SKILL_DISABLED=1
+      cargo() { return 1; }; git() { return 1; }   # never fetch or clone in a test
+      YOYO_SKILL_FLAGS=()
+      eval "$YS_FN"; setup_yoagent_skill >/dev/null; rc=$?
+      out="${YOYO_SKILL_FLAGS[*]:-none}"; echo "${out//$d/D}|rc=$rc"
+      rm -rf "$d" ) 2>/dev/null
+}
+if require "setup_yoagent_skill extracted" "$YS_FN"; then
+    check "yoagent skill: registry crate for the locked version is used" \
+        "$(ys_case 9.9.9 registry)" "--skills D/cargo/registry/src/idx/yoagent-9.9.9/skills|rc=0"
+    check "yoagent skill: an existing tag checkout is reused without cloning" \
+        "$(ys_case 9.9.8 clone)" "--skills D/ext/yoagent-v9.9.8/skills|rc=0"
+    check "yoagent skill: a 0.25.2 lock uses the v0.25.3 checkout" \
+        "$(ys_case 0.25.2 clone)" "--skills D/ext/yoagent-v0.25.3/skills|rc=0"
+    check "yoagent skill: YOYO_YOAGENT_SKILL_DISABLED=1 adds nothing" \
+        "$(ys_case 9.9.9 registry disabled)" "none|rc=0"
+    check "yoagent skill: no yoagent in Cargo.lock adds nothing and does not fail" \
+        "$(ys_case "" none)" "none|rc=0"
+fi
+
 # ── main push: retry, and never echo a failure into success ────────────────
 PR_FN=$(awk '/^push_main_with_retry\(\) \{/,/^\}/' "$SCRIPT")
 if require "push_main_with_retry extracted" "$PR_FN"; then
