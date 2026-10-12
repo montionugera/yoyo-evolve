@@ -149,6 +149,10 @@ pub fn cli_help_text() -> String {
          \x20                       A warning only — nothing is stopped and no run is killed"
     );
     let _ = writeln!(s, "  --no-bell         Disable terminal bell on long completions (also respects YOYO_NO_BELL env)");
+    let _ = writeln!(
+        s,
+        "  --no-hints        Don't print the dim contextual tip after REPL turns (or hints = false)"
+    );
     let _ = writeln!(s, "  --no-notify       Disable desktop notifications on long completions (also respects YOYO_NO_NOTIFY env)");
     let _ = writeln!(
         s,

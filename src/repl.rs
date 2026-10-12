@@ -801,8 +801,11 @@ async fn handle_post_prompt(mut ctx: PostPromptContext<'_>) {
             context_usage_ratio: usage_ratio,
             turns_since_slash_command: ctx.turns_since_slash_command,
         };
-        if let Some(hint) = crate::format::contextual_hint(&hint_ctx) {
-            eprintln!("{DIM}  {hint}{RESET}");
+        // Discussion #420: `--no-hints` / `hints = false` silence the tip.
+        if !crate::cli::is_hints_disabled() {
+            if let Some(hint) = crate::format::contextual_hint(&hint_ctx) {
+                eprintln!("{DIM}  {hint}{RESET}");
+            }
         }
 
         // Surface any background spawns that finished since the last turn.

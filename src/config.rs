@@ -1054,6 +1054,15 @@ pub fn parse_auto_continue_from_config(config: &std::collections::HashMap<String
     config_flag(config, "auto_continue", true)
 }
 
+/// Discussion #420: `hints` defaults **true**; only an explicit falsy value
+/// turns the contextual REPL tips off (garbage keeps the default). Returns
+/// true when DISABLED, to OR with `--no-hints`. No trust gate: it narrows.
+pub fn parse_hints_disabled_from_config(
+    config: &std::collections::HashMap<String, String>,
+) -> bool {
+    !config_flag(config, "hints", true)
+}
+
 /// Check whether `retry_after_partial` is enabled in the config (#997).
 /// Defaults to `false`: with stdout not a terminal, a turn that already
 /// streamed text is not retried (#976). `true` retries it anyway, accepting
@@ -1375,6 +1384,10 @@ pub const SETTABLE_KEYS: &[(&str, &str)] = &[
         "retry_after_partial",
         "retry a failed turn even after its text reached a non-terminal stdout (true/false)",
     ),
+    (
+        "hints",
+        "show contextual tips after REPL turns (true/false, default true)",
+    ),
     ("lite", "enable lite mode for small/local LLMs (true/false)"),
     ("no_bell", "suppress terminal bell (true/false)"),
     (
@@ -1474,6 +1487,14 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<String, String> {
                 _ => Err(format!(
                     "invalid continue_on_silence value '{value}' — use true or false"
                 )),
+            }
+        }
+        "hints" => {
+            let lower = value.to_ascii_lowercase();
+            match lower.as_str() {
+                "true" | "1" | "yes" | "on" => Ok("true".to_string()),
+                "false" | "0" | "no" | "off" => Ok("false".to_string()),
+                _ => Err(format!("invalid hints value '{value}' — use true or false")),
             }
         }
         "retry_after_partial" => {
@@ -3078,6 +3099,34 @@ env = { API_KEY = "secret" }
         let mut config = std::collections::HashMap::new();
         config.insert("auto_continue".to_string(), "true".to_string());
         assert!(parse_auto_continue_from_config(&config));
+    }
+
+    /// Discussion #420: `hints` defaults ON; only an explicit falsy value
+    /// disables, and garbage keeps the default (hints stay on).
+    #[test]
+    fn hints_disabled_only_by_an_explicit_falsy_value() {
+        let mut config = std::collections::HashMap::new();
+        assert!(
+            !parse_hints_disabled_from_config(&config),
+            "absent: hints on"
+        );
+        config.insert("hints".to_string(), "true".to_string());
+        assert!(!parse_hints_disabled_from_config(&config));
+        config.insert("hints".to_string(), "maybe".to_string());
+        assert!(
+            !parse_hints_disabled_from_config(&config),
+            "garbage: default"
+        );
+        for off in ["false", "0", "no", "off"] {
+            config.insert("hints".to_string(), off.to_string());
+            assert!(parse_hints_disabled_from_config(&config), "{off} disables");
+        }
+        assert_eq!(
+            validate_config_value("hints", "off"),
+            Ok("false".to_string())
+        );
+        assert!(validate_config_value("hints", "maybe").is_err());
+        assert!(SETTABLE_KEYS.iter().any(|(k, _)| *k == "hints"));
     }
 
     #[test]

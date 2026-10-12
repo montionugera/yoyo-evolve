@@ -119,6 +119,7 @@ temperature = 0.7
 
 # Display settings
 no_bell = false
+hints = true      # false = no contextual tips after REPL turns
 quiet = false
 no_color = false
 

@@ -194,6 +194,10 @@ This shows:
 - Input→output tokens for this turn
 - Estimated cost for this turn
 
+## Contextual tips
+
+After some turns yoyo prints one dim tip on stderr (for example, suggesting `/watch` or `/compact`). Turn these off with `--no-hints` or `hints = false` in `.yoyo.toml`. This does not affect the inline completion hints you see while typing a slash command.
+
 ## Interrupting
 
 Press **Ctrl+C** to cancel the current response. The agent will stop and you can type a new prompt. Press Ctrl+C again to exit.

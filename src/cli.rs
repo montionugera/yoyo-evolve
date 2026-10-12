@@ -56,6 +56,25 @@ pub fn is_continue_on_silence() -> bool {
     *CONTINUE_ON_SILENCE.get_or_init(|| false)
 }
 
+/// Discussion #420: `--no-hints` / `hints = false` silence the dim contextual
+/// tip after a REPL turn. Default false (hints on): setting neither changes nothing.
+static HINTS_DISABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+pub fn set_hints_disabled() {
+    let _ = HINTS_DISABLED.set(true);
+}
+pub fn is_hints_disabled() -> bool {
+    *HINTS_DISABLED.get_or_init(|| false)
+}
+/// Pure core: `--no-hints` OR `hints = false` → off (there is no `--hints`).
+/// A project `.yoyo.toml` needs no trust gate: turning a nudge off grants nothing.
+pub(crate) fn hints_disabled_from(
+    args: &[String],
+    file_config: &std::collections::HashMap<String, String>,
+) -> bool {
+    args.iter().any(|a| a == "--no-hints")
+        || crate::config::parse_hints_disabled_from_config(file_config)
+}
+
 /// #997: opt-in `retry_after_partial` (config key only). Default **off**:
 /// when stdout is not a terminal and an attempt already streamed text, the
 /// #976 rule refuses yoyo's own retry. Opted in, the retry runs anyway, and
@@ -701,6 +720,7 @@ pub(crate) const KNOWN_FLAGS: &[&str] = &[
     "--wait-for-reset",
     "--cost-warn",
     "--no-bell",
+    "--no-hints",
     "--no-notify",
     "--no-rtk",
     "--no-update-check",
@@ -2277,6 +2297,9 @@ pub(crate) fn parse_args_with_config(
     {
         crate::format::enable_quiet();
     }
+    if hints_disabled_from(args, &file_config) {
+        set_hints_disabled();
+    }
     if !args.iter().any(|a| a == "--no-bell")
         && crate::config::parse_no_bell_from_config(&file_config)
     {
@@ -3846,6 +3869,40 @@ mod tests {
         let args = ["yoyo".to_string(), "--screen-reader".to_string()];
         assert!(args.iter().any(|a| a == "--screen-reader"));
         assert!(KNOWN_FLAGS.contains(&"--screen-reader"));
+    }
+
+    /// Discussion #420: both sources turn hints off; with neither, hints stay
+    /// on (the default every existing user gets). Tests the pure function, not
+    /// the process global, to stay clear of global-state races.
+    #[test]
+    fn hints_switch_reads_flag_and_config_and_defaults_on() {
+        let argv = |xs: &[&str]| xs.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let empty = std::collections::HashMap::new();
+        assert!(
+            !hints_disabled_from(&argv(&["yoyo"]), &empty),
+            "default: on"
+        );
+        assert!(hints_disabled_from(&argv(&["yoyo", "--no-hints"]), &empty));
+        assert!(KNOWN_FLAGS.contains(&"--no-hints"));
+        assert!(
+            !FLAGS_NEEDING_VALUES.contains(&"--no-hints"),
+            "--no-hints takes no value"
+        );
+        let mut on = std::collections::HashMap::new();
+        on.insert("hints".to_string(), "true".to_string());
+        assert!(!hints_disabled_from(&argv(&["yoyo"]), &on));
+        // No `--hints` exists to force them on: the flag wins in the off direction.
+        assert!(hints_disabled_from(&argv(&["yoyo", "--no-hints"]), &on));
+    }
+
+    /// A project `.yoyo.toml` saying `hints = false` is honoured, parsed through
+    /// the real config parser. No trust gate: turning a nudge off grants nothing.
+    #[test]
+    fn project_yoyo_toml_hints_false_is_honoured() {
+        let cfg = crate::config::parse_config_file("model = \"x\"\nhints = false\n");
+        assert!(hints_disabled_from(&["yoyo".to_string()], &cfg));
+        let cfg = crate::config::parse_config_file("model = \"x\"\n");
+        assert!(!hints_disabled_from(&["yoyo".to_string()], &cfg));
     }
 
     #[test]
