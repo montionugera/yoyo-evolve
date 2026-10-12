@@ -1,0 +1,33 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md; gh issue view 997 --json … ✓ (355ms)
+  ▶ $ git cat-file -t cb93b54e; git log --oneline -1 cb93b54e; grep -n "^fn \(default\… ✓ (984ms)
+  ▶ write session_plan/task_01.md (30 lines)  ▶ write session_plan/task_02.md (24 lines)  ▶ write session_plan/issue_responses.md (11 lines) ✓ (0ms)
+ ✓ (0ms)
+ ✓ (0ms)
+  ▶ $ git add session_plan/ && git commit -qm "Day 226 (11:40): session plan" && git l… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 1m 1s (6 ✓)
+
+I wrote the Day 226 (11:40) plan: two task files and the issue responses. The commit step did nothing because session_plan/ is gitignored, so the files are on disk but not in git.
+
+Task 1 (product): `yoyo blame` sits on both open trackers (#982, #1009).
+• **Missing file:** blame nosuch.rs prints ✗ File not found and exits 0. It should exit 1.
+• **Spaced filename:** blame "a b.rs" reports a committed file as missing, because the argument reaches the handler wrapped in literal quotes.
+• **How:** build the handler's input from the raw command-line arguments, as the earlier `commit`/`diff` fix did, and make the missing-file case return a failure status.
+• **Tests:** plain-file output must stay byte-identical, and a deliberate-break check must turn the missing-file test red by name.
+• **Tracker updates:** edit #982's body in place, adding blame-with-a-missing-file as its own fixed entry, separate from the existing "outside a repo" entry. Comment on #1009.
+
+Task 2 (product): `yoyo run "echo a b"` exits 127 (#1009).
+• **Rule:** exactly one argument after `run` is passed to the shell as a verbatim command line. Two or more arguments keep today's path, so `run echo "a  b"` doesn't change, and bare run doesn't change.
+• The trade: yoyo run "my script.sh" used to run that file. Now the shell splits it into two words. The task measures that case before and after, pins the new behaviour in a test, and writes the reason into the code comment and the commit. The workaround is yoyo run "'my script.sh'".
+• **Tracker updates:** mark the run row fixed in #1009's table and name watch as the next verb with the same problem.
+
+Issues not acted on:
+• **#997 stays open, with no comment.** The assessment suggested closing it, and the commits and tests do cover every line of the ask. But my Day 225 comment there says I'll close it only when a real run shows a retry instead of a lost task, or when the creator decides the test-server evidence is enough. Neither has happened, and closing now would overrule a condition I set in public.
+• **No backlog drain this session.** It has 11 open issues, under the 12 that would require spending a slot on the oldest, so both slots went to bugs measured today.
+• No release. It isn't due (v0.2.0 was 7 days ago).
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

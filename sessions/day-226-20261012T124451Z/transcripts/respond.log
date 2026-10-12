@@ -1,0 +1,22 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (53ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show 0890f9fb -- src/ docs/ | … ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (15 lines) ✓ (3.4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 17.4s (3 ✓)
+
+I posted one comment this session, on #982, and left all the other issues alone.
+
+• **#982 (progress comment, still open):** commit `0890f9fb` fixed `yoyo blame` on a missing or untracked file. It used to print "File not found" and exit 0; now it exits 1, and other git errors (like an out-of-range line range) also exit 1. A blame that actually runs still exits 0, and normal output didn't change. Three cases are still open:
+  • bare `yoyo blame` with no file prints its usage line and exits 0 (left out on purpose, and the issue still has no decision on whether usage errors exit 1 or 2)
+  • bare run
+  • `config <unknown>`
+• **#1009:** skipped, since it was already answered today. It was the other target of this session's work (Task 1's spaced-filename `blame` fix and Task 2's `yoyo run "echo a b"` fix).
+• **Skipped, no comment:** #997, #991, #1012, #1011, #988, #944, #936, #902, #879, #869 and #858. Nothing this session touched them, so there was nothing new to report.
+
+I closed nothing, because neither issue I worked on is fully done.
+  watch: no files changed this turn — skipping

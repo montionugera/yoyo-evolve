@@ -1,0 +1,147 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (10ms)
+  ▶ $ sed -n 395,415p src/dispatch_sub.rs; grep -n "blame" src/commands_git_review.rs … ✓ (5ms)
+  ▶ $ sed -n 340,395p src/commands_git_review.rs; sed -n 488,560p src/commands_git_rev… ✓ (7ms)
+  ▶ $ grep -n "blame" tests/integration.rs; sed -n 2875,2900p tests/integration.rs ✓ (4ms)
+  ▶ $ sed -n 2855,2880p tests/integration.rs; sed -n 3140,3200p tests/integration.rs ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 8.0s (5 ✓)
+
+Measure first: build and record the three rows.
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cargo build 2>&1 | tail -2; B=$PWD/target/debug/yoyo; D=$(mktemp -d); cd $D; git… ✓ (175ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ sed -n 494,499p src/commands_git_review.rs; grep -n "join_args_as_command(args)"… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 16.6s (2 ✓)
+
+Tests first (integration, through the binary):
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ edit tests/integration.rs (2 → 102 lines)
+  + /// A temp git repo with `plain.rs` and `a b.rs` committed, git confined to it.
+  + fn blame_fixture_repo() -> tempfile::TempDir {
+  +     let dir = tempfile::tempdir().expect("tempdir");
+  +     let git = |args: &[&str]| {
+  +         let ok = Command::new("git")
+  +             .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c"])
+  +             .args(["commit.gpgsign=false"])
+  +             .args(args)
+  +             .current_dir(dir.path())
+  +             .env("GIT_CEILING_DIRECTORIES", dir.path().parent().unwrap())
+  +             .status()
+  +             .expect("git");
+  +         assert!(ok.success(), "git {args:?}");
+  +     };
+  +     git(&["init", "-q"]);
+  +     std::fs::write(dir.path().join("plain.rs"), "plain_marker_982\n").unwrap();
+  +     std::fs::write(dir.path().join("a b.rs"), "spaced_marker_1009\n").unwrap();
+  +     git(&["add", "plain.rs", "a b.rs"]);
+  +     git(&["commit", "-q", "-m", "init"]);
+  +     // Anti-vacuous: the spaced file really has a space and really is committed.
+  ... (82 more lines)
+  ▶ $ cargo test --test integration git_blame 2>&1 | grep -E "^test |panicked|left|rig… ✓ (1m 21s)
+  + /// A temp git repo with `plain.rs` and `a b.rs` committed, git confined to it.
+  + fn blame_fixture_repo() -> tempfile::TempDir {
+  +     let dir = tempfile::tempdir().expect("tempdir");
+  +     let git = |args: &[&str]| {
+  +         let ok = Command::new("git")
+  +             .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c"])
+  +             .args(["commit.gpgsign=false"])
+  +             .args(args)
+  ... (13 more lines)
+ ✓ (1m 21s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 25s (2 ✓)
+
+Two expected reds; the near-miss failure is my typo in the expected string (the step-1 recording shows one trailing newline, not two). Fix the expectation to match the pre-fix recording:
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (7 lines) ✓ (21ms)
+
+Now the fix:
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (17 lines) ✓ (21ms)
+  ▶ read src/commands_git_review.rs:494..499 ✓ (0ms)
+  ▶ $ python3 - <<'EOF' (36 lines) ✓ (10.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 17.8s (3 ✓)
+
+All four green. Now the positive control (one atomic mutate→test→restore), then the outside-repo regression test and the range syntax by hand:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ F=src/commands_git_review.rs; cp $F /tmp/bk.rs; python3 -c " (3 lines) ✓ (21.1s)
+
+Control failed by name and restored green. Hand re-run of the step-1 rows plus range syntax:
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ B=$PWD/target/debug/yoyo; cd /tmp/tmp.Xj9ViCLdN0; for a in nosuch.rs "a b.rs" pl… ✓ (43ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cargo fmt && cargo build 2>&1 | tail -1 && cargo clippy --all-targets -- -D warn… ✓ (3m 32s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3m 38s (2 ✓)
+
+Gate green (no non-ok result lines; clippy and fmt clean). The docs describe blame's exit behaviour, so I'll update that sentence:
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (8 lines) ✓ (807ms)
+
+Commit first (so the issue edit can cite a real SHA), then the trackers.
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ git add -A && git commit -q -F - <<'EOF' (31 lines) ✓ (18ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ gh issue view 982 --json body --jq .body > /tmp/b982.md; sed -n 5,20p /tmp/b982.… ✓ (756ms)
+  ▶ $ python3 - <<'EOF' (8 lines) ✓ (3.0s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 10.8s (3 ✓)
+
+#982's body is updated (verified by the grep). Now the #1009 comment:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ gh issue comment 1009 --body-file - <<'EOF' (10 lines) ✓ (2.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Both halves are fixed and committed as 0890f9fb, with Part of #982 and Part of #1009 in the message. The commit isn't pushed yet; the session's push will take it, and the #982 edit and #1009 comment both cite that SHA.
+
+Before and after (scratch repo, NO_COLOR=1, </dev/null, exit code read directly):
+
+| invocation | before | after |
+|---|---|---|
+| yoyo blame nosuch.rs | ✗ File not found: nosuch.rs, exit 0 | same text, exit 1 |
+| yoyo blame "a b.rs" (committed) | ✗ File not found: "a b.rs", exit 0 | its blame output, exit 0 |
+| yoyo blame plain.rs | blame output, exit 0 | byte-identical, exit 0 |
+
+What changed:
+• **#1009 (the space):** the `blame` arm in `src/dispatch_sub.rs` now builds its input with the existing `join_args_as_command` instead of `quote_args_as_command`. `/blame` treats everything after it as one path (or path:L-R), the same as the REPL. I didn't reuse find_pattern_from_argv, because it refuses two or more arguments and blame never has. Arguments without spaces join exactly as before, and I checked that plain.rs:1-1 and "a b.rs:1-1" still work.
+• **#982 (the exit code):** in `src/commands_git_review.rs`, `handle_blame_status` now returns 1 when the file isn't found. The text is unchanged and still goes to stdout. The REPL `/blame` still ignores the code.
+• **One wider change than the task named:** any other git error from blame also exits 1 now. For example, `plain.rs:5-9` on a one-line file used to print git's error and exit 0; now it exits 1. I counted that as "can't blame this file". Running yoyo blame with no file still prints usage and exits 0; that's out of scope.
+
+Verification:
+• Three new tests in tests/integration.rs run the built binary:
+  • a missing file exits 1;
+  • the spaced file prints its blame with no literal " in the output;
+  • near miss: the plain file's full stdout matches the step-1 recording exactly (assert_eq!).
+• The fixture also checks that a b.rs really is committed and has a space in its name. The existing "outside a repo exits 1" test still passes.
+• The near-miss test failed on its first run because I had typed an extra trailing newline into the expected string. I fixed the expectation to match the pre-change recording; the output itself never changed.
+• Positive control, run as one mutate→test→restore command: making the missing-file branch return 0 again failed git_blame_of_a_missing_file_exits_one by name, and restoring it went back to green. No marker was left behind.
+• `cargo build, cargo test, cargo clippy --all-targets -- -D warnings and cargo fmt -- --check` all pass.
+
+Docs and trackers:
+• I updated the exit-code paragraph in docs/src/usage/commands.md.
+• #982's "Already fixed" list now has a blame <missing file> entry tied to that condition (checked with gh issue view).
+• I commented on #1009 with the before/after rows.
+• Both issues stay open because each still has other affected commands.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
