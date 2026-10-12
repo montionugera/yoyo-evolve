@@ -1,0 +1,135 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat src/commands_file_fence.rs ✓ (3ms)
+ ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn \|static\|OnceLock\|Mu… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 228,302p src/cd_config_note… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "admit_for_add\|path_guar… ✓ (23ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 230,300p src/config.rs; sed… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,80p src/commands_file_fen… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 80,276p src/commands_file_f… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p tests/global_state_ra… ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; head -c 6000 tests/global_state_ra… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '"' tests/global_state_rac… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "expand_file_mentions(\|h… ✓ (52ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (6 lines) ✓ (22ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  13 tools completed in 49.9s (13 ✓)
+
+Now the seam in cd_config_note.rs and the new check.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/cd_config_note.rs (1 → 9 lines)
+  + /// A clone of the process-wide `/cd` directory-deny handle, for readers outside
+  + /// this module that compose their own refusal wording (`commands_file_fence`'s
+  + /// `@path`/`/add`/`/explain`/`--image` doors, #869). Mirrors
+  + /// `cd_deny::cd_added_deny_handle`.
+  + pub(crate) fn cd_denied_dirs_handle() -> crate::cd_deny::DenyAdditions {
+  +     std::sync::Arc::clone(&CD_DENIED_DIRS)
+  + }
+  + 
+    /// The production guard call, reading the process-wide `/cd` list.
+ ✓ (18.7s)
+  + /// A clone of the process-wide `/cd` directory-deny handle, for readers outside
+  + /// this module that compose their own refusal wording (`commands_file_fence`'s
+  + /// `@path`/`/add`/`/explain`/`--image` doors, #869). Mirrors
+  + /// `cd_deny::cd_added_deny_handle`.
+  + pub(crate) fn cd_denied_dirs_handle() -> crate::cd_deny::DenyAdditions {
+  +     std::sync::Arc::clone(&CD_DENIED_DIRS)
+  + }
+  + 
+    /// The production guard call, reading the process-wide `/cd` list.
+
+Expected — the consumer comes next.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (68 lines) ✓ (10.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 -c " (2 lines) ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 -c " (3 lines) ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "" src/commands_file_fence… ✓ (4ms)
+  ▶ edit src/commands_file_fence.rs (1 → 3 lines)
+  - /// judged at its target. With no restrictions it short-circuits to `Ok`.
+  + /// judged at its target. It also asks the `[directories] deny` entries `/cd`
+  + /// has appended (#869), so these doors refuse what `read_file` refuses after a
+  + /// `/cd`. With no restrictions and an empty `/cd` list it short-circuits to `Ok`.
+ ✓ (3m 58s)
+  - /// judged at its target. With no restrictions it short-circuits to `Ok`.
+  + /// judged at its target. It also asks the `[directories] deny` entries `/cd`
+  + /// has appended (#869), so these doors refuse what `read_file` refuses after a
+  + /// `/cd`. With no restrictions and an empty `/cd` list it short-circuits to `Ok`.
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 4m 19s (5 ✓)
+
+Now the tests (appended; existing ones untouched).
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat >> src/com… (149 lines) ✓ (29.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Green. Now the positive control, as one atomic mutate→test→restore:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/command… (9 lines) ✓ (53.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control behaved as intended: exactly the 3 new refusal tests went red by name, near-misses + the original 12 stayed green, restore → 18/18, marker gone. Now docs.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "/cd" docs/src/configurati… ✓ (7ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 540,548p docs/src/configura… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (23ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "Day 226" ARCHITECTURE.md … ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "path_guard_refusal\|CD_DE… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show 863e2ae5 --stat | head -2… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (20 lines) ✓ (20.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (3m 33s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (5m 58s)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 10m 23s (9 ✓)
+
+All green (every suite ok, 0 FAILED). Commit, then the #869 comment.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --s… (23 lines) ✓ (557ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (5 lines) ✓ (929ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show --stat HEAD | tail -7; gi… ✓ (26ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 15.5s (3 ✓)
+
+After a /cd, @path mentions, /add, /explain and --image now refuse files under the new directory's [directories] deny entries, the same way read_file already did. Before this, the file tools refused such a path while @path still sent its contents to the provider. Build, the full test suite, clippy with -D warnings and the fmt check all pass, and it's committed as ddbb29f1.
+
+What changed
+• **src/commands_file_fence.rs:** `admit_for_add` checks the startup fence first, and its result and wording are unchanged. If the startup fence allows the path, it then asks the `/cd list using cd_denied_dir_refusal_with, the same check the file tools use, so symlinks are judged by where they point. A refusal from the /cd list ends with (a [directories] deny entry applied by /cd), so you can tell it apart from a --deny-dir refusal. If /cd` hasn't added anything, nothing extra is checked.
+• **`src/cd_config_note.rs:** added cd_denied_dirs_handle(), an 8-line function that hands out the session-wide list. It mirrors cd_deny::cd_added_deny_handle`.
+• **How tests reach the list:** the functions behind the four doors have 47 callers across four files, so passing the list through all of them wasn't worth it. Tests call `admit_for_add_with(list, …) directly, or use a test-only per-thread override, TEST_CD_DIR_DENY`. No test touches the real session-wide list.
+
+Tests: 6 new ones in src/commands_file_fence_tests.rs. The original 12 were not edited and still pass.
+• **Refusals:** a direct path and a symlink are both refused, checked against the exact warning line. The `@`-mention, `/add`, `/explain` and `--image` doors each have a test. The mention test also confirms the same mention does get inlined when the /cd list is empty.
+• **Both fences deny:** the startup fence's message is the one shown.
+• **No change when unused:** with an empty /cd list, or one naming an unrelated folder, mention, /add and read output are byte-identical to before.
+• **Sabotage check:** I disabled the new `/cd` check and re-ran the tests in one step. Exactly the 3 refusal tests failed and the other 15 passed. After restoring it, all 18 pass and the temporary NEUTERED marker is gone.
+
+Still not done: 5 of the 6 measured file-path readers still see only the startup fence. They are:
+• the context.rs loaders
+• `commands_project.rs`
+• `commands_rename.rs`
+• `commands_map.rs`
+• `commands_goal.rs`
+
+[directories] allow, [permissions] allow, hooks, MCP servers and skills are also still not reloaded on /cd. This is written in the commit message, in a new section of ARCHITECTURE.md, and in a [comment on #869](https://github.com/yologdev/yoyo-evolve/issues/869#issuecomment-6116627654), which is still open. docs/src/configuration/permissions.md now lists these four doors as covered and names the readers that still aren't.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/2 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/2 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/cd_config_note.rs, src/commands_file_fence.rs

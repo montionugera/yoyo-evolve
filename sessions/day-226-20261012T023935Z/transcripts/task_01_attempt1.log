@@ -1,0 +1,146 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; grep … ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 100,300p tests/print_stdo…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 2680,2720p src/cli.rs; gr… ✓ (11ms)
+ ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 495,600p src/cli.rs; sed … ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn gate_project_skills"… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 200,300p tests/print_stdo… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && ls tests/common; head -30 tests/… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "skills" src/agent_build… ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 36.1s (8 ✓)
+
+Good — skills go via yoagent's with_skills, appended to the system prompt at agent build time (not by --print-system-prompt). Now the probe test.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ write tests/skills_fence_request.rs (278 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --test skills_fence_r… ✓ (3m 31s)
+ ✓ (3m 31s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && Y=~/.cargo/registry/src/index.cr…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "raw_config_content\|let… ✓ (6ms)
+ ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "pub fn load_project_con… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n '"src/cli.rs"\|"src/cont… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && Y=~/.cargo/registry/src/index.cr… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && Y=~/.cargo/registry/src/index.cr… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1690,1765p src/cli.rs; se… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && awk 'NR>2600 && NR<3200 && /dir_… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "auto_discover_skills("… ✓ (12ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  11 tools completed in 4m 56s (11 ✓)
+
+Now the module.
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ write src/skill_fence.rs (193 lines) ✓ (2m 15s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1480,1520p src/cli.rs; gr… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 2m 22s (2 ✓)
+
+Now wire it into cli.rs: register the module, hoist the fence parse above skill loading, and gate both skill sources.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (54 lines) ✓ (35ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt && cargo build 2>&1 | … ✓ (12.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (41 lines) ✓ (2.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "assert_eq!(denied\|Near… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (46 lines) ✓ (2.3s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 47.2s (5 ✓)
+
+Positive control — neuter admit_skill_dir, run, restore, one atomic command:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/skill… (3 lines) ✓ (22.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Both deny tests go red by name when neutered and green after the restore. Now one more door, --skills <dir>, end-to-end:
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat >> tests… (41 lines) ✓ (2.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Get the --skills door's pre-fix reading using the same neutered control (it's the same as pre-fix for skill loading):
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/skill… (3 lines) ✓ (11.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Restored (0 markers). Now docs: check what permissions.md and ARCHITECTURE.md say about the fence's loaders.
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n -i "skill\|memory.json\|… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 205,225p docs/src/configu… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "^- \`cli.rs\`\|^- \`con… ✓ (10ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (18 lines) ✓ (40ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 27.8s (4 ✓)
+
+Verify the reporting claim I just wrote before keeping it:
+  ╭─ Turn 31 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn auto_discovered_skil… ✓ (13ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (16 lines) ✓ (4m 1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (6m 2s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 10m 29s (3 ✓)
+
+All green: 20 suites, 0 failed, clippy clean, fmt clean, harness 173/0. Commit:
+  ╭─ Turn 34 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git add -A &… (33 lines) ✓ (443ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue com… (21 lines) ✓ (1.2s)
+  2 tools completed in 20.9s (2 ✓)
+
+Skill content under a --deny-dir target was reaching the provider request. I measured it, fenced the skill loader, and committed (6e853815). I also posted the results table on #1002.
+
+What I measured. I ran the real binary against a stub provider that saves every request body it receives. I planted a marker string (SKILL_CANARY_ZZ7) in a skill's description and counted how often it appeared in the request:
+
+| skill setup | no fence | --deny-dir (before → after) | --allow-dir proj |
+|---|---|---|---|
+| .yoyo/skills symlinked to secret/skills | 1 | 1 → 0 | 1 |
+| plain .yoyo/skills/canary | 1 | 1 → 0 | – |
+| --skills <secret>/skills | 1 | 1 → 0 | – |
+
+• The no-fence column is the control that proves this check can see a leak. Days 221/222 got 0 hits from --print-system-prompt even for unfenced skills; that wasn't proof of safety, it just can't see skills.
+• I didn't run the old binary for the --skills "before" number. It comes from the same check with the fence forced to let everything through, which behaves the same as the old loader.
+• Only each skill's name, description and file location leaked. The body of the skill file is never sent.
+
+The fix
+• **Where:** a new `src/skill_fence.rs` checks every skill directory with the same path check the file tools and instruction loader use (`DirectoryRestrictions::check_path), judging symlinks by where they point. It runs before yoagent reads anything, and covers --skills, .yoyo/skills/, ~/.yoyo/skills/` and the install dir.
+• **Order change:** I moved the code that reads the directory fence settings above skill loading. Project-context fencing is unchanged; only the order of that code's own stderr warnings moved.
+• **Whole directories, not single skills:** yoagent's `SkillSet` can't have skills removed once loaded. So if any skill in a directory is refused, the whole directory is skipped, and a normal (not dimmed, not quiet-gated) warning names every refused file.
+• **Behaviour change for users:** with `--allow-dir`, a `~/.yoyo/skills/` outside every allowed directory is now refused. `read_file` already refused those skills' file locations, so the model was being offered skills it couldn't open.
+
+Verification
+• **Pass-through:** with --allow-dir proj, or a deny entry somewhere else, the request is byte-identical to the unfenced one.
+• **Positive control:** I forced the fence to let everything through, ran the tests and restored it, all in one command. Both deny tests failed by name, then passed again; no neutered marker was left in the code.
+• **Checks:** build, tests (20 suites, 0 failed), clippy with warnings as errors, fmt and harness_logic.sh (173/0) all pass.
+• **Regression tests:** tests/skills_fence_request.rs, plus unit tests in src/skill_fence.rs.
+
+Still open
+• #1002's `--safe-mode` goal-file decision, so the commit says "Part of #1002", not "Fixes".
+• /doctor's skill audit (commands_dev.rs:304) re-reads the skill directories from disk, so it still lists fenced ones. That output only goes to the terminal, never to the model.
+
+I updated the docs to match: a new entry in ARCHITECTURE.md and a paragraph in docs/src/configuration/permissions.md.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/skill_fence.rs
