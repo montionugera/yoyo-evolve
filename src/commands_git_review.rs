@@ -493,9 +493,10 @@ pub fn handle_blame(input: &str) {
 }
 
 /// `/blame` with an exit status for the shell door (`yoyo blame`, #982):
-/// 1 when the not-a-git-repository branch fires, 0 otherwise. Only that
-/// branch changes status in this slice. The REPL calls `handle_blame`, which
-/// discards the code.
+/// 1 when git fails (not a repository, a missing or untracked file, any other
+/// git error), 0 when blame ran (including an empty blame) or for the usage
+/// line. The printed text is unchanged on every branch. The REPL calls
+/// `handle_blame`, which discards the code.
 pub fn handle_blame_status(input: &str) -> i32 {
     let args = match parse_blame_args(input) {
         Ok(a) => a,
@@ -525,11 +526,13 @@ pub fn handle_blame_status(input: &str) -> i32 {
             let msg = e.to_string();
             if msg.contains("no such path") || msg.contains("No such file") {
                 println!("  {RED}✗{RESET} File not found: {DIM}{}{RESET}", args.file);
+                return 1;
             } else if msg.contains("not a git repository") || msg.contains("fatal: not a git") {
                 println!("  {RED}✗{RESET} Not in a git repository");
                 return 1;
             } else {
                 println!("  {RED}✗{RESET} {msg}");
+                return 1;
             }
         }
     }

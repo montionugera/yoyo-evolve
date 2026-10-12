@@ -404,7 +404,12 @@ pub(crate) fn try_dispatch_subcommand_in(
                 std::process::exit(exit_code);
             }
             "blame" => {
-                let input = quote_args_as_command(args);
+                // #1009: plain join, not `quote_args_as_command` — `/blame`
+                // takes its remainder as ONE path (or `path:L-R`), exactly as
+                // the REPL does, so the added `"..."` made `yoyo blame "a b.rs"`
+                // look up a name containing quote characters and report a
+                // committed file as missing. Unspaced args join identically.
+                let input = join_args_as_command(args);
                 exit_if_nonzero(crate::commands_git_review::handle_blame_status(&input));
                 return Some(None);
             }

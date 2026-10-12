@@ -3181,6 +3181,109 @@ fn git_blame_of_a_committed_file_still_exits_zero() {
     assert!(!stdout.contains("Not in a git repository"));
 }
 
+/// A temp git repo with `plain.rs` and `a b.rs` committed, git confined to it.
+fn blame_fixture_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let git = |args: &[&str]| {
+        let ok = Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c"])
+            .args(["commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir.path())
+            .env("GIT_CEILING_DIRECTORIES", dir.path().parent().unwrap())
+            .status()
+            .expect("git");
+        assert!(ok.success(), "git {args:?}");
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join("plain.rs"), "plain_marker_982\n").unwrap();
+    std::fs::write(dir.path().join("a b.rs"), "spaced_marker_1009\n").unwrap();
+    git(&["add", "plain.rs", "a b.rs"]);
+    git(&["commit", "-q", "-m", "init"]);
+    // Anti-vacuous: the spaced file really has a space and really is committed.
+    let tracked = Command::new("git")
+        .args(["ls-files"])
+        .current_dir(dir.path())
+        .env("GIT_CEILING_DIRECTORIES", dir.path().parent().unwrap())
+        .output()
+        .expect("git ls-files");
+    let tracked = String::from_utf8_lossy(&tracked.stdout).to_string();
+    assert!(
+        tracked.lines().any(|l| l == "a b.rs" && l.contains(' ')),
+        "{tracked}"
+    );
+    dir
+}
+
+#[test]
+fn git_blame_of_a_missing_file_exits_one() {
+    // #982: `yoyo blame nosuch.rs` printed "File not found" and exited 0.
+    let dir = blame_fixture_repo();
+    let out = yoyo_in_dir(dir.path(), &["blame", "nosuch.rs"]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stdout={stdout} stderr={stderr}"
+    );
+    // The text and its channel are unchanged.
+    assert!(stdout.contains("File not found"), "stdout={stdout}");
+    assert!(stdout.contains("nosuch.rs"), "stdout={stdout}");
+}
+
+#[test]
+fn git_blame_finds_a_committed_file_whose_name_has_a_space() {
+    // #1009: argv `a b.rs` reached the handler as `"a b.rs"` (literal quotes),
+    // so a file that exists was reported missing, with exit 0.
+    let dir = blame_fixture_repo();
+    let out = yoyo_in_dir(dir.path(), &["blame", "a b.rs"]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout={stdout} stderr={stderr}"
+    );
+    assert!(stdout.contains("spaced_marker_1009"), "stdout={stdout}");
+    assert!(!stdout.contains("File not found"), "stdout={stdout}");
+    assert!(
+        !stdout.contains('"'),
+        "no literal quote looked up: {stdout}"
+    );
+}
+
+#[test]
+fn git_blame_of_a_plain_committed_file_is_byte_identical() {
+    // Near miss for #982/#1009: the common case's bytes and exit don't move.
+    let dir = blame_fixture_repo();
+    let out = yoyo_cmd()
+        .args(["blame", "plain.rs"])
+        .current_dir(dir.path())
+        .env("GIT_CEILING_DIRECTORIES", dir.path().parent().unwrap())
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .output()
+        .expect("run yoyo");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    assert_eq!(out.status.code(), Some(0), "stdout={stdout}");
+    // `<sha> (t <date> <time> <tz> 1) plain_marker_982` — the sha and date
+    // vary, so pin everything around them byte-for-byte.
+    let sha = Command::new("git")
+        .args(["rev-parse", "--short=7", "HEAD"])
+        .current_dir(dir.path())
+        .output()
+        .expect("git rev-parse");
+    let sha = String::from_utf8_lossy(&sha.stdout).trim().to_string();
+    let date = Command::new("git")
+        .args(["log", "-1", "--format=%ad", "--date=iso"])
+        .current_dir(dir.path())
+        .output()
+        .expect("git log");
+    let date = String::from_utf8_lossy(&date.stdout).trim().to_string();
+    assert_eq!(stdout, format!("\n^{sha} (t {date} 1) plain_marker_982\n"));
+}
+
 #[test]
 fn changelog_evolution_tree_exit_one_outside_a_git_repository() {
     // #982 slice: `yoyo changelog`, `yoyo evolution` and `yoyo tree` printed
