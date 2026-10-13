@@ -74,17 +74,6 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           rtk --version || echo "RTK install failed; agent will use native compressor"
 
-      # Install xurl for the x-research skill. Same purpose as in evolve.yml.
-      # Fail-soft: token absence leaves the skill unavailable but the cycle
-      # proceeds — skill-evolve doesn't typically invoke x-research anyway.
-      - name: Install xurl (x-research skill)
-        continue-on-error: true
-        run: |
-          if ! command -v xurl &>/dev/null; then
-            cargo install xurl
-          fi
-          xurl --version || echo "::warning::xurl install failed; x-research skill will be unavailable"
-
       - name: Detect bot identity
         id: bot-info
         run: |
@@ -116,6 +105,8 @@ jobs:
           APP_INSTALLATION_ID: ${{ secrets.APP_INSTALLATION_ID }}
           BOT_LOGIN: ${{ steps.bot-info.outputs.login }}
           BOT_SLUG: ${{ steps.bot-info.outputs.slug }}
+          # x-research (dream-cycle skill) runs in CI via curl + this token, if a
+          # cycle evaluates it; xurl is local-only, so nothing is installed.
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: |
           chmod +x scripts/skill_evolve.sh

@@ -91,6 +91,9 @@ jobs:
       - name: Run dream cycle
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # x-research: read-only X access during the dream's wandering. CI mode
+          # calls the X API with curl and this token; xurl is local-only.
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ steps.bot-token.outputs.token }}
