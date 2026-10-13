@@ -161,12 +161,35 @@ fn goal_for_prompt_fenced_in(
     dir: &Path,
     restrictions: &crate::config::DirectoryRestrictions,
 ) -> (Option<String>, Option<String>) {
+    goal_for_prompt_fenced_in_with(
+        &crate::commands_file_fence::cd_dir_deny_list(),
+        dir,
+        restrictions,
+    )
+}
+
+/// [`goal_for_prompt_fenced_in`] with the `/cd`-appended `[directories] deny`
+/// list passed in (#869). `/goal check` reads `./.yoyo/goal.md` at call time,
+/// so after `/cd` it reads the NEW directory's goal file, and that directory's
+/// deny entries must fence it like they fence `read_file` and `@path`. The
+/// startup fence is asked first, verdict and wording byte-identical; a `/cd`
+/// refusal ends with `CD_DENY_SOURCE_NOTE`. An empty list adds no check.
+fn goal_for_prompt_fenced_in_with(
+    cd_list: &crate::cd_deny::DenyAdditions,
+    dir: &Path,
+    restrictions: &crate::config::DirectoryRestrictions,
+) -> (Option<String>, Option<String>) {
     let path = dir.join(GOAL_FILE);
     if !path.exists() {
         return (None, None);
     }
-    if let Err(reason) = restrictions.check_path(&path.to_string_lossy()) {
+    let shown = path.to_string_lossy();
+    if let Err(reason) = restrictions.check_path(&shown) {
         return (None, Some(reason));
+    }
+    if let Some(reason) = crate::cd_config_note::cd_denied_dir_refusal_with(cd_list, &shown) {
+        let note = crate::commands_file_fence::CD_DENY_SOURCE_NOTE;
+        return (None, Some(format!("{reason} {note}")));
     }
     (goal_for_prompt_in(dir), None)
 }
@@ -1549,6 +1572,77 @@ mod fence_tests {
         let tmp = TempDir::new().unwrap();
         let (goal, refused) = goal_for_prompt_fenced_in(tmp.path(), &deny(tmp.path()));
         assert_eq!((goal, refused), (None, None));
+    }
+
+    /// `proj/.yoyo/goal.md` holding a plain goal (no link), canonical root.
+    fn plain_goal_fixture() -> (TempDir, std::path::PathBuf) {
+        let tmp = TempDir::new().unwrap();
+        let proj = tmp.path().canonicalize().unwrap().join("proj");
+        std::fs::create_dir_all(proj.join(".yoyo")).unwrap();
+        std::fs::write(proj.join(GOAL_FILE), "ship the parser\n").unwrap();
+        (tmp, proj)
+    }
+
+    /// #869: after `/cd`, the new directory's `[directories] deny` fences the
+    /// goal file `/goal check` reads, with the `/cd` source suffix the `@path`
+    /// doors use. A sibling directory's entry does not.
+    #[test]
+    fn cd_applied_deny_refuses_the_goal_file_with_the_cd_suffix() {
+        let (_tmp, proj) = plain_goal_fixture();
+        let none = DirectoryRestrictions::default();
+        let list = crate::cd_deny::DenyAdditions::default();
+        let entry = proj.join(".yoyo").display().to_string();
+        crate::cd_deny::append_deny_with(&list, std::slice::from_ref(&entry));
+        let shown = proj.join(GOAL_FILE).display().to_string();
+        assert_eq!(
+            goal_for_prompt_fenced_in_with(&list, &proj, &none),
+            (
+                None,
+                Some(format!(
+                    "Access denied: '{shown}' is under restricted directory '{entry}' \
+                     (a [directories] deny entry applied by /cd)"
+                ))
+            )
+        );
+        // Near-miss: an entry for a sibling directory leaves the goal loaded.
+        let other = crate::cd_deny::DenyAdditions::default();
+        let sibling = format!("{}X", proj.join(".yoyo").display());
+        crate::cd_deny::append_deny_with(&other, &[sibling]);
+        assert_eq!(
+            goal_for_prompt_fenced_in_with(&other, &proj, &none),
+            (Some("ship the parser".to_string()), None)
+        );
+    }
+
+    /// #869 regression surface: with an empty `/cd` list every verdict is the
+    /// pre-#869 one (startup `check_path`, then the unfenced read), byte for byte.
+    #[test]
+    fn empty_cd_list_leaves_every_goal_verdict_byte_identical() {
+        let (_tmp, proj) = plain_goal_fixture();
+        let empty = crate::cd_deny::DenyAdditions::default();
+        let path = proj.join(GOAL_FILE).display().to_string();
+        let mut refusals = 0;
+        for r in [
+            DirectoryRestrictions::default(),
+            deny(&proj),
+            allow(&[&proj]),
+            allow(&[&proj.join("elsewhere")]),
+        ] {
+            let before = match r.check_path(&path) {
+                Err(reason) => (None, Some(reason)),
+                Ok(()) => (goal_for_prompt_in(&proj), None),
+            };
+            refusals += usize::from(before.1.is_some());
+            assert_eq!(
+                goal_for_prompt_fenced_in_with(&empty, &proj, &r),
+                before,
+                "{r:?}"
+            );
+        }
+        assert_eq!(
+            refusals, 2,
+            "anti-vacuous: the table exercises both verdicts"
+        );
     }
 
     #[test]

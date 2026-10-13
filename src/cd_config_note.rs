@@ -724,6 +724,153 @@ mod tests {
         );
     }
 
+    /// Production `check_path` readers that do NOT consult the `/cd`-appended
+    /// `[directories] deny` list, each with the reason it is still unwired.
+    /// Every reason names #869. The placement decision (Day 227) keeps the
+    /// `/cd` list BESIDE `DirectoryRestrictions::check_path`, so a reader
+    /// nobody wires stays fail-open after `/cd`; this register is the price:
+    /// "unwired" is a test failure unless it is written down here. Wiring a
+    /// reader must remove its row (a stale row fails the guard too), so the
+    /// register's length is the class's remaining size.
+    const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
+        (
+            "src/commands_map.rs",
+            "#869: repo-map fence; the prompt map is built at startup, `/map` is unfenced",
+        ),
+        (
+            "src/commands_project.rs",
+            "#869: /context-style project reads still see only the startup fence",
+        ),
+        (
+            "src/commands_rename.rs",
+            "#869: /rename's file filter still sees only the startup fence",
+        ),
+        (
+            "src/context.rs",
+            "#869: instruction-file loaders run at startup, before any /cd",
+        ),
+        (
+            "src/skill_fence.rs",
+            "#869: skills are loaded at startup; skills reload after /cd is a separate #869 half",
+        ),
+    ];
+
+    /// Every function a `/cd`-aware reader routes through. A `check_path` site
+    /// whose enclosing function names one of these consults the `/cd` list.
+    fn cd_routing_needles() -> Vec<String> {
+        vec![
+            ["cd_denied_dir_", "refusal_with("].concat(),
+            ["path_guard_", "refusal("].concat(),
+            ["path_guard_", "refusal_with("].concat(),
+        ]
+    }
+
+    /// The production part of a source file: everything before the first
+    /// `#[cfg(...test...)]` attribute that opens a `mod`. `*_tests.rs` files
+    /// are test modules in their own right and have no production part.
+    fn production_part(rel: &str, src: &str) -> String {
+        if rel.ends_with("_tests.rs") || rel.ends_with("/tests.rs") {
+            return String::new();
+        }
+        let lines: Vec<&str> = src.lines().collect();
+        let mut end = lines.len();
+        for (i, l) in lines.iter().enumerate() {
+            let t = l.trim_start();
+            if t.starts_with("#[cfg(") && t.contains("test") {
+                let next = lines.get(i + 1).map(|n| n.trim_start()).unwrap_or("");
+                if next.starts_with("mod ") || next.starts_with("pub(crate) mod ") {
+                    end = i;
+                    break;
+                }
+            }
+        }
+        lines[..end].join("\n")
+    }
+
+    fn rs_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+        for e in std::fs::read_dir(dir).unwrap() {
+            let p = e.unwrap().path();
+            if p.is_dir() {
+                rs_files(&p, out);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                out.push(p);
+            }
+        }
+    }
+
+    /// `(file, routed)` for every production `.check_path(` call site in src/.
+    /// "Routed" means the text of its enclosing function (from the nearest
+    /// preceding `fn ` to the next one) names a `/cd` routing needle.
+    fn check_path_sites() -> Vec<(String, bool)> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        rs_files(&root.join("src"), &mut files);
+        files.sort();
+        let call = [".check_", "path("].concat();
+        let needles = cd_routing_needles();
+        let mut sites = Vec::new();
+        for f in files {
+            let rel = f
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            let prod = production_part(&rel, &std::fs::read_to_string(&f).unwrap());
+            for (at, _) in prod.match_indices(&call) {
+                let start = prod[..at].rfind("fn ").unwrap_or(0);
+                let end = prod[at..].find("fn ").map_or(prod.len(), |e| at + e);
+                let body = &prod[start..end];
+                let routed = needles.iter().any(|n| body.contains(n.as_str()));
+                sites.push((rel.clone(), routed));
+            }
+        }
+        sites
+    }
+
+    /// Deliberately WEAK, repo-wide source guard for #869's placement: no
+    /// production `check_path` reader may skip the `/cd` deny list unless its
+    /// file is registered with a reason. It proves a routing call is PRESENT
+    /// in the same function, never that it fires; and a bare `std::fs` read
+    /// with no `check_path` at all is on no list (Day 221's limit).
+    #[test]
+    fn no_check_path_reader_skips_the_cd_deny_list_unregistered() {
+        let sites = check_path_sites();
+        // Anti-vacuous: the walk found readers, and the wired ones are among them.
+        assert!(sites.len() > 1, "walk found no check_path sites: {sites:?}");
+        assert!(
+            sites
+                .iter()
+                .any(|(f, routed)| *routed && f == "src/commands_file_fence.rs"),
+            "the file-tool/@path slice must be seen as wired: {sites:?}"
+        );
+        let registered: Vec<&str> = UNWIRED_CHECK_PATH_READERS.iter().map(|r| r.0).collect();
+        for (file, reason) in UNWIRED_CHECK_PATH_READERS {
+            assert!(reason.contains("#869"), "{file}: reason must name #869");
+        }
+        let mut sorted = registered.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), registered.len(), "duplicate register row");
+        let unwired: std::collections::BTreeSet<&str> = sites
+            .iter()
+            .filter(|(_, routed)| !routed)
+            .map(|(f, _)| f.as_str())
+            .collect();
+        for f in &unwired {
+            assert!(
+                registered.contains(f),
+                "{f} calls check_path without consulting the /cd deny list \
+                 (route it through cd_config_note, or register it with a #869 reason)"
+            );
+        }
+        for f in &registered {
+            assert!(
+                unwired.contains(f),
+                "stale register row: {f} has no unwired check_path site; remove it"
+            );
+        }
+    }
+
     /// Deliberately WEAK source guard: proves both path guards in
     /// tool_wrappers.rs call the /cd-aware refusal and that no direct
     /// startup-only check remains there, never that the call fires.

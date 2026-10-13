@@ -96,7 +96,7 @@ thread_local! {
 }
 
 /// The `/cd` list the doors consult: the process-wide handle in production.
-fn cd_dir_deny_list() -> crate::cd_deny::DenyAdditions {
+pub(crate) fn cd_dir_deny_list() -> crate::cd_deny::DenyAdditions {
     #[cfg(test)]
     if let Some(list) = TEST_CD_DIR_DENY.with(|c| c.borrow().clone()) {
         return list;
