@@ -1,0 +1,23 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 200 cargo test --test pr… ✓ (2.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && mkdir -p ses… (9 lines) ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 17.8s (2 ✓)
+
+Verdict: PASS. The fix does what #1015 asked, and I wrote the verdict to session_plan/eval_task_1.md.
+
+• **What changed:** when `-p` writes to a pipe, a SIGTERM now flushes the text yoyo was holding, prints the `(interrupted)` note on stderr and exits 143. That is the same thing Ctrl+C already did (Ctrl+C still exits 130). The Ctrl+C code was moved into one shared function, interrupt::finish_interrupted_turn, and both signal arms call it rather than each having a copy.
+• **The risk the task flagged is handled:** registering a SIGTERM handler would normally replace "die on SIGTERM" for the whole process. Here the handler is only registered for piped single-shot runs. Once registered, it always ends the process with 143, even when the signal lands during a tool call. A run on a terminal, the REPL, --print, json or stream-json registers nothing and still dies the default way.
+• **Tests:** I re-ran the three signal tests in tests/print_stdout_contract.rs and all passed:
+  • SIGTERM puts exactly PARTIAL_ANSWER_7Q\n on stdout, the note on stderr, and exits 143.
+  • SIGTERM during a bash sleep 30 tool call exits 143 within 10 seconds instead of waiting out the sleep.
+  • The existing SIGINT test is unchanged and still passes.
+• **New code is all wired up:** every new function is called somewhere in the same change, and both exit-code sites in main.rs use the new mapping.
+• **Docs:** docs/src/usage/piped-mode.md and the ARCHITECTURE.md entry are both updated.
+
+I didn't redo the live probe the task asked for (timeout -s TERM 12 ./target/debug/yoyo -p "..." | wc -c) because it needs a real provider. The stub-based tests cover the same behaviour.
+  watch: no files changed this turn — skipping

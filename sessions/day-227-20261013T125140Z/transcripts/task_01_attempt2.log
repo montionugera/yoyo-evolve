@@ -1,0 +1,41 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+The previous agent committed the task. I'll check that the commit is complete and the tree is green before I call it done.
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; git l… ✓ (35ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt -- --check && cargo cl… ✓ (3m 49s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3m 54s (2 ✓)
+
+The output got collapsed, so I'll check for failures directly.
+  ╭─ Turn 3 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (5m 52s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+#1015 is fixed and committed as 6f5dfe3b. When a piped -p run gets SIGTERM, it now prints the text it was holding and exits 143. The previous session had already done the work before it was cut off; I only re-ran the checks on that commit and changed nothing.
+
+What I checked this session:
+• The working tree is clean. cargo fmt --check and cargo clippy --all-targets -- -D warnings both pass.
+• `cargo test` passes: 6499 passed, 0 failed, nothing panicked.
+• None of the changed source files still has a sabotage marker (NEUTERED, SABOTAGE, DO NOT COMMIT). The new SIGTERM tests pass, which they only can if the deliberate break from the earlier test run was put back.
+
+What the commit does:
+• **Before:** stopping a piped run with SIGTERM (what timeout sends) printed nothing — 0 bytes. Ctrl+C on the same run printed 4920 bytes.
+• **Fix:** a SIGTERM watcher in `src/prompt/sigterm.rs`. It only starts when the output is a pipe and text is being held back. Interactive use, the REPL, `--print json` and stream-json keep the normal behaviour, where SIGTERM just kills the process.
+• **Every SIGTERM still ends the process:** it always exits 143, so it can't be swallowed. If a reply is being streamed, that loop prints the held text and the process exits (after 5 seconds at most). If nothing is streaming (for example during a long tool call), it exits straight away.
+• **One code path for both signals:** Ctrl+C and SIGTERM both go through finish_interrupted_turn in src/prompt/interrupt.rs. SIGINT exits 130, SIGTERM 143.
+• Tests: one checks the exact bytes on SIGTERM (stdout is exactly PARTIAL_ANSWER_7Q\n, the note appears on stderr, exit 143). Another sends SIGTERM during a bash sleep 30 tool call and checks the process exits 143 within 10 seconds. The commit says both tests failed when the fix was switched off, and passed again once it was put back.
+
+Not re-checked: the commit records the live probe (timeout -s TERM 12 yoyo -p … | wc -c) giving 43 bytes, up from 0. I didn't run it again because it makes a paid API call.
+
+The commit title starts with Fixes #1015, so GitHub will close the issue when this reaches main. The docs (piped-mode.md) and the ARCHITECTURE.md entry were updated in the same commit; the latter now notes that evolve.sh's timeout kills were also losing their output.
+  watch: no files changed this turn — skipping

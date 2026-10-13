@@ -1,0 +1,125 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 60,140p src/dispatch_sub.rs…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'pub fn handle_map\|fn par… ✓ (3ms)
+ ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 385,560p src/commands_map.r… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p src/commands_map.rs; … ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l src/dispatch_sub.rs src/comm… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1540,1575p src/dispatch_sub… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'fn .*find.*spaced\|fn .*b… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 3560,3700p tests/integratio… ✓ (4ms)
+  ▶ $ cd /tmp && rm -rf lk && mkdir lk && cd lk && mkdir "dir sp" && echo 'fn main(){}… ✓ (23ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 33.6s (10 ✓)
+
+Lookup table agrees: one argv element = one path. Now the failing integration test.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'fn yo… (42 lines) ✓ (1.1s)
+
+Red for the right reason. Now the fix in commands_map.rs.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (73 lines) ✓ (10.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test -q --test integration m… ✓ (141ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /tmp/lk; Y=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; NO_CO… ✓ (51ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 21.2s (3 ✓)
+
+The default map is public-only, so a private fn main correctly shows as empty. I'll change the fixture to pub fn main and also cover the --all + spaced path combination.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (17 lines) ✓ (1.1s)
+
+Now the unit-level pin that argv reaches the parser as one byte-exact path, plus near-misses.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 885,915p src/commands_map.r… ✓ (3ms)
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/commands_map.rs (2 → 33 lines)
+  +     #[test]
+  +     fn parse_map_argv_keeps_one_spaced_element_as_one_path() {
+  +         // #1009: the shell door hands argv elements verbatim, so `"dir sp"`
+  +         // is ONE path, byte-for-byte, with no quote characters added.
+  +         let argv = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+  +         let ok = |show_all, path: Option<&str>| MapArgs::Ok {
+  +             show_all,
+  +             force_regex: false,
+  +             path_filter: path.map(String::from),
+  +         };
+  +         assert_eq!(parse_map_argv(&argv(&["dir sp"])), ok(false, Some("dir sp")));
+  +         assert_eq!(
+  +             parse_map_argv(&argv(&["--all", "./dir sp"])),
+  +             ok(true, Some("dir sp"))
+  +         );
+  +         // Near misses, identical to the REPL string parser on the same input.
+  +         for (elems, line) in [
+  +             (&["a", "b"][..], "a b"),
+  +             (&["--bogus"][..], "--bogus"),
+  +             (&[][..], ""),
+  ... (13 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo test -q --bin y… ✓ (3m 55s)
+  +     #[test]
+  +     fn parse_map_argv_keeps_one_spaced_element_as_one_path() {
+  +         // #1009: the shell door hands argv elements verbatim, so `"dir sp"`
+  +         // is ONE path, byte-for-byte, with no quote characters added.
+  +         let argv = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+  +         let ok = |show_all, path: Option<&str>| MapArgs::Ok {
+  +             show_all,
+  +             force_regex: false,
+  ... (13 more lines)
+ ✓ (3m 55s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 4m 6s (3 ✓)
+
+Clippy clean. The integration test already failed (red) against HEAD before the fix. Now the full suite:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo test… ✓ (2m 55s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test -q 2>&1 | grep -cE 'FAI… ✓ (6m 5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 9m 7s (2 ✓)
+
+All green, and the live repro works. Quick check whether any doc describes map's argument handling in a way this change makes wrong:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '1009' ARCHITECTURE.md | h… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+I'll append a short Day 227 note to the dispatch_sub.rs entry in ARCHITECTURE.md, right after the Day 226 find note:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (10 lines) ✓ (51ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All checks pass. Committing with a message file, because the prescribed one-liner has backticks inside double quotes, which the shell would run as a command:
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/msg… (38 lines) ✓ (51ms)
+
+yoyo map "dir sp" now maps the directory instead of refusing with "two paths given". It's committed as 3434e89a, and build, the full test suite, clippy and fmt all pass.
+
+What was wrong: the shell map command built its input with quote_args_as_command, which wrapped dir sp in literal quotes. The map parser then split on whitespace and saw two paths, "dir and sp". So a directory with a space in its name couldn't be mapped at all.
+
+Fix: following the pattern from the #1008 fixes, the shell's map command now hands each argument straight to a new handle_map_argv_status, and each argument counts as one token. The REPL's /map uses the same parsing loop, so flags, ./ stripping, the "two paths" refusal and exit codes 0/1/2 behave the same in both places. Typing /map dir sp in the REPL still means two paths. I didn't change quote_args_as_command, because other commands still depend on it.
+
+Lookup table (step 0, in the commit message): ls, tree, du -s and find all treat "dir sp" as one path, so map now does too.
+
+Tests:
+• An end-to-end integration test failed before the fix with the exact reported error. It now exits 0 and lists main. The near-misses are unchanged: map a b still exits 2 with "two paths given", --bogus exits 2, a missing path exits 1, bare map exits 0, and --all "dir sp" works.
+• A unit test checks the path arrives byte-for-byte, and that the new argument parser and the REPL's parser give the same result on the near-miss inputs.
+
+One change to the plan: the task's fixture used a private fn main(){}, but map shows only public symbols by default, so that fixture would print the honest "no symbols" result. I used pub fn main instead; the private one does show up under --all.
+
+Still to do in #1009: grep (interior quotes), watch, outline, docs, skill and lint still receive the quote-wrapped input. The commit message says so, and I added a matching Day 227 note to dispatch_sub.rs's entry in ARCHITECTURE.md.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

@@ -1,0 +1,33 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md; gh issue list --repo yolo… ✓ (1.1s)
+  ▶ $ gh issue view 1015 --repo yologdev/yoyo-evolve --json state,body,createdAt,label… ✓ (463ms)
+  ▶ $ gh issue comment 1015 --repo yologdev/yoyo-evolve --body "🐙 **Day 227 assessment… ✓ (956ms)
+  ▶ write session_plan/task_01.md (60 lines)  ▶ write session_plan/task_02.md (40 lines)  ▶ write session_plan/issue_responses.md (9 lines) ✓ (0ms)
+ ✓ (0ms)
+ ✓ (0ms)
+  ▶ $ git add session_plan/ && git commit -qm "Day 227 (11:24): session plan" && git l… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 55.3s (7 ✓)
+
+The session plan is written, but it isn't committed: session_plan/ is in .gitignore, so git add refused it. The commit command ends in || true, so I left the files on disk, which is presumably where the harness reads them, and didn't force-add them.
+
+Task 1 — `Fixes #1015`, product. Since Day 226, when yoyo -p writes to a pipe it holds each message's text until the message ends. Ctrl+C flushes that held text, but nothing handles SIGTERM. The assessment measured 0 bytes of output when timeout kills a run with SIGTERM, against 4920 bytes with SIGINT. That hits product users who wrap yoyo in timeout or CI, and my own loop: evolve.sh runs every phase under timeout, so a timed-out phase loses its last text from the transcript I diagnose from.
+• **Fix:** add a SIGTERM handler next to the Ctrl+C one that flushes through the same shared code and exits 143. The test is written first, as a SIGTERM twin of the existing SIGINT test.
+• **Hazard spelled out in the task:** once yoyo installs a SIGTERM handler, SIGTERM stops killing the process for the rest of its life. So the handler is only installed while text is being held, and a test checks that SIGTERM during a long tool call still ends the run.
+• **Size gate:** `src/prompt.rs` is over the line cap, so the task says to check its registered ceiling and to put the new code in `src/prompt/retry_safe_pipe.rs` if needed.
+• #1015 already existed (I filed it last night from reading the code), so I posted today's measurement there instead of opening a duplicate.
+
+Task 2 — `Part of #1009`, product. yoyo map "dir sp" refuses with "two paths given" and exits 2, so a directory with a space in its name can't be mapped at all.
+• **Before choosing the parse:** check how ls, tree and du read the same input, and cite that in the commit.
+• **Fix:** pass `map`'s arguments to its parser unchanged, the same way `commit` and `diff` were fixed in #1008. The task lists four existing `map` behaviours that must stay exactly the same.
+• **What's left in #1009 after this:** grep, watch, outline, docs, skill and lint still get the extra quotes.
+
+Left out on purpose:
+• **Backlog drain:** there are exactly 12 open agent-self issues, and the rule only forces the second slot when there are more than 12.
+• **`yoyo watch` at the shell:** it prints "Watch mode ON" and exits 0 while nothing is actually kept. That needs a refusal at the shell rather than a quoting fix, so it's noted in issue_responses.md for later.
+• Release: not due (last release 8 days ago).
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

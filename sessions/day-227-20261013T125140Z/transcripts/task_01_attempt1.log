@@ -1,0 +1,75 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "was_interrupted\|130" src… ✓ (6ms)
+ ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1860,2200p tests/print_stdo…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1060,1260p src/prompt.rs; g… ✓ (5ms)
+ ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,80p src/prompt/retry_safe… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1185,1235p src/prompt.rs; s… ✓ (21ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 81,183p tests/print_stdout_… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 184,300p tests/print_stdout… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (31 lines) ✓ (22ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 1m 27s (9 ✓)
+
+Now append the SIGTERM tests.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat >> tests/p… (189 lines) ✓ (30.8s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /tmp && rm -rf t1015 && mkdir t1015 && cd t1015 && python… (13 lines) ✓ (13.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (35 lines) ✓ (2.9s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1222,1232p src/prompt.rs; g… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test module_size 2>&1… ✓ (142ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1218,1230p src/prompt.rs | … ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 1m 35s (6 ✓)
+
+Now write the module and refactor the arm.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (27 lines) ✓ (23ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show HEAD:src/prompt.rs | sed … ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (221 lines) ✓ (10.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (16 lines) ✓ (1m 40s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/prompt/sigterm.rs /tmp/sigt… ✓ (12.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "retry_safe\|#991\|130\|SI… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (17 lines) ✓ (18.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo test… ✓ (3m 6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 3850,3910p src/prompt.rs ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'let body = \|let call = '… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (17 lines) ✓ (46.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo test… ✓ (3m 12s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l src/prompt.rs src/main.rs sr… ✓ (12.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --s… (28 lines) ✓ (56ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  14 tools completed in 11m 10s (14 ✓)
+
+Fixed and committed as 6f5dfe3b with the title "Fixes #1015: …". When a piped yoyo -p run gets SIGTERM, it now writes the text it was holding, prints the (interrupted) note to stderr, and exits 143. Ctrl+C already did this and still exits 130.
+
+Before the fix, I wrote the new test first and ran it against HEAD. stdout was [] (0 bytes) and the process died from the signal with no exit code, which is the bug.
+
+What changed:
+• **New file src/prompt/sigterm.rs:** it listens for SIGTERM only on runs whose text is being held (single-shot, stdout is a pipe). Terminal, REPL, `--print`, json and stream-json runs never register it, so SIGTERM still kills those immediately as before.
+• **No swallowed signals:** once a handler is registered, SIGTERM no longer kills the process by itself. So the handler always ends the process with 143.
+  • If the text loop is running, the handler passes it the signal. The loop writes out the held text, and if the process hasn't exited 5 seconds later, the handler exits it. A second SIGTERM skips the wait.
+  • If no loop is running, it flushes stdout and exits right away.
+• **One shared path for both signals:** the old Ctrl+C code moved into `interrupt::finish_interrupted_turn`, and both the Ctrl+C and SIGTERM branches call it instead of keeping two copies. `src/main.rs now gets its exit code from interrupted_exit_code()`: 143 for SIGTERM, 130 for SIGINT.
+• Tests in tests/print_stdout_contract.rs:
+  • SIGTERM mid-stream: stdout is exactly PARTIAL_ANSWER_7Q\n, the note is on stderr, exit is 143.
+  • SIGTERM during a bash sleep 30 tool call: the process exits with 143 within 10 seconds. On HEAD it died from the signal.
+• **Positive control:** I forced the handler off and both new tests failed by name. I restored it in the same command and no sabotage marker is left.
+• **One existing test needed updating:** the source check that counts gated stdout writes (`every_streamed_text_write_is_gated`) failed because the interrupt write moved into `interrupt.rs`. It now counts that file too and requires the total to stay 15, so it is no looser than before.
+• **Docs:** one sentence in `docs/src/usage/piped-mode.md`. I also added an entry to `ARCHITECTURE.md` that names `evolve.sh`'s `timeout` kills as one of the affected callers.
+
+Checks: cargo build, the full cargo test suite (0 failures), cargo clippy --all-targets -- -D warnings, cargo fmt -- --check and tests/harness_logic.sh all pass. src/prompt.rs is 3904 lines, under its recorded limit of 3906. I re-ran the assessment's probe, timeout -s TERM 12 yoyo -p "…" | wc -c, and it gave 43 bytes, up from 0. That was one real-model run, and I didn't check the exit code directly: the 124 it showed is timeout's own code, which it reports no matter how yoyo exits.
+
+Two limits:
+• On non-Unix systems nothing changes.
+• A SIGTERM that arrives during startup, before the first prompt is read, still kills the process the default way.

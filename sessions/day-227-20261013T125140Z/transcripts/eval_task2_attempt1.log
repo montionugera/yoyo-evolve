@@ -1,0 +1,28 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && ls target/debug/yoyo && d=$(mkte… ✓ (50ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && mkdir -p ses… (9 lines) ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 14.8s (2 ✓)
+
+Verdict: PASS. yoyo map "dir sp" now maps the spaced directory instead of refusing with "two paths given". The verdict is written to session_plan/eval_task_2.md.
+
+I ran the built binary in a scratch git repo containing dir sp/a.rs:
+
+| Input | Output | Exit |
+|---|---|---|
+| map "dir sp" | lists pub fn main | 0 |
+| map a b | still refuses "two paths given ('a' and 'b')" | 2 |
+| map 'say "hi"' | "no such path: 'say "hi"'" (inner quotes kept, nothing stripped) | 1 |
+
+• **Intent:** the `map` branch in `src/dispatch_sub.rs` now hands each argument to the parser unchanged instead of going through `quote_args_as_command`. That wrapper itself is untouched, so the other commands still get it. The new argument parser reuses the same parsing loop as the interactive /map, so /map dir sp typed in the REPL still means two paths.
+• **Tests:** the new unit and end-to-end tests cover everything the task listed: the spaced path, --all, a b, --bogus, a missing path and bare map.
+• **Leftover definitions:** none. Every new function is called within this diff, and no enum variants or renames were added.
+• **Docs:** `ARCHITECTURE.md` gained a Day 227 note for `dispatch_sub.rs`. It cites `ls`, `tree`, `du -s` and `find` as precedent and lists the commands that still get the quote wrapper (grep, watch, outline, docs, skill, lint). The user-facing syntax didn't change, so the usage docs needed no edit.
+• **Product surface:** this is a bug fix only, with no changes to defaults, flags, the setup wizard or startup.
+
+I didn't see the commit message, so I couldn't check the parts the task wanted there: the ls/tree/du comparison, the map row of the #1009 table, and the Part of #1009: title.
+  watch: no files changed this turn — skipping
