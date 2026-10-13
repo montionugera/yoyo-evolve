@@ -24,10 +24,10 @@
 //! `kill -HUP` mid-stream left 0 of the 18 streamed bytes on stdout and the
 //! process died by signal. Same registration condition, same flush, exit 129
 //! (128 + 1). The module keeps its name; it now owns every *terminating*
-//! signal yoyo handles on the held-text population. Not handled, by
-//! decision (the #1016 census): SIGQUIT (also measured: 0 bytes; it is a
-//! "dump core" request, not a polite stop), SIGKILL (unflushable), SIGPIPE
-//! (the reader is gone, so held text has nowhere to go), and a panic.
+//! signal yoyo handles on the held-text population. Not handled (#1016):
+//! by decision, SIGQUIT (measured: 0 bytes; a "dump core" request, not a
+//! polite stop), SIGKILL (unflushable), SIGPIPE (the reader is gone); still
+//! OPEN, not decided: a panic (RetrySafeGate has no Drop, read not run).
 
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::OnceLock;
