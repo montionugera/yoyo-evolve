@@ -17,7 +17,8 @@ mod cancel_mid_tool_tests;
 mod interrupt;
 mod retry_after_partial;
 mod retry_safe_pipe;
-pub use interrupt::{mark_single_shot, was_interrupted};
+mod sigterm;
+pub use interrupt::{interrupted_exit_code, mark_single_shot, was_interrupted};
 mod stream_external_servers;
 mod stream_session_restored;
 pub(crate) use stream_session_restored::record_session_restored;
@@ -1078,6 +1079,7 @@ async fn handle_prompt_events(
     // #991: a single-shot run writing to a pipe reads through yoagent's
     // retry_safe filter; everything else (TTY, REPL, --print/json) is unchanged.
     let mut gate = retry_safe_pipe::RetrySafeGate::new(retry_safe_pipe::retry_safe_pipe_live());
+    let mut term = sigterm::listen(gate.is_filtering());
 
     loop {
         tokio::select! {
@@ -1198,34 +1200,12 @@ async fn handle_prompt_events(
                 }
             }
             _ = tokio::signal::ctrl_c() => {
-                // Stop spinner if still running
-                if let Some(s) = state.spinner.take() { s.stop(); }
-                agent.abort();
-                // #991/#993: text the retry-safe gate still holds was produced
-                // before the interrupt; keep it, as the unfiltered stream did.
-                let held = gate.take_held_text();
-                if !held.is_empty() {
-                    state.handle_message_update_text(&held);
-                }
-                if state.in_text {
-                    write_stream_text("\n");
-                }
-                // #993: single-shot runs get a stderr note; REPL bytes unchanged.
-                interrupt::INTERRUPTED.store(true, std::sync::atomic::Ordering::SeqCst);
-                let single = interrupt::is_single_shot();
-                let note = interrupt::interrupt_note(single);
-                if single {
-                    let _ = io::stderr().write_all(note.as_bytes());
-                } else {
-                    write_chrome(&note);
-                }
-                return PromptResult::Done {
-                    collected_text: state.collected_text,
-                    text_since_last_tool: state.text_since_last_tool,
-                    usage: state.usage,
-                    last_tool_error: state.last_tool_error,
-                    last_tool_name: state.last_tool_name,
-                };
+                return interrupt::finish_interrupted_turn(state, &mut gate, agent);
+            }
+            // #1015: SIGTERM (what `timeout` sends) flushes the same way;
+            // armed only when the gate holds text, else it never resolves.
+            _ = sigterm::recv(&mut term) => {
+                return interrupt::finish_interrupted_turn(state, &mut gate, agent);
             }
         }
     }
@@ -3909,7 +3889,12 @@ mod reserved_stdout_tests {
         let body = &src[..src.find(&format!("#[cfg({})]\nmod tests", "test")).unwrap()];
         let call = format!("{}(", "write_stream_text");
         let sites = body.matches(&call).count() - 1; // minus the definition
-        assert_eq!(sites, 15, "gated streamed-text sites changed"); // +1 Day 219: handle_provider_retry (#989)
+                                                     // Day 227 (#1015): the interrupt flush moved to
+                                                     // interrupt::finish_interrupted_turn, so it is counted there.
+        let interrupt_src = include_str!("prompt/interrupt.rs");
+        let moved = interrupt_src.matches(&format!("super::{call}")).count();
+        assert_eq!(moved, 1, "the interrupt flush must stay gated");
+        assert_eq!(sites + moved, 15, "gated streamed-text sites changed"); // +1 Day 219: handle_provider_retry (#989)
         for bare in ["rendered", "remaining"] {
             let a = format!("print!(\"{{}}\", {bare})");
             let b = format!("print!(\"{{{bare}}}\")");

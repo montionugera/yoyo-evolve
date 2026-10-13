@@ -1964,6 +1964,12 @@ struct SigintRun {
 /// readiness signal left (localhost bytes, parsed in microseconds).
 #[cfg(unix)]
 fn run_yoyo_sigint(extra: &[&str], partial: &str) -> SigintRun {
+    run_yoyo_signal(extra, partial, "-INT")
+}
+
+/// `run_yoyo_sigint` with the signal named (`kill`'s spelling: `-INT`, `-TERM`).
+#[cfg(unix)]
+fn run_yoyo_signal(extra: &[&str], partial: &str, signal: &str) -> SigintRun {
     use std::sync::Mutex;
     const SIGINT_GRACE: Duration = Duration::from_millis(1500);
     let (port, hit, sent) = start_stall_stub(partial);
@@ -2040,10 +2046,10 @@ fn run_yoyo_sigint(extra: &[&str], partial: &str) -> SigintRun {
         thread::sleep(Duration::from_millis(20));
     }
     let status = Command::new("kill")
-        .args(["-INT", &child.id().to_string()])
+        .args([signal, &child.id().to_string()])
         .status()
         .expect("run kill");
-    assert!(status.success(), "kill -INT failed");
+    assert!(status.success(), "kill {signal} failed");
     let deadline = Instant::now() + Duration::from_secs(30);
     let status = loop {
         if let Some(s) = child.try_wait().unwrap() {
@@ -2051,7 +2057,7 @@ fn run_yoyo_sigint(extra: &[&str], partial: &str) -> SigintRun {
         }
         if Instant::now() > deadline {
             let _ = child.kill();
-            panic!("yoyo did not exit after SIGINT");
+            panic!("yoyo did not exit after kill {signal}");
         }
         thread::sleep(Duration::from_millis(20));
     };
@@ -2126,5 +2132,193 @@ fn uninterrupted_print_prompt_is_unchanged_and_exits_zero() {
         !run.stderr.contains("(interrupted"),
         "stderr={}",
         run.stderr
+    );
+}
+
+// ---------------------------------------------------------------------------
+// #1015: SIGTERM during a piped `-p` stream (what `timeout` sends).
+// ---------------------------------------------------------------------------
+
+/// #1015: on a pipe the retry-safe gate (#991) holds the open attempt's text
+/// until its `MessageEnd`. Before the fix a SIGTERM killed the process with
+/// the default disposition and that held text never reached stdout (0 bytes);
+/// SIGINT already flushed it. Now SIGTERM flushes exactly what SIGINT does and
+/// exits 143 (128 + 15), so a `timeout` wrapper can still tell it apart.
+#[cfg(unix)]
+#[test]
+fn sigterm_during_piped_print_prompt_flushes_held_text_and_exits_143() {
+    let run = run_yoyo_signal(&["-p", "hi"], PARTIAL_LINE, "-TERM");
+    assert!(run.stub_hit, "anti-vacuous: stub never received a POST");
+    eprintln!(
+        "PROBE #1015: stdout={:?} code={:?} stderr_tail={:?}",
+        String::from_utf8_lossy(&run.stdout),
+        run.code,
+        run.stderr.lines().rev().take(3).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        run.stdout,
+        PARTIAL_LINE.as_bytes(),
+        "#1015: the text streamed before SIGTERM must be on stdout, exactly once; stderr={}",
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("(interrupted)"),
+        "#1015: the interrupt note belongs on stderr; stderr={}",
+        run.stderr
+    );
+    assert_eq!(
+        run.code,
+        Some(143),
+        "#1015: SIGTERM exits 143 (SIGINT stays 130); stderr={}",
+        run.stderr
+    );
+}
+
+/// A tool turn whose only call is `bash` running `sleep 30`.
+#[cfg(unix)]
+fn sse_bash_sleep_body() -> String {
+    let partial = serde_json::to_string(r#"{"command": "sleep 30"}"#).unwrap();
+    sse_events(vec![
+        (
+            "message_start",
+            r#"{"type":"message_start","message":{"id":"msg_sleep","type":"message","role":"assistant","model":"claude-stub","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":1}}}"#.to_string(),
+        ),
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_sleep_1","name":"bash","input":{}}}"#.to_string(),
+        ),
+        (
+            "content_block_delta",
+            format!(
+                r#"{{"type":"content_block_delta","index":0,"delta":{{"type":"input_json_delta","partial_json":{partial}}}}}"#
+            ),
+        ),
+        (
+            "content_block_stop",
+            r#"{"type":"content_block_stop","index":0}"#.to_string(),
+        ),
+        (
+            "message_delta",
+            r#"{"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null},"usage":{"output_tokens":7}}"#.to_string(),
+        ),
+        ("message_stop", r#"{"type":"message_stop"}"#.to_string()),
+    ])
+}
+
+/// #1015 hazard: once a SIGTERM handler is registered the default "die"
+/// disposition is gone for the rest of the process, so a SIGTERM that lands
+/// while a long tool call runs must still END the process (not set a flag
+/// nothing reads, which would leave `timeout` to escalate to SIGKILL).
+#[cfg(unix)]
+#[test]
+fn sigterm_during_a_long_tool_call_on_a_pipe_still_terminates() {
+    use std::sync::Mutex;
+    let (port, hit) = start_stub_seq(vec![sse_bash_sleep_body(), sse_body()]);
+    let home = tempfile::tempdir().unwrap();
+    let cwd = tempfile::tempdir().unwrap();
+    let base_url = format!("http://127.0.0.1:{port}/v1");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_yoyo"))
+        .args([
+            "--provider",
+            "anthropic",
+            "--model",
+            "claude-sonnet-4-5",
+            "--base-url",
+            &base_url,
+            "--max-turns",
+            "4",
+            "--yes",
+            "-p",
+            "sleep",
+        ])
+        .current_dir(cwd.path())
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", home.path().join(".config"))
+        .env("XDG_DATA_HOME", home.path().join(".local/share"))
+        .env("XDG_STATE_HOME", home.path().join(".local/state"))
+        .env("XDG_CACHE_HOME", home.path().join(".cache"))
+        .env("ANTHROPIC_API_KEY", "sk-ant-dummy-test-key")
+        .env_remove("API_KEY")
+        .env_remove("MODEL")
+        .env_remove("YOYO_MODEL")
+        .env_remove("YOYO_PROVIDER")
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn yoyo");
+    let err = Arc::new(Mutex::new(Vec::<u8>::new()));
+    let e2 = Arc::clone(&err);
+    let mut se = child.stderr.take().unwrap();
+    let mut so = child.stdout.take().unwrap();
+    // Readers are detached: an orphaned `sleep` may hold the pipes open.
+    thread::spawn(move || {
+        let mut buf = [0u8; 4096];
+        while let Ok(n) = so.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+        }
+    });
+    thread::spawn(move || {
+        let mut buf = [0u8; 4096];
+        while let Ok(n) = se.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+            e2.lock().unwrap().extend_from_slice(&buf[..n]);
+        }
+    });
+    // The bash progress line is printed only when the tool COMPLETES, so the
+    // readiness signal is the stub having served the tool turn, plus a grace
+    // for yoyo to parse it and spawn `sleep 30`.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        if hit.load(Ordering::SeqCst) > 0 {
+            thread::sleep(Duration::from_millis(2000));
+            break;
+        }
+        if Instant::now() > deadline || child.try_wait().unwrap().is_some() {
+            let _ = child.kill();
+            panic!(
+                "the bash tool never started; stderr={}",
+                String::from_utf8_lossy(&err.lock().unwrap())
+            );
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(
+        hit.load(Ordering::SeqCst),
+        1,
+        "anti-vacuous: the tool turn was served and `sleep 30` has not finished"
+    );
+    let ok = Command::new("kill")
+        .args(["-TERM", &child.id().to_string()])
+        .status()
+        .expect("run kill")
+        .success();
+    assert!(ok, "kill -TERM failed");
+    // Well inside `sleep 30`: the process must not wait out the tool.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        if let Some(s) = child.try_wait().unwrap() {
+            break s;
+        }
+        if Instant::now() > deadline {
+            let _ = child.kill();
+            panic!(
+                "#1015: SIGTERM during a tool call was swallowed; stderr={}",
+                String::from_utf8_lossy(&err.lock().unwrap())
+            );
+        }
+        thread::sleep(Duration::from_millis(20));
+    };
+    thread::sleep(Duration::from_millis(200));
+    let stderr = String::from_utf8_lossy(&err.lock().unwrap()).into_owned();
+    assert_eq!(
+        status.code(),
+        Some(143),
+        "#1015: SIGTERM mid-tool exits 143; stderr={stderr}"
     );
 }

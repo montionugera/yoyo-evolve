@@ -617,8 +617,9 @@ async fn run_single_prompt(
         output_write_failed,
         CHECKPOINT_TRIGGERED.load(Ordering::SeqCst),
     );
-    // #993: SIGINT mid-turn exits 130, partial answer kept on stdout.
-    let code = if prompt::was_interrupted() { 130 } else { code };
+    // #993/#1015: SIGINT mid-turn exits 130 (SIGTERM on a pipe: 143),
+    // partial answer kept on stdout.
+    let code = prompt::interrupted_exit_code().unwrap_or(code);
     let code = save_session_after_turn(agent, save_session, code).await;
     if code != 0 {
         std::process::exit(code);
@@ -942,9 +943,10 @@ async fn run_piped_mode(
         output_write_failed,
         CHECKPOINT_TRIGGERED.load(Ordering::SeqCst),
     );
-    // #993: a turn cut short by SIGINT exits 130 (the shell convention), so a
-    // script can tell a partial answer from a complete one.
-    let code = if prompt::was_interrupted() { 130 } else { code };
+    // #993/#1015: a turn cut short by SIGINT exits 130 (SIGTERM on a pipe:
+    // 143; the shell convention), so a script can tell a partial answer
+    // from a complete one.
+    let code = prompt::interrupted_exit_code().unwrap_or(code);
     let code = save_session_after_turn(agent, save_session, code).await;
     if code != 0 {
         std::process::exit(code);
