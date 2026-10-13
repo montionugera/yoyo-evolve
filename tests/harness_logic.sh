@@ -868,6 +868,22 @@ if require "setup_yoagent_skill extracted" "$YS_FN"; then
         "$(ys_case "" none)" "none|rc=0"
 fi
 
+# ── skill-evolve retire rule: one rule, and one that can fire (#1017, #858) ──
+# The state table said `score < 0.3 OR 10 sessions unused`, the step that runs
+# said AND, and the score could never fall below 0.5 (wins == uses for every
+# skill), so retirement was unreachable. Pin the replacement in the spec text
+# the skill-evolve agent follows: both places say 60 days of disuse, nothing
+# gates retirement on the score, and unmeasured skills are exempt.
+SE_SPEC="$(cd "$(dirname "$0")/.." && pwd)/skills/skill-evolve/SKILL.md"
+check "skill-evolve: state table retires on 60 days of disuse" \
+    "$(grep -c '^| \*\*deprecated\*\* |.*unused ≥ 60 days' "$SE_SPEC")" "1"
+check "skill-evolve: the retire step uses the same 60-day disuse rule" \
+    "$(grep -c '^1\. \*\*Retire\*\*.*60 or more days' "$SE_SPEC")" "1"
+check "skill-evolve: no retire rule is gated on score < 0.3 any more" \
+    "$(grep -E '^(1\. \*\*Retire\*\*|\| \*\*(active|deprecated)\*\* \|)' "$SE_SPEC" | grep -c 'score < 0.3')" "0"
+check "skill-evolve: unmeasured skills are exempt, naming the unlogged loops" \
+    "$(grep -c 'never retired for silence.*social.*dream' "$SE_SPEC")" "1"
+
 # ── main push: retry, and never echo a failure into success ────────────────
 PR_FN=$(awk '/^push_main_with_retry\(\) \{/,/^\}/' "$SCRIPT")
 if require "push_main_with_retry extracted" "$PR_FN"; then
