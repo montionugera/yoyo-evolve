@@ -22,16 +22,16 @@ pub fn was_interrupted() -> bool {
     INTERRUPTED.load(std::sync::atomic::Ordering::SeqCst)
 }
 
-/// #993/#1015: the exit code a cut-short single-shot run should use:
-/// 143 (128 + SIGTERM) when a SIGTERM ended it, 130 (128 + SIGINT) for
-/// Ctrl+C, `None` when nothing interrupted it.
+/// #993/#1015/#1016: the exit code a cut-short single-shot run should use:
+/// 143 (128 + SIGTERM) or 129 (128 + SIGHUP) when that signal ended it,
+/// 130 (128 + SIGINT) for Ctrl+C, `None` when nothing interrupted it.
 pub fn interrupted_exit_code() -> Option<i32> {
-    interrupted_exit_code_from(super::sigterm::was_terminated(), was_interrupted())
+    interrupted_exit_code_from(super::sigterm::terminated_exit_code(), was_interrupted())
 }
 
-fn interrupted_exit_code_from(terminated: bool, interrupted: bool) -> Option<i32> {
-    if terminated {
-        Some(super::sigterm::SIGTERM_EXIT)
+fn interrupted_exit_code_from(terminated: Option<i32>, interrupted: bool) -> Option<i32> {
+    if terminated.is_some() {
+        terminated
     } else if interrupted {
         Some(130)
     } else {
@@ -108,10 +108,15 @@ mod tests {
 
     #[test]
     fn interrupted_exit_code_prefers_sigterm_then_sigint() {
-        assert_eq!(interrupted_exit_code_from(false, false), None);
-        assert_eq!(interrupted_exit_code_from(false, true), Some(130));
+        let term = Some(super::super::sigterm::SIGTERM_EXIT);
+        let hup = Some(super::super::sigterm::SIGHUP_EXIT);
+        assert_eq!(interrupted_exit_code_from(None, false), None);
+        assert_eq!(interrupted_exit_code_from(None, true), Some(130));
         // The SIGTERM arm also marks the turn interrupted; the code is 143.
-        assert_eq!(interrupted_exit_code_from(true, true), Some(143));
-        assert_eq!(interrupted_exit_code_from(true, false), Some(143));
+        assert_eq!(interrupted_exit_code_from(term, true), Some(143));
+        assert_eq!(interrupted_exit_code_from(term, false), Some(143));
+        // #1016: SIGHUP likewise wins over the interrupted flag, with 129.
+        assert_eq!(interrupted_exit_code_from(hup, true), Some(129));
+        assert_eq!(interrupted_exit_code_from(hup, false), Some(129));
     }
 }

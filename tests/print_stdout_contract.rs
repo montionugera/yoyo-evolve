@@ -2174,6 +2174,40 @@ fn sigterm_during_piped_print_prompt_flushes_held_text_and_exits_143() {
     );
 }
 
+/// #1016: SIGHUP (a dropped ssh session, a closed terminal under
+/// `yoyo -p ... | tee log`) hits the same held text SIGTERM did. Before the
+/// fix SIGHUP kept its default disposition (die), so the partial was lost.
+/// Now it flushes exactly what SIGTERM does and exits 129 (128 + 1).
+#[cfg(unix)]
+#[test]
+fn sighup_during_piped_print_prompt_flushes_held_text_and_exits_129() {
+    let run = run_yoyo_signal(&["-p", "hi"], PARTIAL_LINE, "-HUP");
+    assert!(run.stub_hit, "anti-vacuous: stub never received a POST");
+    eprintln!(
+        "PROBE #1016: stdout={:?} code={:?} stderr_tail={:?}",
+        String::from_utf8_lossy(&run.stdout),
+        run.code,
+        run.stderr.lines().rev().take(3).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        run.stdout,
+        PARTIAL_LINE.as_bytes(),
+        "#1016: the text streamed before SIGHUP must be on stdout, exactly once; stderr={}",
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("(interrupted)"),
+        "#1016: the interrupt note belongs on stderr; stderr={}",
+        run.stderr
+    );
+    assert_eq!(
+        run.code,
+        Some(129),
+        "#1016: SIGHUP exits 129 (SIGTERM stays 143, SIGINT 130); stderr={}",
+        run.stderr
+    );
+}
+
 /// A tool turn whose only call is `bash` running `sleep 30`.
 #[cfg(unix)]
 fn sse_bash_sleep_body() -> String {

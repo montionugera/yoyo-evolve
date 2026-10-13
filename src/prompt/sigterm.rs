@@ -15,25 +15,42 @@
 //!   `--print`, json and stream-json never register it and still die by
 //!   default), and
 //! - the handler is a process-lifetime watcher task that ALWAYS ends the
-//!   process with 143: when a text loop is listening it hands the loop the
+//!   process with 143 (129 for SIGHUP): when a text loop is listening it hands the loop the
 //!   signal (the loop flushes and returns) and exits after a grace if `main`
 //!   has not already; when no loop is listening it flushes stdout and exits.
+//!
+//! **#1016: SIGHUP rides the same watcher** (a dropped ssh session or a
+//! closed terminal under `yoyo -p ... | tee log`). Measured before the fix:
+//! `kill -HUP` mid-stream left 0 of the 18 streamed bytes on stdout and the
+//! process died by signal. Same registration condition, same flush, exit 129
+//! (128 + 1). The module keeps its name; it now owns every *terminating*
+//! signal yoyo handles on the held-text population. Not handled, by
+//! decision (the #1016 census): SIGQUIT (also measured: 0 bytes; it is a
+//! "dump core" request, not a polite stop), SIGKILL (unflushable), SIGPIPE
+//! (the reader is gone, so held text has nowhere to go), and a panic.
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::OnceLock;
 use tokio::sync::watch;
 
 /// 128 + SIGTERM(15), the shell convention (SIGINT is 130).
 pub(super) const SIGTERM_EXIT: i32 = 143;
+/// #1016: 128 + SIGHUP(1).
+pub(super) const SIGHUP_EXIT: i32 = 129;
 
-static TERMINATED: AtomicBool = AtomicBool::new(false);
+/// The exit code of the first terminating signal received (0 = none).
+static TERMINATED: AtomicI32 = AtomicI32::new(0);
 /// Text loops currently polling a [`SigtermListener`].
 static LISTENING: AtomicUsize = AtomicUsize::new(0);
 static CHANNEL: OnceLock<watch::Sender<bool>> = OnceLock::new();
 
-/// Whether a SIGTERM was received by this process (#1015: exit 143).
-pub(super) fn was_terminated() -> bool {
-    TERMINATED.load(Ordering::SeqCst)
+/// The exit code owed to a terminating signal this process received:
+/// 143 for SIGTERM (#1015), 129 for SIGHUP (#1016), `None` if neither.
+pub(super) fn terminated_exit_code() -> Option<i32> {
+    match TERMINATED.load(Ordering::SeqCst) {
+        0 => None,
+        code => Some(code),
+    }
 }
 
 /// A text loop's handle on the SIGTERM watcher; dropping it tells the
@@ -72,37 +89,48 @@ pub(super) async fn recv(listener: &mut Option<SigtermListener>) {
 
 #[cfg(unix)]
 fn install() -> watch::Sender<bool> {
+    use tokio::signal::unix::SignalKind;
+    let (tx, _) = watch::channel(false);
+    arm(SignalKind::terminate(), SIGTERM_EXIT);
+    // #1016: same watcher, same flush, its own exit code.
+    arm(SignalKind::hangup(), SIGHUP_EXIT);
+    tx
+}
+
+/// Register one terminating signal. Registration failure leaves that
+/// signal's default disposition intact.
+#[cfg(unix)]
+fn arm(kind: tokio::signal::unix::SignalKind, exit_code: i32) {
     use std::io::Write;
     use std::time::Duration;
-    use tokio::signal::unix::{signal, SignalKind};
-    /// How long the listening loop gets to flush and `main` to exit 143.
+    use tokio::signal::unix::signal;
+    /// How long the listening loop gets to flush and `main` to exit.
     const LOOP_GRACE: Duration = Duration::from_secs(5);
-    let (tx, _) = watch::channel(false);
-    // Registration failure leaves the default disposition intact.
-    if let Ok(mut sig) = signal(SignalKind::terminate()) {
-        tokio::spawn(async move {
-            if sig.recv().await.is_none() {
-                return;
+    let Ok(mut sig) = signal(kind) else {
+        return;
+    };
+    tokio::spawn(async move {
+        if sig.recv().await.is_none() {
+            return;
+        }
+        // First signal wins the exit code; a later one cannot relabel it.
+        let _ = TERMINATED.compare_exchange(0, exit_code, Ordering::SeqCst, Ordering::SeqCst);
+        if LISTENING.load(Ordering::SeqCst) > 0 {
+            if let Some(tx) = CHANNEL.get() {
+                tx.send_replace(true);
             }
-            TERMINATED.store(true, Ordering::SeqCst);
-            if LISTENING.load(Ordering::SeqCst) > 0 {
-                if let Some(tx) = CHANNEL.get() {
-                    tx.send_replace(true);
-                }
-                // A second SIGTERM skips the grace.
-                tokio::select! {
-                    _ = tokio::time::sleep(LOOP_GRACE) => {}
-                    _ = sig.recv() => {}
-                }
-            } else {
-                let note = super::interrupt::interrupt_note(true);
-                let _ = std::io::stderr().write_all(note.as_bytes());
+            // A second instance of the same signal skips the grace.
+            tokio::select! {
+                _ = tokio::time::sleep(LOOP_GRACE) => {}
+                _ = sig.recv() => {}
             }
-            let _ = std::io::stdout().flush();
-            std::process::exit(SIGTERM_EXIT);
-        });
-    }
-    tx
+        } else {
+            let note = super::interrupt::interrupt_note(true);
+            let _ = std::io::stderr().write_all(note.as_bytes());
+        }
+        let _ = std::io::stdout().flush();
+        std::process::exit(terminated_exit_code().unwrap_or(exit_code));
+    });
 }
 
 #[cfg(not(unix))]
