@@ -403,11 +403,28 @@ pub(crate) enum MapArgs {
 /// Pure — no I/O, no printing. Unknown flags and a second positional path are
 /// honest errors rather than a path filter that silently matches nothing.
 pub(crate) fn parse_map_args(rest: &str) -> MapArgs {
+    parse_map_tokens(rest.split_whitespace())
+}
+
+/// Parse `yoyo map <argv…>` (#1009): each argv element is ONE token, so
+/// `yoyo map "dir sp"` is one path — as `ls`, `tree`, `du -s` and `find`
+/// read it. The REPL's `/map dir sp` stays a whitespace split (two paths).
+/// Blank elements are skipped, matching what the old `"/map "` string did.
+pub(crate) fn parse_map_argv(argv: &[String]) -> MapArgs {
+    parse_map_tokens(
+        argv.iter()
+            .map(String::as_str)
+            .filter(|a| !a.trim().is_empty()),
+    )
+}
+
+/// Shared token loop for both doors (REPL string, shell argv).
+fn parse_map_tokens<'a>(parts: impl IntoIterator<Item = &'a str>) -> MapArgs {
     let mut show_all = false;
     let mut force_regex = false;
     let mut path_filter: Option<String> = None;
 
-    for part in rest.split_whitespace() {
+    for part in parts {
         match part {
             "--all" => show_all = true,
             "--regex" => force_regex = true,
@@ -484,8 +501,17 @@ pub fn handle_map(input: &str) {
 /// exist, [`MAP_USAGE_EXIT`] for an argument error.
 pub fn handle_map_status(input: &str) -> i32 {
     let rest = input.strip_prefix("/map").unwrap_or("").trim();
+    map_status_for(parse_map_args(rest))
+}
 
-    let (show_all, force_regex, path_filter) = match parse_map_args(rest) {
+/// Shell door for `yoyo map <argv…>` (#1009): argv elements reach the parser
+/// verbatim, never through `quote_args_as_command`'s `"..."` wrapping.
+pub fn handle_map_argv_status(argv: &[String]) -> i32 {
+    map_status_for(parse_map_argv(argv))
+}
+
+fn map_status_for(parsed: MapArgs) -> i32 {
+    let (show_all, force_regex, path_filter) = match parsed {
         MapArgs::Ok {
             show_all,
             force_regex,
@@ -862,6 +888,44 @@ mod tests {
             }
             other => panic!("expected Error for two paths, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_map_argv_keeps_one_spaced_element_as_one_path() {
+        // #1009: the shell door hands argv elements verbatim, so `"dir sp"`
+        // is ONE path, byte-for-byte, with no quote characters added.
+        let argv = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let ok = |show_all, path: Option<&str>| MapArgs::Ok {
+            show_all,
+            force_regex: false,
+            path_filter: path.map(String::from),
+        };
+        assert_eq!(
+            parse_map_argv(&argv(&["dir sp"])),
+            ok(false, Some("dir sp"))
+        );
+        assert_eq!(
+            parse_map_argv(&argv(&["--all", "./dir sp"])),
+            ok(true, Some("dir sp"))
+        );
+        // Near misses, identical to the REPL string parser on the same input.
+        for (elems, line) in [
+            (&["a", "b"][..], "a b"),
+            (&["--bogus"][..], "--bogus"),
+            (&[][..], ""),
+            (&["src"][..], "src"),
+            (&["--all", "--regex"][..], "--all --regex"),
+            (&[""][..], ""),
+        ] {
+            assert_eq!(
+                parse_map_argv(&argv(elems)),
+                parse_map_args(line),
+                "{elems:?}"
+            );
+        }
+        assert!(
+            matches!(parse_map_argv(&argv(&["a", "b"])), MapArgs::Error(m) if m.contains("two paths given ('a' and 'b')"))
+        );
     }
 
     #[test]

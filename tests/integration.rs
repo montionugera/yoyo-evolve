@@ -3656,3 +3656,47 @@ fn find_refuses_extra_args_and_passes_one_spaced_arg_verbatim() {
         "  No files matching 'zzqq_nomatch1009'.\n\n"
     );
 }
+
+#[test]
+fn map_takes_one_spaced_argv_element_as_one_path() {
+    // #1009: `quote_args_as_command` wrapped `dir sp` as `"dir sp"`, and
+    // `/map`'s whitespace split saw two paths (`"dir` and `sp"`), so a
+    // directory with a space in its name could not be mapped at all (exit 2).
+    // `ls`, `tree`, `du -s` and `find` all read one argv element as one path.
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir(dir.path().join("dir sp")).unwrap();
+    // `pub`: the default map is public-only (`--all` shows private symbols).
+    std::fs::write(dir.path().join("dir sp").join("a.rs"), "pub fn main(){}\n").unwrap();
+
+    let spaced = yoyo_in_dir(dir.path(), &["map", "dir sp"]);
+    let stdout = String::from_utf8_lossy(&spaced.stdout);
+    let stderr = String::from_utf8_lossy(&spaced.stderr);
+    assert_eq!(
+        spaced.status.code(),
+        Some(0),
+        "stdout={stdout:?} stderr={stderr:?}"
+    );
+    assert!(stdout.contains("main"), "{stdout:?}");
+    assert!(!stderr.contains("two paths given"), "{stderr:?}");
+    // A flag beside the spaced path still parses as a flag.
+    let all = yoyo_in_dir(dir.path(), &["map", "--all", "dir sp"]);
+    assert_eq!(all.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&all.stdout).contains("dir sp/a.rs"));
+
+    // Near misses: two real argv elements are still two paths (usage, 2);
+    // an unknown flag is still usage (2); a missing path is still 1.
+    let two = yoyo_in_dir(dir.path(), &["map", "a", "b"]);
+    assert_eq!(two.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&two.stderr).contains("two paths given ('a' and 'b')"),
+        "{:?}",
+        String::from_utf8_lossy(&two.stderr)
+    );
+    let bogus = yoyo_in_dir(dir.path(), &["map", "--bogus"]);
+    assert_eq!(bogus.status.code(), Some(2));
+    let missing = yoyo_in_dir(dir.path(), &["map", "missing_zz1009"]);
+    assert_eq!(missing.status.code(), Some(1));
+    let bare = yoyo_in_dir(dir.path(), &["map"]);
+    assert_eq!(bare.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&bare.stdout).contains("main"));
+}

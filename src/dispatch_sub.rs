@@ -365,9 +365,9 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "map" => {
-                let input = quote_args_as_command(args);
                 // #982: 1 for a missing path, 2 for a usage error; empty stays 0.
-                exit_if_nonzero(crate::commands_map::handle_map_status(&input));
+                // #1009: argv verbatim, so `map "dir sp"` is one path.
+                exit_if_nonzero(crate::commands_map::handle_map_argv_status(&args[2..]));
                 return Some(None);
             }
             "outline" => {
