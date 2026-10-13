@@ -1,0 +1,117 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cat src/prompt/sigterm.rs; grep -rln "TERM" tests/ | head; git log --oneline -3 ✓ (10ms)
+  ▶ $ head -25 src/prompt/sigterm.rs; grep -rn "sigterm::\|was_terminated\|SIGTERM_EXI… ✓ (21ms)
+  ▶ $ sed -n 1,25p src/prompt/sigterm.rs; sed -n 1960,2240p tests/print_stdout_contrac… ✓ (7ms)
+  ▶ $ cat src/prompt/interrupt.rs; sed -n 1075,1090p src/prompt.rs; sed -n 1200,1225p … ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 16.3s (4 ✓)
+
+Measuring first: add the HUP test beside #1015's and run it against the unfixed binary.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (45 lines) ✓ (2.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+SIGHUP measured: stdout "" (0 of 18 bytes), exit code None (killed by signal), no note. Probing SIGQUIT the same way for the census (atomic swap-and-restore):
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cp tests/print_stdout_contract.rs /tmp/psc.bak && sed -i 's/PARTIAL_LINE, "-HUP"… ✓ (2.3s)
+
+Now the census greps (exit paths, SIGPIPE, panic, my loop's callers):
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "process::exit" src/prompt.rs src/prompt/*.rs; grep -n "SIGPIPE\|SIG_DFL… ✓ (8ms)
+  ▶ $ grep -rn "yoyo\b.*\(-p\|--print\|< \|<<\)\|\$YOYO\|YOYO_BIN\|\./target/.*yoyo" s… ✓ (11ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ sed -n 650,672p scripts/evolve.sh; grep -n "TIMEOUT_CMD=" scripts/*.sh | head ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 8.3s (3 ✓)
+
+Census done (written up below). Now the fix: the watcher also arms SignalKind::hangup(), records which signal fired, and the exit code follows it.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ sed -n 1,20p src/prompt/sigterm.rs | cat -A | cut -c1-200 | head -20 ✓ (4ms)
+  ▶ read src/prompt/sigterm.rs (20 lines) ✓ (0ms)
+  2 tools completed in 22.0s (2 ✓)
+
+Now rewrite the module's state and install to cover both signals.
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (137 lines) ✓ (10.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ sed -i 's|//!   process with 143: when a text loop is listen… (4 lines) ✓ (15.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 34.1s (2 ✓)
+
+Green, raw bytes exact. Positive control — one atomic mutate→test→restore:
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/prompt/sigterm.rs /tmp/sigterm.bak && sed -i '/arm(SignalKind::hangup(), … ✓ (25.9s)
+  ▶ $ cp src/prompt/sigterm.rs /tmp/sigterm.bak && sed -i '/arm(SignalKind::hangup(), … ✓ (12.7s)
+  2 tools completed in 42.2s (2 ✓)
+
+Control failed by name (only the new test), restored and green. Now docs, then the full gate.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "143\|SIGTERM" docs/src/usage/piped-mode.md; grep -n "sigterm.rs" ARCHIT… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ sed -i '57s|Ctrl+C (SIGINT) and SIGTERM (what `timeout` send… (2 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ grep -c "129" docs/src/usage/piped-mode.md; cargo fmt -- --check && echo FMT_OK;… ✓ (1.7s)
+  ▶ $ cargo test 2>&1 | grep -E "^test result|FAILED|panicked" | sort | uniq -c | head… ✓ (3m 14s)
+  ▶ $ cargo test 2>&1 | grep -E "^test result" | grep -vc " 0 failed"; grep -rn "NEUTE… ✓ (3m 16s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 8m 47s (4 ✓, 1 ✗)
+
+All suites green, no failures, no sabotage markers. Committing:
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ git add -A && git commit -q -m "Day 227 (20:59): Part of #10… (15 lines) ✓ (19ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Checking the panic row's facts before posting the census:
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "panic" Cargo.toml; grep -n "impl Drop" src/prompt/retry_safe_pipe.rs; g… ✓ (369ms)
+  ▶ $ cat > /tmp/c.md <<'EOF' (27 lines) ✓ (1.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 24.0s (2 ✓)
+
+A piped -p run that gets SIGHUP now writes out the text it was holding and exits 129. Before the fix it lost all of it. Committed as c347aa34. #1016 stays open because some other ways the process can end still lose the text.
+
+Measured before changing anything: I reused #1015's test (a stub provider sends PARTIAL_ANSWER_7Q\n and then stalls, with stdout going to a pipe) and sent kill -HUP once the text had gone out. stdout received 0 of the 18 bytes, the process died from the signal with no exit code, and no note was printed. kill -QUIT lost the text the same way.
+
+The fix: the signal watcher in src/prompt/sigterm.rs now also listens for SignalKind::hangup(). It's set up under the same condition as SIGTERM (only when the run is holding text, so a terminal or the REPL behaves exactly as before) and flushes through the same finish_interrupted_turn. Whichever signal arrives first sets the exit code. I also had to change src/prompt/interrupt.rs so that exit code can be 143 or 129, and I extended its unit test with two SIGHUP rows. That file wasn't on the task's list, which pushed the change to four files, so per the task I skipped ARCHITECTURE.md and put the census in the issue comment instead.
+
+Tests:
+• The new test `sighup_during_piped_print_prompt_flushes_held_text_and_exits_129 checks that stdout is exactly PARTIAL_ANSWER_7Q\n, the exit code is 129, and (interrupted)` is on stderr.
+• #1015's SIGTERM tests are untouched and pass.
+• In one command I deleted the hangup line, ran the tests, and put it back. Only the new test failed, by name; after restoring, it passed. No sabotage markers are left in the code.
+• fmt, clippy with -D warnings and the full cargo test all pass.
+
+Census (posted on #1016, every way a run can end while text is held):
+
+| Exit | Status |
+|---|---|
+| SIGINT (130), SIGTERM (143) | already handled |
+| SIGHUP (129) | handled now |
+| SIGQUIT | still loses the text (measured). Left alone on purpose: it asks for an immediate core dump, not a clean stop |
+| SIGPIPE | the reader has already gone, so there's nobody to lose the text |
+| panic | not run, only read in the code: the holding buffer doesn't flush on drop and no panic setting is configured, so I believe a panic drops the text. Still open |
+| early return / process::exit | grep finds none in the piped path except the watcher's own exit after it flushes |
+| SIGKILL | can't be handled |
+
+My own loop: every yoyo run in scripts/*.sh is wrapped in timeout, which sends SIGTERM (already handled), and runs in CI with no terminal. Nothing uses nohup, setsid or disown. So none of my runs normally get SIGHUP; this fix is for users running something like yoyo -p … | tee log over ssh, or in a terminal that gets closed.
+
+I also updated docs/src/usage/piped-mode.md with the 129 exit and a note that SIGQUIT and SIGKILL still lose the text. The commit isn't pushed yet; the harness does that.
+  watch: no files changed this turn — skipping

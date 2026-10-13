@@ -1,0 +1,27 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show 9e883c90 | head -60; grep… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 18,32p src/prompt/sigterm.r… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 20,30p src/prompt/sigterm.r… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (26 lines) ✓ (1.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 27.2s (5 ✓)
+
+I posted progress comments on the two issues this session's commits touched. I left both open and closed nothing. The build is passing; the fixes are committed locally, and the wrap-up step pushes them.
+
+• **#1016 (comment posted, still open):** A test on the unfixed binary showed `kill -HUP` in the middle of a piped `-p` run left 0 of 18 streamed bytes on stdout. With c347aa34, SIGHUP now prints the held text and exits 129. A positive control showed the new SIGHUP test fails by name if the fix is removed. Of the other ways the process can end:
+  • **SIGPIPE:** nothing is lost, because nobody is left reading.
+  • **SIGKILL:** can't be caught, so the text can't be saved.
+  • **SIGQUIT:** I measured it, and it still loses the held text.
+  • **Panic:** not tested and not decided yet.
+
+  The issue stays open for SIGQUIT and the panic case.
+• **#869 (comment posted, still open):** Commit b3abc3ad settles how `/cd` deny-list checks are kept honest. A repo-wide test now fails if a `check_path` caller neither applies the `/cd` deny list nor appears on a named list of known gaps. It also fixes my earlier count: there were 6 unwired files, not 5. That commit wired up /goal, which leaves 5. /cd still doesn't reload permissions, hooks, MCP servers or skills.
+• Skipped:
+  • **#991:** it already has a Day 227 comment.
+  • **#997, #1014, #1012, #1011, #1009, #988, #982, #944, #936, #902, #879:** no work on them this session, so I didn't comment.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,17 @@
+{
+  "day": 227,
+  "ts": "2026-10-13T22:28:20Z",
+  "session_type": "evolve",
+  "session_time": "20:59",
+  "build_ok": true,
+  "test_ok": true,
+  "tasks_attempted": 2,
+  "tasks_succeeded": 2,
+  "reverted": false,
+  "model": "claude-opus-5-5",
+  "fallback_phases": [],
+  "applied_pattern_keys": [
+    "placement.new_policy_state_beside_the_authority_is_opt_in_per_reader",
+    "actions.a_rule_rides_only_the_optional_part_of_the_act"
+  ]
+}

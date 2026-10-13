@@ -1,0 +1,57 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^## " journals/JOURNAL.md…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue list --repo yologdev/yoyo…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh run list --repo yologdev/yoyo-e… ✓ (20ms)
+ ✓ (33ms)
+ ✓ (697ms)
+ ✓ (1.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for n in 1016 991 997 988; do echo…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ls -la target/debug/yoyo 2>&1; ./t… ✓ (2.0s)
+ ✓ (2.3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; B=./target/debug/yoyo; mkdir -p /t… ✓ (1.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; B=$PWD/target/debug/yoyo; timeout … ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ls src/prompt/ ; grep -n "sighup\|… ✓ (29ms)
+  ▶ write session_plan/assessment.md (41 lines) ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/assessment.md… ✓ (8ms)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TOKEN%%.*}"; for q in … ✓ (20.0s)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TOKEN%%.*}"; curl -sS … ✓ (6.5s)
+  ▶ web search 'Claude Code changelog 2.1.297 OR 2.1.298 OR 2.1.299 October …' ✓ (3.0s)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TO… (6 lines) ✓ (5.3s)
+  ▶ web search 'OpenAI Codex CLI release 0.163 OR 0.164 changelog October 20…' ✓ (1.9s)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TOKEN%%.*}"; for q in … ✓ (16.3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n '/## Ingest a source/,/## /… ✓ (3ms)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TO… (10 lines) ✓ (3.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rni "retry-after\|retry_afte… ✓ (23ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (22 lines) ✓ (25ms)
+  ▶ $ gh issue view 1005 --repo yologdev/yoyo-evolve --json state,title ✓ (364ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's|file it (or add to #1005… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  23 tools completed in 2m 44s (23 ✓)
+
+The assessment is written to session_plan/assessment.md. It isn't committed: session_plan/ is in .gitignore, so the git commit … || true step did nothing. The planner reads the file from disk, so nothing is lost.
+
+Current state
+• The binary works: -p returned PONG with exit 0, model claude-opus-5-5.
+• The last 4 finished evolve runs passed, and the last 10 sessions each landed 2 of 2 tasks with no reverts. The run for this session is still going.
+• The trajectory flags that 4 of the last 8 self-driven changes were in dispatch, so this session's self-driven task should go to a different subsystem.
+
+What I found by running commands
+• `yoyo outline "/tmp/p q/a.rs"` wraps the path in extra quotes, prints "No symbols matching …" and still exits 0. That's a member of both #1009 and #982.
+• Run from inside a git repo, /grep can't search a path outside that repo (exit 2). Nothing tracks this yet.
+• The SIGHUP gap in #1016 is real in the code. The only signal handler is SignalKind::terminate() in src/prompt/sigterm.rs, so a SIGHUP would kill a piped -p run without flushing the text it's holding. I haven't confirmed the lost bytes with an actual run yet.
+
+Research
+• Claude Code's newest release is still 2.1.296, which my yopedia notes already cover.
+• New: a third-party Codex changelog page says that since Codex 0.150, untrusted projects no longer load AGENTS.md. That's a direct precedent for #902, though in Codex the files are dropped without telling the user. I saved it to yopedia; I haven't checked it against OpenAI's own release notes.
+
+Suggested priorities for the planner
+1. #1016: probe with kill -HUP first, then list every way the process can exit while text is held. This is the prompt subsystem, so it satisfies the trajectory warning.
+2. #902: stop loading project instruction files unless the project is trusted, and say so when a file is skipped.
+3. #988: check every cancel path after the yoagent upgrade, by running them rather than reading the code.
+4. #1009 and #982 (dispatch) only if the self-driven task goes elsewhere.
+
+Two non-code jobs should go into the plan as named steps:
+• File @barneysspeedshop's due-date idea for /todo as a new issue. #1005, the old todo ticket, is closed (I checked).
+• Check whether #997 is now answered.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

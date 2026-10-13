@@ -1,0 +1,216 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show --stat 863e2ae5 | head -2… ✓ (13ms)
+ ✓ (25ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 255,332p src/cd_config_note… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "path_guard_refusal\|cd_d…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 40,110p src/commands_file_f… ✓ (8ms)
+ ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 200,240p src/commands_goal.… ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 135,150p src/commands_goal.… ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn goal_base" -A12 src/co… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "goal_for_prompt_fenced_i… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "goal_for_prompt_fenced_in… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1466,1560p src/commands_goa… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "pub fn check_path" -A40 s… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for f in src/config.rs src/config_… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "cd_config_note\|cd_deny" … ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  14 tools completed in 1m 7s (14 ✓)
+
+Now write the guard test (first, at HEAD state).
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/cd_config_note.rs (2 → 149 lines)
+  +     /// Production `check_path` readers that do NOT consult the `/cd`-appended
+  +     /// `[directories] deny` list, each with the reason it is still unwired.
+  +     /// Every reason names #869. The placement decision (Day 227) keeps the
+  +     /// `/cd` list BESIDE `DirectoryRestrictions::check_path`, so a reader
+  +     /// nobody wires stays fail-open after `/cd`; this register is the price:
+  +     /// "unwired" is a test failure unless it is written down here. Wiring a
+  +     /// reader must remove its row (a stale row fails the guard too), so the
+  +     /// register's length is the class's remaining size.
+  +     const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
+  +         (
+  +             "src/commands_map.rs",
+  +             "#869: repo-map fence; the prompt map is built at startup, `/map` is unfenced",
+  +         ),
+  +         (
+  +             "src/commands_project.rs",
+  +             "#869: /context-style project reads still see only the startup fence",
+  +         ),
+  +         (
+  +             "src/commands_rename.rs",
+  +             "#869: /rename's file filter still sees only the startup fence",
+  ... (129 more lines)
+ ✓ (2m 31s)
+  +     /// Production `check_path` readers that do NOT consult the `/cd`-appended
+  +     /// `[directories] deny` list, each with the reason it is still unwired.
+  +     /// Every reason names #869. The placement decision (Day 227) keeps the
+  +     /// `/cd` list BESIDE `DirectoryRestrictions::check_path`, so a reader
+  +     /// nobody wires stays fail-open after `/cd`; this register is the price:
+  +     /// "unwired" is a test failure unless it is written down here. Wiring a
+  +     /// reader must remove its row (a stale row fails the guard too), so the
+  +     /// register's length is the class's remaining size.
+  ... (13 more lines)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ edit src/cd_config_note.rs (2 → 6 lines)
+        const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
+  +         (
+  +             "src/commands_goal.rs",
+  +             "#869: the goal file is read after /cd by /goal check",
+  +         ),
+            (
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo no_check_pat… ✓ (4m 31s)
+        const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
+  +         (
+  +             "src/commands_goal.rs",
+  +             "#869: the goal file is read after /cd by /goal check",
+  +         ),
+            (
+ ✗ (4m 31s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test --bin yoyo … ✓ (227ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 7m 13s (3 ✓, 1 ✗)
+
+Guard passes at HEAD with 6 registered files (#869's comment listed 5; HEAD also has src/skill_fence.rs). Now wire commands_goal.rs.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 150,172p src/commands_goal.… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (57 lines) ✓ (25ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn refusal_warning_is_san… ✓ (3ms)
+  ▶ edit src/commands_goal.rs (2 → 70 lines)
+  +     /// `proj/.yoyo/goal.md` holding a plain goal (no link), canonical root.
+  +     fn plain_goal_fixture() -> (TempDir, std::path::PathBuf) {
+  +         let tmp = TempDir::new().unwrap();
+  +         let proj = tmp.path().canonicalize().unwrap().join("proj");
+  +         std::fs::create_dir_all(proj.join(".yoyo")).unwrap();
+  +         std::fs::write(proj.join(GOAL_FILE), "ship the parser\n").unwrap();
+  +         (tmp, proj)
+  +     }
+  + 
+  +     /// #869: after `/cd`, the new directory's `[directories] deny` fences the
+  +     /// goal file `/goal check` reads, with the `/cd` source suffix the `@path`
+  +     /// doors use. A sibling directory's entry does not.
+  +     #[test]
+  +     fn cd_applied_deny_refuses_the_goal_file_with_the_cd_suffix() {
+  +         let (_tmp, proj) = plain_goal_fixture();
+  +         let none = DirectoryRestrictions::default();
+  +         let list = crate::cd_deny::DenyAdditions::default();
+  +         let entry = proj.join(".yoyo").display().to_string();
+  +         crate::cd_deny::append_deny_with(&list, std::slice::from_ref(&entry));
+  +         let shown = proj.join(GOAL_FILE).display().to_string();
+  ... (50 more lines)
+  ▶ edit src/cd_config_note.rs (4 → 0 lines)
+  -         (
+  -             "src/commands_goal.rs",
+  -             "#869: the goal file is read after /cd by /goal check",
+  -         ),
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && timeout 590 cargo tes… ✓ (4m 19s)
+  +     /// `proj/.yoyo/goal.md` holding a plain goal (no link), canonical root.
+  +     fn plain_goal_fixture() -> (TempDir, std::path::PathBuf) {
+  +         let tmp = TempDir::new().unwrap();
+  +         let proj = tmp.path().canonicalize().unwrap().join("proj");
+  +         std::fs::create_dir_all(proj.join(".yoyo")).unwrap();
+  +         std::fs::write(proj.join(GOAL_FILE), "ship the parser\n").unwrap();
+  +         (tmp, proj)
+  +     }
+  ... (13 more lines)
+ ✓ (8m 4s)
+  -         (
+  -             "src/commands_goal.rs",
+  -             "#869: the goal file is read after /cd by /goal check",
+  -         ),
+ ✓ (8m 4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 8m 35s (6 ✓)
+
+Positive controls, serially and atomically. Control 1: scratch check_path call at the top of an unregistered file.
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/banner.rs /tmp/banner.bak &… ✓ (17.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Compile error (inner doc must lead). Retry placing it after the module docs.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; n=$(grep -n -v '^//!' src/banner.r… ✓ (29.9s)
+
+Control 1 failed by name; restored. Control 2: neuter the goal wiring.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/command… (5 lines) ✓ (30.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Both reddened by name, near-miss stayed green; restored. Now the ARCHITECTURE.md entry.
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1340,1351p ARCHITECTURE.md … ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (24 lines) ✓ (35ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 20.6s (2 ✓)
+
+Mark the old residue sentence superseded in place:
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (9 lines) ✓ (20.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (3m 57s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (3m 5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7m 29s (3 ✓)
+
+All green. Check for user docs describing which readers honour /cd's deny list:
+  ╭─ Turn 28 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "/cd" docs/src README.md … ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 545,547p docs/src/configura… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (27 lines) ✓ (65ms)
+  3 tools completed in 9.0s (3 ✓)
+
+Now the #869 comment. Per the rule, I'll check the issue's state first.
+  ╭─ Turn 31 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 869 --json state,tit… ✓ (416ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/c86… (16 lines) ✓ (1.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 21.0s (2 ✓)
+
+/goal check now honours the /cd deny list, and a new repo-wide test fails if any other file checks a path against the startup fence without either honouring that list or being registered with a reason. Five files still skip the list: commands_map.rs, commands_project.rs, commands_rename.rs, context.rs and skill_fence.rs. Build, test, clippy and fmt all pass. The commit is b3abc3ad. It's local only; the session push will send it.
+
+Where the deny list lives. The list stays outside DirectoryRestrictions::check_path, so that function stays pure and its existing tests don't change. I wrote this decision into ARCHITECTURE.md along with the option I turned down: putting the list inside the check would protect every caller automatically, but all of its tests would then depend on global state. The cost of my choice is that a path check nobody updates still ignores the list after /cd, and the new test is what pays for that.
+
+The test (no_check_path_reader_skips_the_cd_deny_list_unregistered, in src/cd_config_note.rs):
+• It scans the non-test code in every src/**/*.rs file for .check_path( calls.
+• A call passes if the function around it also calls one of the /cd deny checks. Otherwise its file has to be listed in UNWIRED_CHECK_PATH_READERS with a reason naming #869.
+• A listed file that no longer has an unwired call also fails the test. So the list has to shrink by exactly the number of files fixed, and its length is the count of what's left.
+• It only proves the /cd check is called in the same function, not that it runs. A plain std::fs read with no check_path call at all is on no list.
+
+The real count was 6, not 5. The #869 comment's list missed src/skill_fence.rs, so I built the list from what the code actually contains. I noted the difference in ARCHITECTURE.md (the old sentence is marked superseded, not deleted) and in the #869 comment.
+
+Why `/goal check`: it's the one unwired reader that clearly runs after a /cd and reads a file in the new directory. It looks for the goal file relative to . at the moment it runs, so after /cd it reads the new directory's .yoyo/goal.md.
+• The startup check runs first and gives exactly the same result and wording as before.
+• The /cd check comes next, and its refusal ends with (a [directories] deny entry applied by /cd), the same suffix @path uses.
+• New tests compare the full refusal, check that a near-miss sibling directory still loads, and check that an empty /cd list gives the old result byte for byte across four startup setups.
+• The list went from 6 files to 5.
+
+Positive controls, run one at a time and both restored:
+• Adding a dummy check_path call to banner.rs made the new test fail and name that file.
+• Disabling the new goal check failed the /cd refusal test and the new test, while the byte-identical test stayed green.
+
+I also updated docs/src/configuration/permissions.md: /goal check is now on the list of places that honour the deny list, and skill loading is added to the readers that don't. I commented on #869 with the decision, the test, the reader I updated and the count by file, and left the issue open.
+
+  (interrupted)
