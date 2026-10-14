@@ -1,0 +1,180 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "" src/cd_config_note.rs |…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 420,885p src/cd_config_note… ✓ (8ms)
+ ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 100,330p src/cd_config_note… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "cd_denied_dirs_handle\|p… ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "DenyAdditions" src/ | gr… ✓ (21ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "Sets(" src/ --include=*.… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1450,1475p src/dispatch.rs;… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1455,1472p src/dispatch.rs … ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=134 && NR<=146' src/cd_co… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=146 && NR<=150' src/cd_co… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=500 && NR<=760' src/cd_co… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=596 && NR<=660' src/cd_co… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "snapshot(\|lock_or_recov… ✓ (29ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "lock_or_recover" src/ --… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,20p src/commands_permissi… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 40,110p src/commands_file_f… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "deny entry applied by /c… ✓ (11ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  18 tools completed in 2m 16s (18 ✓)
+
+Now I have the shape. Writing the core change in cd_config_note.rs.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (141 lines) ✓ (172ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/ed1… (141 lines) ✓ (27ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/ed2… (155 lines) ✓ (35ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1458,1470p src/dispatch.rs … ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 57.4s (4 ✓)
+
+Now the source label: a /cd allow refusal would be mislabelled "deny entry". Generalising it.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ rename CD_DENY_SOURCE_NOTE → CD_DIR_SOURCE_NOTE ✓ (94ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rln "a \[directories\] deny … ✓ (21ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git checkout -… (16 lines) ✓ (11.0s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 18.8s (3 ✓)
+
+Builds. Now /permissions.
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 14,32p src/commands_permiss… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/ed3… (65 lines) ✓ (26ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (63 lines) ✓ (12.7s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 39.0s (3 ✓)
+
+Now the cd_config_note tests: run the existing ones to see what my change legitimately moved.
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo cd_config_no… ✓ (17.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's/CdConfigReading::Sets(ve… ✓ (29.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo cd_config_no… ✓ (203ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 430,450p src/cd_config_note… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/ed4… (63 lines) ✓ (25ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/ed5… (194 lines) ✓ (114ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "deny list stays append-on… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (11 lines) ✓ (31.5s)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 2m 30s (8 ✓)
+
+Green. Positive control — neuter the allow check, run, restore, all in one command:
+  ╭─ Turn 35 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/cd_config_note.rs /tmp/cdn.… ✓ (58.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control reddened the three allow tests by name (near-miss stayed green), restored, green again. Now docs.
+  ╭─ Turn 36 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 538,556p docs/src/configura… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (21 lines) ✓ (107ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (21 lines) ✓ (41ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "allow, hooks\|NOT reload… ✓ (19.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,20p src/cd_deny.rs; sed -… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=1 && NR<=20' src/cd_deny.… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 41.6s (6 ✓)
+
+Stale claim in cd_deny.rs (the task's named file) — correcting it in place.
+  ╭─ Turn 42 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/cd_deny.rs (3 → 5 lines)
+  - //! `deny` verbatim while refusing its `allow` (#749 item 3). Allow,
+  - //! `[directories]`, hooks, MCP and skills can widen, or need an agent rebuild
+  - //! that drops MCP connections (#842), so they are still NOT reloaded on `/cd`.
+  + //! `deny` verbatim while refusing its `allow` (#749 item 3). Allow, hooks, MCP
+  + //! and skills can widen, or need an agent rebuild that drops MCP connections
+  + //! (#842), so they are still NOT reloaded on `/cd`. (Superseded: this list
+  + //! also named `[directories]`. Both of its halves only narrow and are applied
+  + //! on `/cd` by `cd_config_note` — deny since Day 226, allow since Day 228.)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (4m 55s)
+  - //! `deny` verbatim while refusing its `allow` (#749 item 3). Allow,
+  - //! `[directories]`, hooks, MCP and skills can widen, or need an agent rebuild
+  - //! that drops MCP connections (#842), so they are still NOT reloaded on `/cd`.
+  + //! `deny` verbatim while refusing its `allow` (#749 item 3). Allow, hooks, MCP
+  + //! and skills can widen, or need an agent rebuild that drops MCP connections
+  + //! (#842), so they are still NOT reloaded on `/cd`. (Superseded: this list
+  + //! also named `[directories]`. Both of its halves only narrow and are applied
+  + //! on `/cd` by `cd_config_note` — deny since Day 226, allow since Day 228.)
+ ✗ (4m 55s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (3m 40s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (3m 9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 11m 51s (3 ✓, 1 ✗)
+
+All green (every test binary 0 failed, harness 182/0). Adding a short history note to ARCHITECTURE.md where the next reader of this file looks.
+  ╭─ Turn 45 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "cd_config_note" ARCHITECT… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (43 lines) ✓ (87ms)
+  2 tools completed in 19.7s (2 ✓)
+
+Now the comment on #869 the task asked for. First I'm checking that the issue is still open:
+  ╭─ Turn 47 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 869 --json state,tit… ✓ (356ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/c86… (14 lines) ✓ (1.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 20.8s (2 ✓)
+
+After /cd, the new directory's [directories] allow list now narrows the file tools. Before this change it was ignored. It's committed as 15ae6150 ("Part of #869"). Build, clippy with -D warnings, fmt --check, the full cargo test (every test binary, 0 failed) and tests/harness_logic.sh (182 passed) are all green.
+
+How it behaves
+• A path must pass both the startup fence and the new directory's allow list, so /cd can only narrow. Relative entries like src are tied to the directory you /cd'd into, the same way deny entries already were.
+• Each `/cd` **replaces** the allow list; deny entries still only accumulate. Two unrelated projects' allow lists would together refuse almost everything. A replacement can only widen back to the launch fence, never past it. The reason is written in the doc comment on apply_cd_dir_fence_with.
+• **Placement:** the check sits inside `cd_denied_dir_refusal_with`, the function every `/cd`-aware reader already calls. So the file tools, `@path`/`/add`/`/explain/--image, /goal check, auto-context and /rename all got it without new wiring. The list of readers that skip the /cd fence (UNWIRED_CHECK_PATH_READERS`) is unchanged: 2 rows, both startup-only.
+• The list itself is stored separately (CD_ALLOWED_DIRS), next to the deny list. Storing both in one shared value would have changed every reader's signature. The cost: a reader given a test-only deny list still reads the real allow list, which is empty in tests.
+
+Beyond the planned 3 files. I didn't stop at the 3-file limit, because none of these is a parallel wrapper:
+• `dispatch.rs: one call in the /cd` handler.
+• `commands_config.rs: one argument so /permissions` gets the allow list.
+• `commands_rename.rs: its shortcut only checked whether the /cd deny list was empty, so a /cd` that set only an allow list would have skipped the fence. I found it by grepping for that emptiness test, not by listing who calls the check.
+• **Renamed label:** `CD_DENY_SOURCE_NOTE` became `CD_DIR_SOURCE_NOTE`, now reading `(a [directories] entry applied by /cd)`. It is appended to every `/cd` refusal, so an allow refusal would have been labelled "deny entry", which is false. Three tests that quote the text were updated.
+
+Visible to the user
+• `/permissions lists each /cd allow entry under Allowed directories`, labelled "(an allow entry applied by /cd; also required, replaced by the next /cd)".
+• The `/cd` warning reports the allow list as applied rather than unapplied.
+
+Tests: I added four in cd_config_note.rs:
+• real files admitted or refused, with the exact refusal text;
+• a directory with no allow list gives byte-identical refusals to before;
+• the startup allow list still applies alongside a /cd allow list;
+• the next /cd replaces the allow list and keeps the deny entries.
+
+I also added an exact-line test for /permissions. For the positive control I disabled the allow check (marked NEUTERED) in one command that also restored it. Exactly the three allow tests failed by name and the near-miss test stayed green. After the restore everything passed and no NEUTERED marker is left.
+
+Docs and records
+• `docs/src/configuration/permissions.md`: the "After /cd" section describes the new behaviour.
+• `ARCHITECTURE.md`: new entry with the placement decision.
+• `cd_deny.rs: its module comment wrongly said [directories] is not reloaded on /cd`. I marked that as superseded in place.
+• I commented on #869 (still open) listing what remains unapplied on /cd: [permissions] allow, hooks, MCP servers and skills. These loosen limits, so they need the trust gate.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 1/6 changed files were in top-10 predictions (16.7% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/6 (0.0%) — reactive was 16.7%
+     Predicted correctly: src/commands_file_fence.rs
+     Surprises (not predicted): src/commands_file_fence_tests.rs, src/commands_goal.rs, src/commands_map.rs, src/commands_permissions.rs, src/cd_deny.rs

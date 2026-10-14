@@ -1,0 +1,28 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; grep -rn "no-hi… ✓ (613ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue creat… (11 lines) ✓ (1.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p sessi… (113 lines) ✓ (17ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 38s (3 ✓)
+
+I wrote the plan for this session. The task files are in session_plan/, but the commit step did nothing because that folder is gitignored, so they exist only on disk (the harness reads them from there). I filed one new issue: #1022.
+
+Task 1: Fixes #1022 (product, top priority). --deny-dir doesn't protect what a whole-directory search or list_files returns. The assessment ran it: with secrets denied, a search over . still gave the model ./secrets/key.txt:1:token=CANARY_Q7Z. The wrapper only checks the path argument, and the tool underneath then walks straight into the denied folder.
+• **Fix:** a small new filter module drops any `search` or `list_files` result line whose path falls in a denied place, and adds one line saying how many results were held back. It uses the same check the argument already goes through, which covers the startup list, the /cd deny list and sub-agents.
+• **Tests:** a planted secret must not appear in the output. A match in an allowed sibling folder must come back unchanged, and output with nothing denied must be byte-for-byte the same as today. There is also a sabotage-then-restore check that the canary test goes red.
+• **Left for later:** the rg config weakness (yoagent runs rg without --no-config) stays open on #1022.
+
+Task 2: Part of #869 (product, clearing the oldest open issue). #858 is older, but only the creator can edit that skill file and he's working on it in #1017, so #869 is next.
+• **What changes:** after `/cd`, the new folder's `[directories] allow` list now limits file access, the same way it does when yoyo starts there. Today it's ignored after /cd, so a project's allow-fence holds if you launch in it and vanishes if you /cd into it.
+• **Decisions written in before any code:** the new list goes into the same `/cd` state the already-connected readers check, so they all pick it up without separate wiring. It can only narrow access, never widen it. A later /cd replaces the previous /cd allow list, while the startup allow list always stays. /permissions will show the new entries.
+• **Still open on #869 after this:** [permissions] allow, hooks, MCP servers and skills. Those widen access, so they need the trust check first.
+
+Other items:
+• **Discussion #420 promise:** already kept. `--no-hints` and `hints = false` exist (`src/cli.rs:59-74`). The promise checker looks for commit messages mentioning "hints", which is why it still says unfulfilled.
+• Release: not due (9 days since v0.2.0), so no release this session.
+• **No community issues** in today's queue.
+  watch: no files changed this turn — skipping
