@@ -884,6 +884,38 @@ check "skill-evolve: no retire rule is gated on score < 0.3 any more" \
 check "skill-evolve: unmeasured skills are exempt, naming the unlogged loops" \
     "$(grep -c 'never retired for silence.*social.*dream' "$SE_SPEC")" "1"
 
+# ── refused wrap-up patches reach the next planner; the responder is read-only ─
+# Day 228 (14:52): the issue responder wrote three tests while "probing", the
+# wrap-up gate refused them, and nothing ever read the saved patch. Real git: an
+# audit-log branch with four sessions; only patches in the newest three are
+# listed, with the files they touch.
+RP_FN=$(awk '/^refused_patches_block\(\) \{/,/^\}/' "$SCRIPT")
+rp_case() { # $1 = ref to pass → the function's output, newlines as ' ; '
+    ( set +e; d=$(mktemp -d); cd "$d" || exit 1
+      git init -q; git config user.email t@t; git config user.name t
+      echo x > f; git add f; git commit -qm base
+      git checkout -q -b audit-log
+      mkpatch() { printf 'diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n' "$2" "$2" "$2" "$2" > "$1"; }
+      mkdir -p sessions/day-9-20261001T000000Z sessions/day-10-20261002T000000Z \
+               sessions/day-11-20261003T000000Z sessions/day-12-20261004T000000Z
+      mkpatch sessions/day-9-20261001T000000Z/refused_wrapup.patch src/old.rs     # aged out
+      mkpatch sessions/day-11-20261003T000000Z/refused_wrapup.patch src/prompt/x.rs
+      echo t > sessions/day-10-20261002T000000Z/transcript.log
+      echo t > sessions/day-12-20261004T000000Z/transcript.log
+      git add -A; git commit -qm sessions; git checkout -q -
+      eval "$RP_FN"; refused_patches_block "$1" | paste -sd';' - | sed 's/;/ ; /g'
+      cd /; rm -rf "$d" ) 2>/dev/null
+}
+if require "refused_patches_block extracted" "$RP_FN"; then
+    check "refused patches: only the newest three sessions, with the files touched" \
+        "$(rp_case audit-log)" "- sessions/day-11-20261003T000000Z/refused_wrapup.patch: src/prompt/x.rs"
+    check "refused patches: a missing audit-log ref lists nothing" "$(rp_case no-such-ref)" ""
+    check "refused patches: the planner prompt carries the block" \
+        "$(grep -c '^=== REFUSED AT A RECENT WRAP-UP' "$SCRIPT")" "1"
+    check "respond prompt: the issue responder is read-only" \
+        "$(grep -c 'This phase only replies. Do NOT edit, create or delete repository files' "$SCRIPT")" "1"
+fi
+
 # ── main push: retry, and never echo a failure into success ────────────────
 PR_FN=$(awk '/^push_main_with_retry\(\) \{/,/^\}/' "$SCRIPT")
 if require "push_main_with_retry extracted" "$PR_FN"; then

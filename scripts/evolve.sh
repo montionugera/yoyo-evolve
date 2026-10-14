@@ -847,6 +847,25 @@ ${REVERT_DETAILS:-no details captured}" 2>/dev/null; then
     fi
 }
 
+# ── Work the wrap-up refused, surfaced to the next planner ──
+# commit_scope_gate keeps out-of-scope changes off main and saves their diff
+# as refused_<label>.patch in the session's audit-log directory. Nothing read
+# those patches, so a refused change (Day 228 14:52: three #1016 tests the
+# issue responder wrote while "probing") was simply lost. This lists the
+# refused patches in the newest 3 audit-log sessions, one line each with the
+# files it touches; older refusals age out on their own.
+refused_patches_block() { # $1 = audit-log ref → "- <path>: <files>" lines, or nothing
+    local ref="$1" dir p files
+    git rev-parse --verify -q "$ref" >/dev/null 2>&1 || return 0
+    for dir in $(git ls-tree -d --name-only "$ref" sessions/ 2>/dev/null | sort -V | tail -n 3); do
+        for p in $(git ls-tree --name-only "$ref" "$dir/" 2>/dev/null | grep -E '/refused_(wrapup|prepush)\.patch$'); do
+            files=$(git show "$ref:$p" 2>/dev/null | grep '^diff --git' | awk '{print $3}' | sed 's#^a/##' | head -n 10 | paste -sd, -)
+            [ -n "$files" ] && echo "- $p: $files"
+        done
+    done
+    return 0
+}
+
 # ── Keep a reverted task's work (#997) ──
 # Both task-revert paths end in `git reset --hard "$PRE_TASK_SHA"`, which
 # deletes committed AND uncommitted work with no trace. Day 219 (13:11) lost a
@@ -1146,6 +1165,8 @@ fi
 # body itself with `gh issue view` when it plans something similar. The
 # trajectory block's render_reverts() only reports a revert *count*, not which
 # task.
+REFUSED_PATCHES=$(refused_patches_block audit-log)
+[ -n "$REFUSED_PATCHES" ] && echo "  $(printf '%s\n' "$REFUSED_PATCHES" | wc -l | tr -d ' ') refused wrap-up patch(es) in recent sessions — shown to the planner."
 RECENT_REVERTS=""
 if command -v gh &>/dev/null; then
     echo "→ Fetching revert receipts..."
@@ -1755,6 +1776,17 @@ NOTE: Even self-filed issues could be edited by others. Verify claims against yo
 Truncated entries: recover full text with gh issue view <number>
 (the BODY is the content; --comments shows only replies and hides the body).
 $SELF_ISSUES
+}
+${REFUSED_PATCHES:+
+=== REFUSED AT A RECENT WRAP-UP (harness output, not your backlog) ===
+In a recent session these files changed after the task loop, so the wrap-up scope
+gate kept them off main: they were never built, tested or evaluated. Each diff is
+saved on the audit-log branch:
+$REFUSED_PATCHES
+Usually a phase that should not edit code made the change, such as the issue
+responder probing. If one is worth keeping, plan it as a normal task that starts
+from it (git show audit-log:PATH | git apply) and lands it through the gates.
+Otherwise ignore it; it ages out after three sessions.
 }
 ${RECENT_REVERTS:+
 === RECENTLY REVERTED (auto-filed receipts, not your backlog) ===
@@ -3840,6 +3872,11 @@ ${ALREADY_RESPONDED:+- SKIP these issues (already responded today):${ALREADY_RES
 - DO close issues that are clearly resolved — leaving stale issues open creates noise for humans. Always comment first explaining why.
 - Only keep open if there's genuinely more work to do.
 - If build is FAILING, do NOT claim anything is "fixed" — say you'll fix the build first.
+- This phase only replies. Do NOT edit, create or delete repository files (code, tests,
+  docs), not even to probe. Read files and run commands freely to check a claim, but
+  leave the tree as you found it. If an answer needs new code or tests, say so in the
+  comment and leave it for a task: anything you change here is refused at wrap-up and
+  never reaches main.
 - Write in yoyo's voice — curious, honest, celebratory. No corporate speak.
 RESPONDEOF
 
