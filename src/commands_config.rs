@@ -932,61 +932,16 @@ pub fn handle_permissions(
     permissions: &crate::cli::PermissionConfig,
     dir_restrictions: &crate::cli::DirectoryRestrictions,
 ) {
-    println!("{DIM}  Security Configuration:\n");
-
-    // Auto-approve status
-    if auto_approve {
-        println!("    {YELLOW}⚠ Auto-approve: ON{RESET}{DIM} (--yes flag active)");
-        println!("      All tool operations run without confirmation{RESET}");
-    } else {
-        println!("    {GREEN}✓ Confirmation: required{RESET}");
-        println!("    {DIM}  Tools will prompt before write/edit/bash operations{RESET}");
-    }
-    println!();
-
-    // Bash command permissions
-    if permissions.is_empty() {
-        println!("    Command patterns: none configured");
-    } else {
-        if !permissions.allow.is_empty() {
-            println!("    {GREEN}Allow patterns:{RESET}");
-            for pat in &permissions.allow {
-                println!("      {GREEN}✓{RESET} {pat}");
-            }
-        }
-        if !permissions.deny.is_empty() {
-            println!("    {RED}Deny patterns:{RESET}");
-            for pat in &permissions.deny {
-                println!("      {RED}✗{RESET} {pat}");
-            }
-        }
-    }
-    println!();
-
-    // Directory restrictions
-    if dir_restrictions.is_empty() {
-        println!("    Directory restrictions: none (full filesystem access)");
-    } else {
-        if !dir_restrictions.allow.is_empty() {
-            println!("    {GREEN}Allowed directories:{RESET}");
-            for dir in &dir_restrictions.allow {
-                println!("      {GREEN}✓{RESET} {dir}");
-            }
-        }
-        if !dir_restrictions.deny.is_empty() {
-            println!("    {RED}Denied directories:{RESET}");
-            for dir in &dir_restrictions.deny {
-                println!("      {RED}✗{RESET} {dir}");
-            }
-        }
-    }
-    println!();
-
-    // Quick reference
-    println!(
-        "    {DIM}Configure with: --allow <pat>, --deny <pat>, --allow-dir <d>, --deny-dir <d>"
+    // The /cd-appended deny lists are live policy too (#869): reading only the
+    // launch-time config printed "none (full filesystem access)" over a fence.
+    let report = crate::commands_permissions::permissions_report(
+        auto_approve,
+        permissions,
+        dir_restrictions,
+        &crate::commands_permissions::snapshot(&crate::cd_deny::cd_added_deny_handle()),
+        &crate::commands_permissions::snapshot(&crate::cd_config_note::cd_denied_dirs_handle()),
     );
-    println!("    Or in .yoyo.toml: allow = [...], deny = [...]{RESET}\n");
+    print!("{report}");
 }
 
 /// The complete argument vocabulary of `/teach` — mirrors the `"on"`/`"off"` arms of
