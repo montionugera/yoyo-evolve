@@ -270,7 +270,9 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // is a reverted session. The split is owed, not done.
     ("src/commands.rs", 2164),
     // Day 211 (#962): 3640 -> 3645 (+5): `handle_init_in(dir)` seam.
-    ("src/commands_project.rs", 3645),
+    // Day 228 (#869): /cd deny wired into auto_context; 3653 -> 3709 (+56: pure
+    // select_auto_context_paths extracted + its emission-point test).
+    ("src/commands_project.rs", 3709),
     // Day 162 (#708): +40 lines — classify_broke_files now filters to `src/`
     // (the risk model's whole universe), plus its unit test and the updated
     // end-to-end fixture assertions.

@@ -734,10 +734,6 @@ mod tests {
     /// register's length is the class's remaining size.
     const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
         (
-            "src/commands_project.rs",
-            "#869: /context-style project reads still see only the startup fence",
-        ),
-        (
             "src/context.rs",
             "#869: instruction-file loaders run at startup, before any /cd",
         ),

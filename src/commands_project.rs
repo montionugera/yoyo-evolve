@@ -1298,6 +1298,49 @@ fn get_recent_git_files() -> std::collections::HashSet<String> {
     get_recent_git_files_in(std::path::Path::new("."))
 }
 
+/// The per-candidate decision of [`auto_context_for_prompt`], pure over its inputs:
+/// the `/cd` deny list is a **parameter** (#869) so tests drive a local list. There is
+/// no early return keyed on either fence being empty; each half short-circuits itself.
+fn select_auto_context_paths(
+    results: &[RelevanceResult],
+    recent_context: &[String],
+    restrictions: &DirectoryRestrictions,
+    cd_list: &crate::cd_deny::DenyAdditions,
+) -> Vec<String> {
+    let mut matched_paths = Vec::new();
+
+    for r in results {
+        if matched_paths.len() >= AUTO_CONTEXT_MAX_FILES {
+            break;
+        }
+        if r.score < AUTO_CONTEXT_MIN_SCORE {
+            break; // results are sorted descending, so all remaining are lower
+        }
+
+        // Skip files already in the conversation context
+        if recent_context.iter().any(|ctx| ctx.contains(&r.path)) {
+            continue;
+        }
+
+        // Skip binary files
+        if is_binary_extension(&r.path) {
+            continue;
+        }
+
+        // Skip files the startup fence (#817) or a `/cd`-loaded `[directories] deny`
+        // (#869) forbids — the rule the model-facing read tool is wrapped in, checked
+        // *before* the read loop so a denied file is never opened and never consumes an
+        // `AUTO_CONTEXT_MAX_FILES` slot. Both halves return immediately when empty.
+        if crate::cd_config_note::path_guard_refusal_with(cd_list, restrictions, &r.path).is_some()
+        {
+            continue;
+        }
+
+        matched_paths.push(r.path.clone());
+    }
+    matched_paths
+}
+
 /// Automatically identify project files relevant to a user prompt.
 ///
 /// Returns `(path, content)` pairs for the top files with score ≥ `AUTO_CONTEXT_MIN_SCORE`.
@@ -1310,11 +1353,10 @@ fn get_recent_git_files() -> std::collections::HashSet<String> {
 ///
 /// `restrictions` is the caller's [`DirectoryRestrictions`] — the *same* rules the
 /// model-facing file tools are wrapped in (`maybe_guard` in `src/tools.rs`). Candidate
-/// paths are filtered through `restrictions.check_path` **before** the read loop, so a
-/// denied file is never opened, never counted against `AUTO_CONTEXT_MAX_FILES`, and never
-/// reaches the signature block. When `restrictions.is_empty()` (the overwhelmingly common
-/// case) `check_path` short-circuits to `Ok`, so the returned vec is byte-identical to the
-/// pre-#817 behaviour.
+/// paths are filtered through it **and** any `/cd`-loaded deny list (#869) **before** the
+/// read loop (`select_auto_context_paths`): a denied file is never opened, never counted
+/// against `AUTO_CONTEXT_MAX_FILES`, and never reaches the signature block. With both
+/// empty (the common case) each check short-circuits, so the vec is byte-identical.
 pub fn auto_context_for_prompt(
     prompt: &str,
     recent_context: &[String],
@@ -1346,37 +1388,8 @@ pub fn auto_context_for_prompt(
     }
 
     let mut out = Vec::new();
-    let mut matched_paths = Vec::new();
-
-    for r in &results {
-        if matched_paths.len() >= AUTO_CONTEXT_MAX_FILES {
-            break;
-        }
-        if r.score < AUTO_CONTEXT_MIN_SCORE {
-            break; // results are sorted descending, so all remaining are lower
-        }
-
-        // Skip files already in the conversation context
-        if recent_context.iter().any(|ctx| ctx.contains(&r.path)) {
-            continue;
-        }
-
-        // Skip binary files
-        if is_binary_extension(&r.path) {
-            continue;
-        }
-
-        // Skip files the caller's directory restrictions forbid (#817). This is the same
-        // rule the model-facing read tool is wrapped in, checked *before* the read loop so
-        // a denied file is never opened and never consumes one of the
-        // `AUTO_CONTEXT_MAX_FILES` slots. `check_path` returns `Ok` immediately when no
-        // restrictions are configured, so the common path is unchanged.
-        if restrictions.check_path(&r.path).is_err() {
-            continue;
-        }
-
-        matched_paths.push(r.path.clone());
-    }
+    let cd_list = crate::commands_file_fence::cd_dir_deny_list();
+    let matched_paths = select_auto_context_paths(&results, recent_context, restrictions, &cd_list);
 
     // Build a compact signature block for matched files and prepend it
     if let Some(sig_block) = build_signature_block(&repo_map, &matched_paths) {
@@ -3270,6 +3283,49 @@ mod tests {
             "baseline run should attach {} — otherwise the deny assertion is vacuous",
             target
         );
+    }
+
+    /// #869: the per-candidate filter consults the `/cd` deny list, driven through a
+    /// LOCAL list (never the process global). Absolute temp paths, so cwd is irrelevant.
+    #[test]
+    fn test_select_auto_context_paths_honours_cd_deny() {
+        let t = TempDir::new().unwrap();
+        let p = |rel: &str| t.path().join(rel).to_string_lossy().into_owned();
+        for d in ["secret", "secrets2", "src"] {
+            fs::create_dir_all(t.path().join(d)).unwrap();
+            fs::write(t.path().join(d).join("f.rs"), "fn f() {}").unwrap();
+        }
+        let files = [p("secret/f.rs"), p("secrets2/f.rs"), p("src/f.rs")];
+        let results: Vec<RelevanceResult> = files
+            .iter()
+            .map(|f| RelevanceResult {
+                path: f.clone(),
+                score: AUTO_CONTEXT_MIN_SCORE,
+                matched_keywords: vec![],
+            })
+            .collect();
+        let empty = crate::cd_deny::DenyAdditions::default();
+        let cd = crate::cd_deny::DenyAdditions::default();
+        crate::cd_deny::append_deny_with(&cd, &[p("secret")]);
+        let other = DirectoryRestrictions {
+            allow: vec![],
+            deny: vec![p("elsewhere")],
+        };
+        // Near-miss: an empty /cd list returns exactly the pre-#869 selection.
+        assert_eq!(
+            select_auto_context_paths(&results, &[], &no_restrictions(), &empty),
+            files.to_vec()
+        );
+        // No startup restrictions at all: the /cd entry alone excludes the file. The
+        // sibling `secrets2/` (prefix of the denied name) stays included, because
+        // `check_path` matches path components, not string prefixes.
+        let kept = vec![p("secrets2/f.rs"), p("src/f.rs")];
+        assert_eq!(
+            select_auto_context_paths(&results, &[], &no_restrictions(), &cd),
+            kept
+        );
+        // Non-empty (unrelated) startup restrictions: same exclusion.
+        assert_eq!(select_auto_context_paths(&results, &[], &other, &cd), kept);
     }
 
     #[test]
