@@ -206,7 +206,9 @@ Restrict which directories yoyo's file tools can access:
 yoyo --allow-dir ./src --allow-dir ./tests --deny-dir ~/.ssh
 ```
 
-This affects `read_file`, `write_file`, `edit_file`, `list_files`, and `search`.
+This affects `read_file`, `write_file`, `edit_file`, `list_files`, and `search`. For `search` and `list_files` the
+fence covers the results as well as the path you pass: searching or listing an allowed root still withholds every
+match or file inside a refused directory, and the result ends with a line saying how many were withheld.
 
 The same fence applies to project instruction files (`YOYO.md`, `CLAUDE.md`, `AGENTS.md`, …) loaded into the
 system prompt: a `CLAUDE.md` whose resolved target is denied (or outside every allowed directory) is not loaded,

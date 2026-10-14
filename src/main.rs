@@ -118,6 +118,7 @@ mod dispatch_sub;
 #[cfg(test)]
 mod dispatch_sub_project_tests;
 mod docs;
+mod fence_result_filter;
 mod format;
 #[cfg(feature = "gasp")]
 mod gasp;

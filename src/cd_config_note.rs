@@ -860,13 +860,21 @@ mod tests {
     }
 
     /// Deliberately WEAK source guard: proves both path guards in
-    /// tool_wrappers.rs call the /cd-aware refusal and that no direct
+    /// tool_wrappers.rs (argument check and result fence) call the /cd-aware
+    /// refusal and that no direct
     /// startup-only check remains there, never that the call fires.
     #[test]
     fn both_path_guards_consult_the_cd_list() {
         let src = include_str!("tool_wrappers.rs");
         let call = ["cd_config_note::", "path_guard_refusal("].concat();
-        assert_eq!(src.matches(&call).count(), 2, "both guards must call it");
+        // 4 = two argument guards (GuardedTool, ArcGuardedTool) + the two
+        // result fences beside them for search/list_files (#1022), which must
+        // use this same /cd-aware predicate rather than a second one.
+        assert_eq!(
+            src.matches(&call).count(),
+            4,
+            "both guards and both result fences must call it"
+        );
         let direct = ["restrictions.", "check_path("].concat();
         assert_eq!(
             src.matches(&direct).count(),
