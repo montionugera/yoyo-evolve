@@ -135,3 +135,4 @@
 {"day":226,"git_hash":"a186cdc6","path":"src/prompt/retry_safe_pipe.rs","ts":"2026-10-12T23:46:17Z"}
 {"day":226,"git_hash":"2be2eba6","path":"src/prompt/sigterm.rs","ts":"2026-10-13T12:51:40Z"}
 {"day":228,"git_hash":"2fa68ebb","path":"src/output_ceiling_tests.rs","ts":"2026-10-14T02:11:59Z"}
+{"day":228,"git_hash":"054a524d","path":"src/commands_permissions.rs","ts":"2026-10-14T10:16:45Z"}
