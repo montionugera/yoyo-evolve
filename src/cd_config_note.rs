@@ -738,10 +738,6 @@ mod tests {
             "#869: /context-style project reads still see only the startup fence",
         ),
         (
-            "src/commands_rename.rs",
-            "#869: /rename's file filter still sees only the startup fence",
-        ),
-        (
             "src/context.rs",
             "#869: instruction-file loaders run at startup, before any /cd",
         ),

@@ -68,21 +68,25 @@ pub struct RenameResult {
 /// How many denied paths to name in the skip note before summarising the rest.
 const MAX_DENIED_PATHS_SHOWN: usize = 5;
 
-/// Split candidate files into `(allowed, denied)` under `restrictions`.
-///
-/// Empty restrictions allow everything (the common product default), so the
-/// unrestricted path costs one `is_empty()` check and no path resolution.
+/// Split candidate files into `(allowed, denied)` under the startup
+/// `restrictions` AND the `[directories] deny` entries `/cd` has applied this
+/// session (#869), via `cd_config_note::path_guard_refusal_with` — the same
+/// startup-first, then-/cd check the file tools use. Denied files are returned,
+/// never silently dropped. With no startup restrictions and an empty `/cd`
+/// list it short-circuits: no path resolution, the input list unchanged.
 pub fn partition_denied_files(
     files: &[String],
     restrictions: &DirectoryRestrictions,
 ) -> (Vec<String>, Vec<String>) {
-    if restrictions.is_empty() {
+    let cd_list = crate::commands_file_fence::cd_dir_deny_list();
+    let cd_empty = crate::sync_util::lock_or_recover(&cd_list).is_empty();
+    if restrictions.is_empty() && cd_empty {
         return (files.to_vec(), Vec::new());
     }
     let mut allowed = Vec::new();
     let mut denied = Vec::new();
     for f in files {
-        if restrictions.check_path(f).is_ok() {
+        if crate::cd_config_note::path_guard_refusal_with(&cd_list, restrictions, f).is_none() {
             allowed.push(f.clone());
         } else {
             denied.push(f.clone());
@@ -1207,5 +1211,70 @@ mod tests {
         assert!(note.contains("denied/f0.rs"), "got: {note}");
         assert!(note.contains("(+3 more)"), "got: {note}");
         assert!(!note.contains("denied/f7.rs"), "got: {note}");
+    }
+
+    // --- #869: the /cd-applied [directories] deny list reaches /rename ---
+    // Driven through commands_file_fence's per-thread override, never the
+    // process-wide list, so parallel tests cannot see each other's entries.
+
+    fn with_cd_list<T>(entries: &[String], f: impl FnOnce() -> T) -> T {
+        use crate::commands_file_fence::TEST_CD_DIR_DENY;
+        let list: crate::cd_deny::DenyAdditions =
+            std::sync::Arc::new(std::sync::Mutex::new(entries.to_vec()));
+        TEST_CD_DIR_DENY.with(|c| *c.borrow_mut() = Some(list));
+        let out = f();
+        TEST_CD_DIR_DENY.with(|c| *c.borrow_mut() = None);
+        out
+    }
+
+    /// After `/cd` into a dir whose `.yoyo.toml` denies `denied/`, a rename
+    /// with NO startup restrictions must still leave `denied/b.rs` untouched.
+    /// Before #869's rename slice the empty-startup fast path returned every
+    /// file, so this wrote through the /cd deny.
+    #[test]
+    fn cd_deny_list_excludes_file_from_rename() {
+        let (_dir, allowed, denied, deny_dir) = denied_fixture();
+        let result = with_cd_list(std::slice::from_ref(&deny_dir), || {
+            rename_in_files(
+                &[allowed.clone(), denied.clone()],
+                "foo",
+                "bar",
+                None,
+                &DirectoryRestrictions::default(),
+            )
+        })
+        .expect("allowed file should still be renamed");
+        assert_eq!(fs::read_to_string(&allowed).unwrap(), "let bar = 1;\n");
+        assert_eq!(fs::read_to_string(&denied).unwrap(), "let foo = 2;\n");
+        assert_eq!(result.files_changed, vec![allowed.clone()]);
+        assert_eq!(result.skipped_denied, vec![denied.clone()]);
+        assert_eq!(result.written, vec![allowed]);
+    }
+
+    /// Near-miss guard: an empty /cd list, or one naming an unrelated dir,
+    /// leaves the file set byte-identical to the no-restrictions case.
+    #[test]
+    fn cd_deny_list_empty_or_unrelated_changes_nothing() {
+        let (dir, allowed, denied, _deny_dir) = denied_fixture();
+        let files = vec![allowed.clone(), denied.clone()];
+        let none = DirectoryRestrictions::default();
+        let elsewhere = dir.path().join("elsewhere").to_string_lossy().into_owned();
+        for entries in [Vec::new(), vec![elsewhere]] {
+            let got = with_cd_list(&entries, || partition_denied_files(&files, &none));
+            assert_eq!(got, (files.clone(), Vec::new()), "entries: {entries:?}");
+        }
+    }
+
+    /// Startup `--deny-dir` still excludes on its own, with an empty /cd list.
+    #[test]
+    fn startup_deny_still_excludes_with_empty_cd_list() {
+        let (_dir, allowed, denied, deny_dir) = denied_fixture();
+        let startup = DirectoryRestrictions {
+            allow: Vec::new(),
+            deny: vec![deny_dir],
+        };
+        let files = vec![allowed.clone(), denied.clone()];
+        let got = with_cd_list(&[], || partition_denied_files(&files, &startup));
+        assert_eq!(got, (vec![allowed], vec![denied]));
     }
 }
