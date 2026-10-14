@@ -1,2 +1,0 @@
-journal.a_how_many_question_answered_by_one_specimen
-actions.a_rule_rides_only_the_optional_part_of_the_act
