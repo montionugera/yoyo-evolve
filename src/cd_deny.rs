@@ -3,9 +3,11 @@
 //!
 //! Why deny only, and why no trust check: a deny entry can only NARROW what
 //! bash may run — `cli::gate_project_permissions` already keeps a project's
-//! `deny` verbatim while refusing its `allow` (#749 item 3). Allow,
-//! `[directories]`, hooks, MCP and skills can widen, or need an agent rebuild
-//! that drops MCP connections (#842), so they are still NOT reloaded on `/cd`.
+//! `deny` verbatim while refusing its `allow` (#749 item 3). Allow, hooks, MCP
+//! and skills can widen, or need an agent rebuild that drops MCP connections
+//! (#842), so they are still NOT reloaded on `/cd`. (Superseded: this list
+//! also named `[directories]`. Both of its halves only narrow and are applied
+//! on `/cd` by `cd_config_note` — deny since Day 226, allow since Day 228.)
 //!
 //! The list is **append-only for the session**: `/cd`-ing back to the launch
 //! directory removes nothing. Both bash executors — the parent's

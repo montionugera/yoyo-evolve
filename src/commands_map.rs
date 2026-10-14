@@ -433,13 +433,13 @@ pub(crate) fn repo_map_fence_note(omitted: usize, plain: bool) -> Option<String>
 
 /// The stderr note when a `/cd`-appended `[directories] deny` entry omitted
 /// files from the repo map (#869). `None` at zero. Count only, never names;
-/// ends with `CD_DENY_SOURCE_NOTE`; glyph-free under plain output.
+/// ends with `CD_DIR_SOURCE_NOTE`; glyph-free under plain output.
 pub(crate) fn repo_map_cd_deny_note(omitted: usize, plain: bool) -> Option<String> {
     if omitted == 0 {
         return None;
     }
     let files = if omitted == 1 { "file" } else { "files" };
-    let note = crate::commands_file_fence::CD_DENY_SOURCE_NOTE;
+    let note = crate::commands_file_fence::CD_DIR_SOURCE_NOTE;
     let marker = if plain { "warning:" } else { "⚠" };
     Some(format!(
         "{marker} repo map omitted {omitted} {files} blocked by the directory fence {note}"
@@ -933,7 +933,7 @@ mod tests {
                 note,
                 format!(
                     "warning: repo map omitted 1 file blocked by the directory fence {}",
-                    crate::commands_file_fence::CD_DENY_SOURCE_NOTE
+                    crate::commands_file_fence::CD_DIR_SOURCE_NOTE
                 )
             );
         }
@@ -978,7 +978,7 @@ mod tests {
             assert_eq!(repo_map_cd_deny_note(0, true), None);
             assert_eq!(
                 repo_map_cd_deny_note(3, false).as_deref(),
-                Some("⚠ repo map omitted 3 files blocked by the directory fence (a [directories] deny entry applied by /cd)")
+                Some("⚠ repo map omitted 3 files blocked by the directory fence (a [directories] entry applied by /cd)")
             );
             assert!(repo_map_cd_deny_note(2, true).unwrap().is_ascii());
         }

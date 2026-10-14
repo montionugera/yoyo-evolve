@@ -75,16 +75,19 @@ pub(crate) fn admit_for_add_with(
     if let Some(reason) = crate::cd_config_note::cd_denied_dir_refusal_with(cd_list, path) {
         return Err(AddReadError::Refused(add_fence_refusal_message(
             path,
-            &format!("{reason} {CD_DENY_SOURCE_NOTE}"),
+            &format!("{reason} {CD_DIR_SOURCE_NOTE}"),
             plain,
         )));
     }
     Ok(())
 }
 
-/// Appended to a refusal that came from the `/cd`-applied list, so the user
-/// can tell it apart from a launch `--deny-dir` / startup-config refusal.
-pub(crate) const CD_DENY_SOURCE_NOTE: &str = "(a [directories] deny entry applied by /cd)";
+/// Appended to a refusal that came from a `/cd`-applied `[directories]` list,
+/// so the user can tell it apart from a launch `--deny-dir` / `--allow-dir` /
+/// startup-config refusal. Day 228: was `CD_DENY_SOURCE_NOTE` reading
+/// "(a [directories] deny entry applied by /cd)"; `/cd` now applies the allow
+/// half too, and an allow refusal labelled "deny entry" would be false.
+pub(crate) const CD_DIR_SOURCE_NOTE: &str = "(a [directories] entry applied by /cd)";
 
 #[cfg(test)]
 thread_local! {

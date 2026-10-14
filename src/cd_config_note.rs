@@ -19,8 +19,13 @@
 //! Day 226: the reading's `[directories] deny` entries are applied the same way,
 //! resolved against the `/cd` target at append time and kept in this module's
 //! append-only list, which both path guards in `tool_wrappers.rs` read at call
-//! time (`path_guard_refusal`). `[directories] allow` is NOT applied: it would
-//! have to be intersected with the startup allow list, which is a design call.
+//! time (`path_guard_refusal`). Superseded (Day 228): this said `[directories]
+//! allow` is NOT applied because intersecting it with the startup allow list was
+//! a design call. The call is made: the new directory's allow list is now a
+//! SECOND fence a path must also pass (startup allow AND /cd allow), checked
+//! inside `cd_denied_dir_refusal_with`, so every reader already routed through
+//! that helper gets it. Unlike deny it is REPLACED by each /cd (see
+//! `apply_cd_dir_fence_with` for why).
 //!
 //! The file is read through yoyo's own config parsers — the same doors startup
 //! uses — so "does this file set X" has exactly one statement per section and
@@ -37,28 +42,30 @@ pub(crate) enum CdConfigReading {
     /// deliberately distinct from "sets nothing": we cannot tell what it sets.
     Unreadable,
     /// The file was read: the NOT-applied sections it sets (possibly none), its
-    /// `[permissions] deny` entries, which `/cd` does apply (bash only), and its
+    /// `[permissions] deny` entries, which `/cd` does apply (bash only), its
     /// `[directories] deny` entries as written, which `/cd` applies to the file
-    /// tools after resolving them against the new directory (Day 226).
-    Sets(Vec<&'static str>, Vec<String>, Vec<String>),
+    /// tools after resolving them against the new directory (Day 226), and its
+    /// `[directories] allow` entries as written, which `/cd` applies the same
+    /// way as an extra narrowing fence (Day 228).
+    Sets(Vec<&'static str>, Vec<String>, Vec<String>, Vec<String>),
 }
 
 /// Section labels, in the fixed order they are reported.
-/// Only the allow halves: both deny halves are applied on `/cd` (Days 218, 226).
+/// Only the widening halves: both deny halves (Days 218, 226) and the
+/// `[directories] allow` half (Day 228) only narrow, so `/cd` applies them.
 const PERMISSIONS: &str = "[permissions] allow";
-const DIRECTORIES: &str = "[directories] allow";
 const HOOKS: &str = "hooks";
 const MCP: &str = "MCP servers";
 
-/// Every section this module can name. All four decide what the session may do
-/// (what is denied, where it may write, what runs around a tool call, which
-/// external tools exist), so a note naming any of them is a WARNING, not chrome.
+/// Every section this module can name. All three decide what the session may do
+/// (what bash may run, what runs around a tool call, which external tools
+/// exist), so a note naming any of them is a WARNING, not chrome.
 /// Read by `note_volume`; built from the constants above, never re-spelled.
-const SAFETY_SECTIONS: [&str; 4] = [PERMISSIONS, DIRECTORIES, HOOKS, MCP];
+const SAFETY_SECTIONS: [&str; 3] = [PERMISSIONS, HOOKS, MCP];
 
-/// Which safety-relevant sections `toml_text` sets, in a fixed order:
-/// `[permissions] allow`, `[directories] allow`, `hooks.<phase>.<tool>`
-/// keys, and MCP servers (`mcp = [...]` or `[mcp_servers.*]`).
+/// Which safety-relevant sections `toml_text` sets that `/cd` does NOT apply,
+/// in a fixed order: `[permissions] allow`, `hooks.<phase>.<tool>` keys, and
+/// MCP servers (`mcp = [...]` or `[mcp_servers.*]`).
 ///
 /// Uses the startup parsers rather than a second grammar. The hook check mirrors
 /// `parse_hooks_from_config`'s key shape without calling it, because that function
@@ -71,12 +78,8 @@ pub(crate) fn unapplied_config_sections(toml_text: &str) -> Vec<&'static str> {
         out.push(PERMISSIONS);
     }
 
-    let dirs = crate::config::parse_directories_from_config(toml_text);
-    // Allow only: deny narrows and is applied on /cd. Allow would need an
-    // intersection with the startup allow list, which is a design question.
-    if !dirs.allow.is_empty() {
-        out.push(DIRECTORIES);
-    }
+    // [directories] is not checked here: both of its halves only narrow and
+    // are applied on /cd (deny Day 226, allow Day 228).
 
     let flat = crate::config::parse_config_file(toml_text);
     let has_hook = flat.iter().any(|(k, v)| {
@@ -107,11 +110,15 @@ pub(crate) fn unapplied_config_sections(toml_text: &str) -> Vec<&'static str> {
 /// any other error is `Unreadable` (never silently "sets nothing").
 pub(crate) fn classify_read(read: std::io::Result<String>) -> CdConfigReading {
     match read {
-        Ok(text) => CdConfigReading::Sets(
-            unapplied_config_sections(&text),
-            crate::config::parse_permissions_from_config(&text).deny,
-            crate::config::parse_directories_from_config(&text).deny,
-        ),
+        Ok(text) => {
+            let dirs = crate::config::parse_directories_from_config(&text);
+            CdConfigReading::Sets(
+                unapplied_config_sections(&text),
+                crate::config::parse_permissions_from_config(&text).deny,
+                dirs.deny,
+                dirs.allow,
+            )
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => CdConfigReading::Absent,
         Err(_) => CdConfigReading::Unreadable,
     }
@@ -130,8 +137,8 @@ pub(crate) fn cd_config_note(
     let sep = if plain { ":" } else { " —" };
     match reading {
         CdConfigReading::Absent => None,
-        CdConfigReading::Sets(sections, deny, dir_deny)
-            if !deny.is_empty() || !dir_deny.is_empty() =>
+        CdConfigReading::Sets(sections, deny, dir_deny, dir_allow)
+            if !deny.is_empty() || !dir_deny.is_empty() || !dir_allow.is_empty() =>
         {
             let mut applied = Vec::new();
             // Each applied list names the executor it fences and the one it
@@ -148,9 +155,18 @@ pub(crate) fn cd_config_note(
                     ));
                 }
             }
+            if !dir_allow.is_empty() {
+                let n = dir_allow.len();
+                let (noun, them) = if n == 1 { ("entry", "it") } else { ("entries", "them") };
+                applied.push(format!(
+                    "its {n} [directories] allow {noun} now also fence the file tools: a path \
+                     outside {them} is refused until the next /cd replaces this list (the launch \
+                     allow list still applies too; bash never reads this list)"
+                ));
+            }
             let tail = if sections.is_empty() {
-                "Its [permissions] allow, [directories] allow, hooks and MCP servers would still \
-                 not be reloaded on /cd (#869)."
+                "Its [permissions] allow, hooks and MCP servers would still not be reloaded on \
+                 /cd (#869)."
                     .to_string()
             } else {
                 format!(
@@ -161,8 +177,8 @@ pub(crate) fn cd_config_note(
             };
             Some(format!("  {dir}/.yoyo.toml: {}. {tail}", applied.join("; ")))
         }
-        CdConfigReading::Sets(sections, _, _) if sections.is_empty() => None,
-        CdConfigReading::Sets(sections, _, _) => Some(format!(
+        CdConfigReading::Sets(sections, _, _, _) if sections.is_empty() => None,
+        CdConfigReading::Sets(sections, _, _, _) => Some(format!(
             "  {dir}/.yoyo.toml sets {} and they are NOT applied in this session{sep} \
              the launch directory's settings stay in force. Restart yoyo here to use them (#869).",
             sections.join(", ")
@@ -191,9 +207,10 @@ pub(crate) enum NoteVolume {
 /// before; raising it would warn on content we have not seen.
 pub(crate) fn note_volume(reading: &CdConfigReading) -> NoteVolume {
     match reading {
-        CdConfigReading::Sets(sections, deny, dir_deny)
+        CdConfigReading::Sets(sections, deny, dir_deny, dir_allow)
             if !deny.is_empty()
                 || !dir_deny.is_empty()
+                || !dir_allow.is_empty()
                 || sections.iter().any(|s| SAFETY_SECTIONS.contains(s)) =>
         {
             NoteVolume::Warning
@@ -223,7 +240,7 @@ pub(crate) fn read_cd_config(target: &Path) -> CdConfigReading {
 /// The `[permissions] deny` entries `/cd` applies; empty unless the file was read.
 pub(crate) fn deny_entries(reading: &CdConfigReading) -> &[String] {
     match reading {
-        CdConfigReading::Sets(_, deny, _) => deny,
+        CdConfigReading::Sets(_, deny, _, _) => deny,
         _ => &[],
     }
 }
@@ -233,10 +250,24 @@ pub(crate) fn deny_entries(reading: &CdConfigReading) -> &[String] {
 /// meaning that after a later `/cd` moves the process cwd elsewhere. Absolute
 /// and `~` entries are kept as written (`check_path` expands `~` itself).
 pub(crate) fn dir_deny_entries(target: &Path, reading: &CdConfigReading) -> Vec<String> {
-    let CdConfigReading::Sets(_, _, dir_deny) = reading else {
+    let CdConfigReading::Sets(_, _, dir_deny, _) = reading else {
         return Vec::new();
     };
-    dir_deny
+    resolve_against(target, dir_deny)
+}
+
+/// The `[directories] allow` entries `/cd` applies, resolved exactly like
+/// [`dir_deny_entries`] (relative -> `<target>/<entry>`, absolute and `~` kept).
+pub(crate) fn dir_allow_entries(target: &Path, reading: &CdConfigReading) -> Vec<String> {
+    let CdConfigReading::Sets(_, _, _, dir_allow) = reading else {
+        return Vec::new();
+    };
+    resolve_against(target, dir_allow)
+}
+
+/// Bind relative entries to `target` at `/cd` time; one rule for both halves.
+fn resolve_against(target: &Path, entries: &[String]) -> Vec<String> {
+    entries
         .iter()
         .map(|e| {
             if e.starts_with('~') || Path::new(e).is_absolute() {
@@ -254,40 +285,112 @@ pub(crate) fn dir_deny_entries(target: &Path, reading: &CdConfigReading) -> Vec<
 static CD_DENIED_DIRS: std::sync::LazyLock<crate::cd_deny::DenyAdditions> =
     std::sync::LazyLock::new(Default::default);
 
-/// The `/cd` consumer: resolve and append. Never removes. Returns new count.
-pub(crate) fn append_cd_dir_deny(target: &Path, reading: &CdConfigReading) -> usize {
-    crate::cd_deny::append_deny_with(&CD_DENIED_DIRS, &dir_deny_entries(target, reading))
+/// The `[directories] allow` list of the most recent `/cd` (#869, Day 228),
+/// read at call time inside [`cd_denied_dir_refusal_with`] — the one helper
+/// every `/cd`-aware reader already routes through — so no reader needs its own
+/// wiring. Empty until a `/cd` lands in a directory whose config sets it.
+static CD_ALLOWED_DIRS: std::sync::LazyLock<crate::cd_deny::DenyAdditions> =
+    std::sync::LazyLock::new(Default::default);
+
+/// The `/cd` consumer for `[directories]`, over explicit handles: append the
+/// resolved deny entries to `deny` (never removes) and install the resolved
+/// allow entries as THE allow list in `allow`, dropping the previous one
+/// (empty when the file is absent, unreadable or sets none). Returns the
+/// number of NEW deny entries.
+///
+/// Allow is deliberately REPLACED, unlike deny's append. Deny entries name places to
+/// stay out of, and the union of several projects' "stay out" lists is still a
+/// sensible fence. Allow entries name the ONLY places to be, and the
+/// intersection of two unrelated projects' allow lists is usually empty — it
+/// would refuse every path, including the directory the user just moved to.
+/// So each `/cd` brings its own allow list (or none). This can only widen back
+/// to the launch fence, never past it: the startup allow list is a separate
+/// check (`path_guard_refusal_lists`) that no `/cd` can remove, and the `/cd`
+/// deny list stays append-only.
+pub(crate) fn apply_cd_dir_fence_with(
+    deny: &crate::cd_deny::DenyAdditions,
+    allow: &crate::cd_deny::DenyAdditions,
+    target: &Path,
+    reading: &CdConfigReading,
+) -> usize {
+    *crate::sync_util::lock_or_recover(allow) = dir_allow_entries(target, reading);
+    crate::cd_deny::append_deny_with(deny, &dir_deny_entries(target, reading))
 }
 
-/// Refusal from the `/cd`-added directory list, or `None`. An empty list is
-/// `None` with no filesystem call. Matching is `DirectoryRestrictions::check_path`
-/// itself (symlinks, wildcards, unresolvable paths) — never a second matcher.
+/// The production `/cd` consumer, over the process-wide lists.
+pub(crate) fn apply_cd_dir_fence(target: &Path, reading: &CdConfigReading) -> usize {
+    apply_cd_dir_fence_with(&CD_DENIED_DIRS, &CD_ALLOWED_DIRS, target, reading)
+}
+
+/// Refusal from the `/cd`-applied `[directories]` lists, or `None`: the deny
+/// list in `list` and the process-wide `/cd` allow list. Both empty is `None`
+/// with no filesystem call.
 pub(crate) fn cd_denied_dir_refusal_with(
     list: &crate::cd_deny::DenyAdditions,
     path: &str,
 ) -> Option<String> {
-    let deny = crate::sync_util::lock_or_recover(list).clone();
-    if deny.is_empty() {
+    cd_dir_refusal_with(list, &CD_ALLOWED_DIRS, path)
+}
+
+/// [`cd_denied_dir_refusal_with`] with the allow list passed in, so tests drive
+/// local handles. Matching is `DirectoryRestrictions::check_path` itself
+/// (symlinks, wildcards, unresolvable paths, deny before allow) — never a
+/// second matcher. With an empty allow list it is byte-identical to the Day-226
+/// deny-only check.
+pub(crate) fn cd_dir_refusal_with(
+    deny: &crate::cd_deny::DenyAdditions,
+    allow: &crate::cd_deny::DenyAdditions,
+    path: &str,
+) -> Option<String> {
+    let r = crate::config::DirectoryRestrictions {
+        allow: crate::sync_util::lock_or_recover(allow).clone(),
+        deny: crate::sync_util::lock_or_recover(deny).clone(),
+    };
+    if r.is_empty() {
         return None;
     }
-    let r = crate::config::DirectoryRestrictions {
-        allow: vec![],
-        deny,
-    };
     r.check_path(path).err()
 }
 
+/// True when `/cd` has applied no `[directories]` entry of either kind — the
+/// test a fast path must use instead of `deny.is_empty()`, which goes stale
+/// the moment a `/cd` sets only an allow list.
+pub(crate) fn cd_dir_fence_is_empty(list: &crate::cd_deny::DenyAdditions) -> bool {
+    cd_dir_fence_is_empty_with(list, &CD_ALLOWED_DIRS)
+}
+
+/// [`cd_dir_fence_is_empty`] over explicit handles.
+fn cd_dir_fence_is_empty_with(
+    deny: &crate::cd_deny::DenyAdditions,
+    allow: &crate::cd_deny::DenyAdditions,
+) -> bool {
+    crate::sync_util::lock_or_recover(deny).is_empty()
+        && crate::sync_util::lock_or_recover(allow).is_empty()
+}
+
 /// What both path guards ask: the startup fence first, byte-identical to
-/// before, then whatever `/cd` has added so far.
+/// before, then whatever `/cd` has applied so far.
 pub(crate) fn path_guard_refusal_with(
     list: &crate::cd_deny::DenyAdditions,
+    startup: &crate::config::DirectoryRestrictions,
+    path: &str,
+) -> Option<String> {
+    path_guard_refusal_lists(list, &CD_ALLOWED_DIRS, startup, path)
+}
+
+/// [`path_guard_refusal_with`] with the `/cd` allow list passed in. Both
+/// fences must pass: a path the `/cd` allow list admits is still refused if
+/// it lies outside the startup allow list (monotonic — `/cd` only narrows).
+pub(crate) fn path_guard_refusal_lists(
+    deny: &crate::cd_deny::DenyAdditions,
+    allow: &crate::cd_deny::DenyAdditions,
     startup: &crate::config::DirectoryRestrictions,
     path: &str,
 ) -> Option<String> {
     startup
         .check_path(path)
         .err()
-        .or_else(|| cd_denied_dir_refusal_with(list, path))
+        .or_else(|| cd_dir_refusal_with(deny, allow, path))
 }
 
 /// A clone of the process-wide `/cd` directory-deny handle, for readers outside
@@ -296,6 +399,11 @@ pub(crate) fn path_guard_refusal_with(
 /// `cd_deny::cd_added_deny_handle`.
 pub(crate) fn cd_denied_dirs_handle() -> crate::cd_deny::DenyAdditions {
     std::sync::Arc::clone(&CD_DENIED_DIRS)
+}
+
+/// A clone of the process-wide `/cd` allow-list handle, for `/permissions`.
+pub(crate) fn cd_allowed_dirs_handle() -> crate::cd_deny::DenyAdditions {
+    std::sync::Arc::clone(&CD_ALLOWED_DIRS)
 }
 
 /// The production guard call, reading the process-wide `/cd` list.
@@ -330,6 +438,7 @@ mod tests {
     const PERMS_TOML: &str = "model = \"x\"\n\n[permissions]\ndeny = [\"rm -rf *\"]\n";
     const ALLOW_TOML: &str = "[permissions]\nallow = [\"git *\"]\n";
     const DIR_DENY_TOML: &str = "[directories]\ndeny = [\"secrets\", \"/abs/vault\"]\n";
+    const DIR_ALLOW_TOML: &str = "[directories]\nallow = [\"src\"]\n";
 
     fn sets(text: &str) -> CdConfigReading {
         classify_read(Ok(text.to_string()))
@@ -348,8 +457,8 @@ mod tests {
             note,
             "  /repo/.yoyo.toml: its 1 [permissions] deny pattern is now enforced on bash \
              commands for the rest of this session (another /cd does not remove it; file tools \
-             never read this list). Its [permissions] allow, [directories] allow, hooks and MCP \
-             servers would still not be reloaded on /cd (#869)."
+             never read this list). Its [permissions] allow, hooks and MCP servers would still \
+             not be reloaded on /cd (#869)."
         );
     }
 
@@ -387,7 +496,10 @@ mod tests {
     fn model_only_config_sets_nothing_and_prints_nothing() {
         let text = "provider = \"anthropic\"\nmodel = \"x\"\n";
         assert_eq!(unapplied_config_sections(text), Vec::<&str>::new());
-        assert_eq!(sets(text), CdConfigReading::Sets(vec![], vec![], vec![]));
+        assert_eq!(
+            sets(text),
+            CdConfigReading::Sets(vec![], vec![], vec![], vec![])
+        );
         assert_eq!(cd_config_note("/repo", &sets(text), false), None);
         assert_eq!(cd_config_note("/repo", &sets(text), true), None);
     }
@@ -400,25 +512,23 @@ mod tests {
     }
 
     #[test]
-    fn all_four_sections_in_fixed_order() {
+    fn all_unapplied_sections_in_fixed_order() {
         let text = "mcp = [\"npx server\"]\n\
                     hooks.pre.bash = \"echo hi\"\n\
                     [directories]\nallow = [\"src\"]\ndeny = [\"secrets\"]\n\
                     [permissions]\nallow = [\"git *\"]\n";
         assert_eq!(
             unapplied_config_sections(text),
-            vec![
-                "[permissions] allow",
-                "[directories] allow",
-                "hooks",
-                "MCP servers"
-            ]
+            vec!["[permissions] allow", "hooks", "MCP servers"]
         );
         let note = cd_config_note("/r", &sets(text), false).unwrap();
         assert!(
-            note.contains(
-                "sets [permissions] allow, [directories] allow, hooks, MCP servers and they are NOT"
-            ),
+            note.contains("sets [permissions] allow, hooks, MCP servers and they are NOT"),
+            "{note}"
+        );
+        // Day 228: [directories] allow is reported as APPLIED, never as unapplied.
+        assert!(
+            note.contains("its 1 [directories] allow entry now also fence the file tools"),
             "{note}"
         );
         // Day 226: the deny half of the same section is reported as APPLIED.
@@ -449,7 +559,7 @@ mod tests {
             std::io::ErrorKind::PermissionDenied,
         )));
         assert_eq!(bad, CdConfigReading::Unreadable);
-        assert_ne!(bad, CdConfigReading::Sets(vec![], vec![], vec![]));
+        assert_ne!(bad, CdConfigReading::Sets(vec![], vec![], vec![], vec![]));
         assert!(deny_entries(&bad).is_empty()); // nothing applied from unread bytes
         let note = cd_config_note("/repo", &bad, false).expect("unreadable must be reported");
         assert!(note.contains("could not be read"), "{note}");
@@ -491,9 +601,8 @@ mod tests {
     // --- Day 214: volume follows severity (#869) ---
 
     /// One fixture per safety section, each parsed through the real detector.
-    const SAFETY_FIXTURES: [&str; 4] = [
+    const SAFETY_FIXTURES: [&str; 3] = [
         ALLOW_TOML,
-        "[directories]\nallow = [\"src\"]\n",
         "hooks.pre.bash = \"echo hi\"\n",
         "[mcp_servers.fs]\ncommand = \"npx\"\n",
     ];
@@ -504,7 +613,7 @@ mod tests {
         let mut seen = Vec::new();
         for text in SAFETY_FIXTURES {
             let reading = sets(text);
-            let CdConfigReading::Sets(found, _, _) = &reading else {
+            let CdConfigReading::Sets(found, _, _, _) = &reading else {
                 panic!("{text:?} did not read as Sets");
             };
             assert_eq!(found.len(), 1, "{text:?} -> {found:?}"); // anti-vacuous
@@ -519,6 +628,14 @@ mod tests {
         // Same for a [directories]-deny-only file (Day 226): it changes what
         // the file tools may touch, so it warns though it names no section.
         assert_eq!(note_volume(&sets(DIR_DENY_TOML)), NoteVolume::Warning);
+        // And a [directories]-allow-only file (Day 228): it narrows where the
+        // file tools may go, so it warns though it names no unapplied section.
+        let allow_only = sets(DIR_ALLOW_TOML);
+        assert_eq!(
+            unapplied_config_sections(DIR_ALLOW_TOML),
+            Vec::<&str>::new()
+        );
+        assert_eq!(note_volume(&allow_only), NoteVolume::Warning);
     }
 
     #[test]
@@ -615,7 +732,7 @@ mod tests {
     }
 
     #[test]
-    fn dir_deny_note_says_applied_to_file_tools_and_allow_still_not() {
+    fn dir_deny_note_says_applied_to_file_tools() {
         let reading = sets(DIR_DENY_TOML);
         // Deny is applied, so it is no longer an unapplied section.
         assert_eq!(unapplied_config_sections(DIR_DENY_TOML), Vec::<&str>::new());
@@ -623,8 +740,8 @@ mod tests {
             cd_config_note("/repo", &reading, false).unwrap(),
             "  /repo/.yoyo.toml: its 2 [directories] deny entries are now enforced on the file \
              tools for the rest of this session (another /cd does not remove them; bash never \
-             reads this list). Its [permissions] allow, [directories] allow, hooks and MCP \
-             servers would still not be reloaded on /cd (#869)."
+             reads this list). Its [permissions] allow, hooks and MCP servers would still not be \
+             reloaded on /cd (#869)."
         );
         // Both deny lists at once: each named, each with its own executor.
         let both = sets("[permissions]\ndeny = [\"rm *\"]\n[directories]\ndeny = [\"s\"]\n");
@@ -634,8 +751,8 @@ mod tests {
              for the rest of this session (another /cd does not remove it; file tools never read \
              this list); its 1 [directories] deny entry is now enforced on the file tools for the \
              rest of this session (another /cd does not remove it; bash never reads this list). \
-             Its [permissions] allow, [directories] allow, hooks and MCP servers would still not \
-             be reloaded on /cd (#869)."
+             Its [permissions] allow, hooks and MCP servers would still not be reloaded on /cd \
+             (#869)."
         );
     }
 
@@ -724,6 +841,133 @@ mod tests {
         );
     }
 
+    // --- Day 228: [directories] allow narrows the file tools after /cd ---
+
+    /// A real project dir: `.yoyo.toml` with `toml`, plus `src/a.rs` and
+    /// `other/b.rs` on disk, so `check_path` resolves real files.
+    fn project(toml: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let (g, t) = tmp();
+        std::fs::create_dir_all(t.join("src")).unwrap();
+        std::fs::create_dir_all(t.join("other")).unwrap();
+        std::fs::write(t.join("src/a.rs"), "fn a() {}\n").unwrap();
+        std::fs::write(t.join("other/b.rs"), "fn b() {}\n").unwrap();
+        std::fs::write(t.join(".yoyo.toml"), toml).unwrap();
+        (g, t)
+    }
+
+    #[test]
+    fn cd_allow_admits_inside_and_refuses_outside() {
+        let (_g, t) = project(DIR_ALLOW_TOML);
+        let reading = read_cd_config(&t);
+        let (deny, allow) = (local(), local());
+        assert_eq!(apply_cd_dir_fence_with(&deny, &allow, &t, &reading), 0);
+        // Relative "src" is bound to the /cd target, like deny entries.
+        assert_eq!(dir_allow_entries(&t, &reading), vec![p(&t, "src")]);
+        let none = DirectoryRestrictions::default();
+        let inside = p(&t, "src/a.rs");
+        let outside = p(&t, "other/b.rs");
+        assert!(Path::new(&inside).is_file() && Path::new(&outside).is_file()); // real files
+        assert_eq!(
+            path_guard_refusal_lists(&deny, &allow, &none, &inside),
+            None
+        );
+        assert_eq!(
+            path_guard_refusal_lists(&deny, &allow, &none, &outside),
+            Some(format!(
+                "Access denied: '{outside}' is not under any allowed directory"
+            ))
+        );
+        // The note says it was applied, and how long it lasts.
+        assert_eq!(
+            cd_config_note("/r", &reading, true).unwrap(),
+            "  /r/.yoyo.toml: its 1 [directories] allow entry now also fence the file tools: a \
+             path outside it is refused until the next /cd replaces this list (the launch allow \
+             list still applies too; bash never reads this list). Its [permissions] allow, hooks \
+             and MCP servers would still not be reloaded on /cd (#869)."
+        );
+        assert!(!cd_dir_fence_is_empty_with(&deny, &allow));
+    }
+
+    #[test]
+    fn no_cd_allow_leaves_the_refusal_byte_identical() {
+        // Near-miss: a /cd target whose config sets deny but no allow. Every
+        // verdict and every byte matches the Day-226 deny-only check.
+        let (_g, t) = project("[directories]\ndeny = [\"other\"]\n");
+        let reading = read_cd_config(&t);
+        let (deny, allow) = (local(), local());
+        apply_cd_dir_fence_with(&deny, &allow, &t, &reading);
+        assert!(snapshot_of(&allow).is_empty());
+        let day_226 = DirectoryRestrictions {
+            allow: vec![],
+            deny: dir_deny_entries(&t, &reading),
+        };
+        let mut refusals = 0;
+        for path in [p(&t, "src/a.rs"), p(&t, "other/b.rs"), p(&t, "x")] {
+            let before = day_226.check_path(&path).err();
+            refusals += usize::from(before.is_some());
+            assert_eq!(cd_dir_refusal_with(&deny, &allow, &path), before, "{path}");
+        }
+        assert_eq!(refusals, 1); // anti-vacuous: the table holds a refusal
+                                 // And a dir with no config at all applies nothing.
+        let (_g2, empty) = tmp();
+        let (d2, a2) = (local(), local());
+        apply_cd_dir_fence_with(&d2, &a2, &empty, &read_cd_config(&empty));
+        assert!(cd_dir_fence_is_empty_with(&d2, &a2));
+        assert_eq!(cd_dir_refusal_with(&d2, &a2, &p(&t, "other/b.rs")), None);
+    }
+
+    #[test]
+    fn startup_allow_still_applies_under_a_cd_allow() {
+        // Monotonic: a path inside the /cd allow but outside the launch allow
+        // is refused by the launch list; both fences must pass.
+        let (_g, t) = project(DIR_ALLOW_TOML);
+        let (deny, allow) = (local(), local());
+        apply_cd_dir_fence_with(&deny, &allow, &t, &read_cd_config(&t));
+        let launch = DirectoryRestrictions {
+            allow: vec![p(&t, "other")],
+            deny: vec![],
+        };
+        let in_cd_only = p(&t, "src/a.rs");
+        assert_eq!(
+            path_guard_refusal_lists(&deny, &allow, &launch, &in_cd_only),
+            launch.check_path(&in_cd_only).err()
+        );
+        assert!(launch.check_path(&in_cd_only).is_err()); // anti-vacuous
+                                                          // And the reverse: inside the launch allow, outside the /cd allow.
+        let in_launch_only = p(&t, "other/b.rs");
+        assert!(launch.check_path(&in_launch_only).is_ok());
+        assert!(path_guard_refusal_lists(&deny, &allow, &launch, &in_launch_only).is_some());
+    }
+
+    #[test]
+    fn next_cd_replaces_the_allow_list_and_keeps_deny() {
+        let (_g1, d1) = project("[directories]\nallow = [\"src\"]\ndeny = [\"src/secret\"]\n");
+        let (_g2, d2) = tmp(); // no .yoyo.toml
+        let (deny, allow) = (local(), local());
+        apply_cd_dir_fence_with(&deny, &allow, &d1, &read_cd_config(&d1));
+        let d1_outside = p(&d1, "other/b.rs");
+        let d1_secret = p(&d1, "src/secret/k");
+        assert!(cd_dir_refusal_with(&deny, &allow, &d1_outside).is_some());
+        assert!(cd_dir_refusal_with(&deny, &allow, &p(&d2, "f")).is_some()); // D1's allow bites D2
+        apply_cd_dir_fence_with(&deny, &allow, &d2, &read_cd_config(&d2));
+        // D1's allow no longer applies, in D1 or in D2.
+        assert!(snapshot_of(&allow).is_empty());
+        assert_eq!(cd_dir_refusal_with(&deny, &allow, &d1_outside), None);
+        assert_eq!(cd_dir_refusal_with(&deny, &allow, &p(&d2, "f")), None);
+        // D1's deny stays, byte-identical to the deny-only refusal.
+        assert_eq!(
+            cd_dir_refusal_with(&deny, &allow, &d1_secret),
+            Some(format!(
+                "Access denied: '{d1_secret}' is under restricted directory '{}'",
+                p(&d1, "src/secret")
+            ))
+        );
+    }
+
+    fn snapshot_of(list: &DenyAdditions) -> Vec<String> {
+        crate::sync_util::lock_or_recover(list).clone()
+    }
+
     /// Production `check_path` readers that do NOT consult the `/cd`-appended
     /// `[directories] deny` list, each with the reason it is still unwired.
     /// Every reason names #869. The placement decision (Day 227) keeps the
@@ -748,6 +992,7 @@ mod tests {
     fn cd_routing_needles() -> Vec<String> {
         vec![
             ["cd_denied_dir_", "refusal_with("].concat(),
+            ["cd_dir_", "refusal_with("].concat(),
             ["path_guard_", "refusal("].concat(),
             ["path_guard_", "refusal_with("].concat(),
         ]

@@ -79,7 +79,7 @@ pub fn partition_denied_files(
     restrictions: &DirectoryRestrictions,
 ) -> (Vec<String>, Vec<String>) {
     let cd_list = crate::commands_file_fence::cd_dir_deny_list();
-    let cd_empty = crate::sync_util::lock_or_recover(&cd_list).is_empty();
+    let cd_empty = crate::cd_config_note::cd_dir_fence_is_empty(&cd_list);
     if restrictions.is_empty() && cd_empty {
         return (files.to_vec(), Vec::new());
     }
