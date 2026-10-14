@@ -185,20 +185,80 @@ fn request_above_272k_uses_the_gpt6_tier_and_below_stays_flat() {
 fn output_ceiling_is_the_model_maximum_not_the_preset_default() {
     for (id, ctor) in presets() {
         let ceiling = openai_compat_output_ceiling("openai", id, ctor.max_tokens);
-        assert_eq!(ceiling, GPT_6_OUTPUT_MAXIMUM, "{id}");
+        assert_eq!(ceiling, Some(GPT_6_OUTPUT_MAXIMUM), "{id}");
+        let ceiling = ceiling.expect("asserted Some above");
         // A correct 128000 must not warn; one over must.
         assert_eq!(max_tokens_ceiling_warning(128_000, ceiling, id, true), None);
         assert!(max_tokens_ceiling_warning(128_001, ceiling, id, true).is_some());
     }
-    // Near-misses keep the pre-existing rule: the config's own max_tokens.
-    assert_eq!(openai_compat_output_ceiling("openai", "gpt-5", 4096), 4096);
+    // Near-misses (#1019): an id with no preset has NO known maximum. These
+    // rows used to pin the config's `max_tokens` (4096, a request default) as
+    // the ceiling, which was the bug: it told users to lower to 4096.
+    assert_eq!(openai_compat_output_ceiling("openai", "gpt-5", 4096), None);
     assert_eq!(
         openai_compat_output_ceiling("openai", "gpt-6.1-sol", 4096),
-        4096
+        None
     );
     assert_eq!(
         openai_compat_output_ceiling("openrouter", "gpt-6-sol", 4096),
-        4096
+        None
+    );
+}
+
+/// #1019: composed exactly as `build_agent`'s OpenAI-compatible arm composes
+/// it (resolved config's `max_tokens` -> `openai_compat_output_ceiling` ->
+/// `and_then(max_tokens_ceiling_warning)`), so the value asserted is the value
+/// the caller receives.
+fn compat_ceiling_warning(provider: &str, model: &str, configured: u32) -> Option<String> {
+    let resolved = create_model_config(provider, model, None).max_tokens;
+    openai_compat_output_ceiling(provider, model, resolved)
+        .and_then(|c| max_tokens_ceiling_warning(configured, c, model, true))
+}
+
+#[test]
+fn no_ceiling_warning_when_no_preset_declares_a_maximum() {
+    // The assessment's measured rows: each printed "declared output ceiling
+    // 4096 ... Lower max_tokens to 4096" before the fix.
+    for (provider, model, configured) in [
+        ("ollama", "llama3.3", 16_000),
+        ("groq", "llama-3.3-70b-versatile", 16_000),
+        ("openrouter", "some/model", 16_000),
+        ("openai", "gpt-6.1-sol", 64_000),
+        ("custom", "my-local", 16_000),
+        ("zai", "glm-5", 16_000),
+        ("minimax", "MiniMax-M2", 16_000),
+    ] {
+        // Anti-vacuous: the resolved config really carries a value below the
+        // configured one, so the old fallback WOULD have warned here.
+        let resolved = create_model_config(provider, model, None).max_tokens;
+        assert!(resolved < configured, "{provider}/{model}: fixture premise");
+        assert_eq!(
+            compat_ceiling_warning(provider, model, configured),
+            None,
+            "{provider}/{model}: no maximum is known, so no ceiling claim"
+        );
+    }
+}
+
+#[test]
+fn ceiling_warning_still_fires_where_a_preset_declares_the_maximum() {
+    // True positive: gpt-6-sol's real maximum is 128000.
+    assert_eq!(
+        compat_ceiling_warning("openai", "gpt-6-sol", 200_000).as_deref(),
+        Some(
+            "max_tokens: configured 200000 exceeds gpt-6-sol's declared output \
+ceiling 128000. The provider may reject the request with a 400. Lower max_tokens to \
+128000 or below, or pick a model that allows more."
+        )
+    );
+    // Near-misses: at and below the maximum stay silent.
+    assert_eq!(compat_ceiling_warning("openai", "gpt-6-sol", 128_000), None);
+    assert_eq!(compat_ceiling_warning("openai", "gpt-6-sol", 64_000), None);
+    // DeepSeek's preset declares 384000 (#943) and keeps its ceiling.
+    assert!(compat_ceiling_warning("deepseek", "deepseek-flash", 384_001).is_some());
+    assert_eq!(
+        compat_ceiling_warning("deepseek", "deepseek-flash", 131_072),
+        None
     );
 }
 

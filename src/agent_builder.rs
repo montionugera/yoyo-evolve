@@ -890,14 +890,15 @@ pub fn openai_preset(model: &str) -> Option<ModelConfig> {
 /// against it would warn on a correct 128000 (the #964 trap, OpenAI side).
 pub(crate) const GPT_6_OUTPUT_MAXIMUM: u32 = 128_000;
 
-/// Output ceiling for the OpenAI-compatible build path: the GPT-6 maximum on
-/// `provider = "openai"` with a preset id, else the config's `max_tokens`
-/// (the pre-existing behaviour, unchanged for every other id).
-pub(crate) fn openai_compat_output_ceiling(provider: &str, model: &str, max_tokens: u32) -> u32 {
-    if provider == "openai" && openai_preset(model).is_some() {
-        GPT_6_OUTPUT_MAXIMUM
-    } else {
-        max_tokens
+/// Output ceiling for the OpenAI-compatible path, `Some` only where a preset
+/// declares a maximum: GPT-6 presets on `openai`, and `deepseek`'s preset 384K
+/// (#943). Elsewhere `max_tokens` is the base request default (4096), not a
+/// maximum, so `None` skips the warning (#1019, the #964 trap on this path).
+pub(crate) fn openai_compat_output_ceiling(p: &str, model: &str, max_tokens: u32) -> Option<u32> {
+    match p {
+        "openai" if openai_preset(model).is_some() => Some(GPT_6_OUTPUT_MAXIMUM),
+        "deepseek" => Some(max_tokens),
+        _ => None,
     }
 }
 
@@ -1683,12 +1684,9 @@ impl AgentConfig {
             // All other providers use OpenAI-compatible API
             let model_config = create_model_config(&self.provider, &self.model, base_url);
             let context_window = model_config.context_window;
-            // GPT-6: the preset's max_tokens is a default, not the maximum.
-            let output_ceiling = Some(openai_compat_output_ceiling(
-                &self.provider,
-                &self.model,
-                model_config.max_tokens,
-            ));
+            // Default != maximum: `None` unless a preset declares one (#1019).
+            let output_ceiling =
+                openai_compat_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
             // An id with no preset runs on the base config's guessed limits
             // (128K / max_tokens 4096), which silently caps every reply.
             // Volume chosen from that severity: stderr, once per
