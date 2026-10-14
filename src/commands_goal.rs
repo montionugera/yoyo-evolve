@@ -173,7 +173,7 @@ fn goal_for_prompt_fenced_in(
 /// so after `/cd` it reads the NEW directory's goal file, and that directory's
 /// deny entries must fence it like they fence `read_file` and `@path`. The
 /// startup fence is asked first, verdict and wording byte-identical; a `/cd`
-/// refusal ends with `CD_DENY_SOURCE_NOTE`. An empty list adds no check.
+/// refusal ends with `CD_DIR_SOURCE_NOTE`. An empty list adds no check.
 fn goal_for_prompt_fenced_in_with(
     cd_list: &crate::cd_deny::DenyAdditions,
     dir: &Path,
@@ -188,7 +188,7 @@ fn goal_for_prompt_fenced_in_with(
         return (None, Some(reason));
     }
     if let Some(reason) = crate::cd_config_note::cd_denied_dir_refusal_with(cd_list, &shown) {
-        let note = crate::commands_file_fence::CD_DENY_SOURCE_NOTE;
+        let note = crate::commands_file_fence::CD_DIR_SOURCE_NOTE;
         return (None, Some(format!("{reason} {note}")));
     }
     (goal_for_prompt_in(dir), None)
@@ -1600,7 +1600,7 @@ mod fence_tests {
                 None,
                 Some(format!(
                     "Access denied: '{shown}' is under restricted directory '{entry}' \
-                     (a [directories] deny entry applied by /cd)"
+                     (a [directories] entry applied by /cd)"
                 ))
             )
         );

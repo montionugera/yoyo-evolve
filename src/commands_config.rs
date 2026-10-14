@@ -932,7 +932,7 @@ pub fn handle_permissions(
     permissions: &crate::cli::PermissionConfig,
     dir_restrictions: &crate::cli::DirectoryRestrictions,
 ) {
-    // The /cd-appended deny lists are live policy too (#869): reading only the
+    // The /cd-applied lists are live policy too (#869): reading only the
     // launch-time config printed "none (full filesystem access)" over a fence.
     let report = crate::commands_permissions::permissions_report(
         auto_approve,
@@ -940,6 +940,7 @@ pub fn handle_permissions(
         dir_restrictions,
         &crate::commands_permissions::snapshot(&crate::cd_deny::cd_added_deny_handle()),
         &crate::commands_permissions::snapshot(&crate::cd_config_note::cd_denied_dirs_handle()),
+        &crate::commands_permissions::snapshot(&crate::cd_config_note::cd_allowed_dirs_handle()),
     );
     print!("{report}");
 }

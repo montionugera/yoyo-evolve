@@ -17,19 +17,28 @@
 use crate::format::{DIM, GREEN, RED, RESET, YELLOW};
 
 /// Label on a `/cd`-appended bash deny pattern, the command-side twin of
-/// [`crate::commands_file_fence::CD_DENY_SOURCE_NOTE`].
+/// [`crate::commands_file_fence::CD_DIR_SOURCE_NOTE`].
 pub(crate) const CD_BASH_DENY_SOURCE_NOTE: &str = "(a deny entry applied by /cd)";
+
+/// Label on a `/cd`-applied `[directories] allow` entry (Day 228). It says the
+/// two things a user cannot infer from a green tick under "Allowed": the entry
+/// is a SECOND fence (a path must pass the launch list too), and it lasts only
+/// until the next `/cd`, which replaces it.
+pub(crate) const CD_DIR_ALLOW_SOURCE_NOTE: &str =
+    "(an allow entry applied by /cd; also required, replaced by the next /cd)";
 
 /// The full `/permissions` text. `cd_bash_deny` / `cd_dir_deny` are the lists
 /// `/cd` has appended (`cd_deny::cd_added_deny_handle`,
-/// `cd_config_note::cd_denied_dirs_handle`); empty slices render the pre-#869
-/// text byte-identically.
+/// `cd_config_note::cd_denied_dirs_handle`), and `cd_dir_allow` is the allow
+/// list of the latest `/cd` (`cd_config_note::cd_allowed_dirs_handle`, Day
+/// 228); empty slices render the pre-#869 text byte-identically.
 pub(crate) fn permissions_report(
     auto_approve: bool,
     permissions: &crate::cli::PermissionConfig,
     dir_restrictions: &crate::cli::DirectoryRestrictions,
     cd_bash_deny: &[String],
     cd_dir_deny: &[String],
+    cd_dir_allow: &[String],
 ) -> String {
     let mut out = String::new();
     let mut line = |s: String| {
@@ -80,13 +89,19 @@ pub(crate) fn permissions_report(
     line(String::new());
 
     // Directory restrictions
-    if dir_restrictions.is_empty() && cd_dir_deny.is_empty() {
+    if dir_restrictions.is_empty() && cd_dir_deny.is_empty() && cd_dir_allow.is_empty() {
         line("    Directory restrictions: none (full filesystem access)".to_string());
     } else {
-        if !dir_restrictions.allow.is_empty() {
+        if !dir_restrictions.allow.is_empty() || !cd_dir_allow.is_empty() {
             line(format!("    {GREEN}Allowed directories:{RESET}"));
             for dir in &dir_restrictions.allow {
                 line(format!("      {GREEN}✓{RESET} {dir}"));
+            }
+            for dir in cd_dir_allow {
+                let dir = crate::cli::sanitize_for_display(dir);
+                line(format!(
+                    "      {GREEN}✓{RESET} {dir} {CD_DIR_ALLOW_SOURCE_NOTE}"
+                ));
             }
         }
         if !dir_restrictions.deny.is_empty() || !cd_dir_deny.is_empty() {
@@ -94,7 +109,7 @@ pub(crate) fn permissions_report(
             for dir in &dir_restrictions.deny {
                 line(format!("      {RED}✗{RESET} {dir}"));
             }
-            let note = crate::commands_file_fence::CD_DENY_SOURCE_NOTE;
+            let note = crate::commands_file_fence::CD_DIR_SOURCE_NOTE;
             for dir in cd_dir_deny {
                 let dir = crate::cli::sanitize_for_display(dir);
                 line(format!("      {RED}✗{RESET} {dir} {note}"));
@@ -194,7 +209,7 @@ mod tests {
     fn cd_dir_deny_is_shown_and_full_access_is_not_claimed() {
         let perms = PermissionConfig::default();
         let dirs = DirectoryRestrictions::default();
-        let out = permissions_report(false, &perms, &dirs, &[], &s(&["/proj/secret"]));
+        let out = permissions_report(false, &perms, &dirs, &[], &s(&["/proj/secret"]), &[]);
         assert!(
             !out.contains("full filesystem access"),
             "a live /cd fence must not be reported as full access:\n{out}"
@@ -203,7 +218,7 @@ mod tests {
             "    {RED}Denied directories:{RESET}\n{}\n",
             deny_line(
                 "/proj/secret",
-                crate::commands_file_fence::CD_DENY_SOURCE_NOTE
+                crate::commands_file_fence::CD_DIR_SOURCE_NOTE
             )
         );
         assert!(out.contains(&expected_block), "got:\n{out}");
@@ -222,7 +237,7 @@ mod tests {
     fn cd_bash_deny_is_shown_and_none_configured_is_not_claimed() {
         let perms = PermissionConfig::default();
         let dirs = DirectoryRestrictions::default();
-        let out = permissions_report(false, &perms, &dirs, &s(&["curl *"]), &[]);
+        let out = permissions_report(false, &perms, &dirs, &s(&["curl *"]), &[], &[]);
         assert!(!out.contains("none configured"), "got:\n{out}");
         let head = head_text(false, &perms, &dirs);
         let block = format!(
@@ -240,7 +255,7 @@ mod tests {
         let perms = PermissionConfig::default();
         let dirs = DirectoryRestrictions::default();
         for auto in [false, true] {
-            let out = permissions_report(auto, &perms, &dirs, &[], &[]);
+            let out = permissions_report(auto, &perms, &dirs, &[], &[], &[]);
             assert_eq!(out, head_text(auto, &perms, &dirs));
             // Anti-vacuous: HEAD's text really carries the claim this slice guards.
             assert!(out.contains("Directory restrictions: none (full filesystem access)"));
@@ -259,7 +274,7 @@ mod tests {
             deny: s(&["/etc", "/usr"]),
         };
         for auto in [false, true] {
-            let out = permissions_report(auto, &perms, &dirs, &[], &[]);
+            let out = permissions_report(auto, &perms, &dirs, &[], &[], &[]);
             assert_eq!(out, head_text(auto, &perms, &dirs));
         }
     }
@@ -274,8 +289,15 @@ mod tests {
             allow: vec![],
             deny: s(&["/etc"]),
         };
-        let out = permissions_report(false, &perms, &dirs, &s(&["curl *"]), &s(&["/p/secret"]));
-        let note = crate::commands_file_fence::CD_DENY_SOURCE_NOTE;
+        let out = permissions_report(
+            false,
+            &perms,
+            &dirs,
+            &s(&["curl *"]),
+            &s(&["/p/secret"]),
+            &[],
+        );
+        let note = crate::commands_file_fence::CD_DIR_SOURCE_NOTE;
         let dir_block = format!(
             "    {RED}Denied directories:{RESET}\n      {RED}✗{RESET} /etc\n{}",
             deny_line("/p/secret", note)
@@ -302,10 +324,47 @@ mod tests {
             &DirectoryRestrictions::default(),
             std::slice::from_ref(&hostile),
             std::slice::from_ref(&hostile),
+            std::slice::from_ref(&hostile),
         );
         assert!(
             !out.contains(&hostile),
             "raw control bytes reached the report"
+        );
+    }
+
+    #[test]
+    fn cd_dir_allow_is_listed_with_its_label_and_full_access_is_not_claimed() {
+        let perms = PermissionConfig::default();
+        let dirs = DirectoryRestrictions::default();
+        let out = permissions_report(false, &perms, &dirs, &[], &[], &s(&["/proj/src"]));
+        // The exact line a user reads.
+        let line =
+            format!("      {GREEN}✓{RESET} /proj/src (an allow entry applied by /cd; also required, replaced by the next /cd)\n");
+        assert!(
+            out.contains(&format!("    {GREEN}Allowed directories:{RESET}\n{line}")),
+            "got:\n{out}"
+        );
+        assert!(!out.contains("full filesystem access"), "got:\n{out}");
+        // Only the directory block differs from HEAD's text.
+        let head = head_text(false, &perms, &dirs);
+        assert_eq!(
+            out,
+            head.replace(
+                "    Directory restrictions: none (full filesystem access)\n",
+                &format!("    {GREEN}Allowed directories:{RESET}\n{line}")
+            )
+        );
+        // With a launch allow list too, the launch entry stays unlabelled and first.
+        let launch = DirectoryRestrictions {
+            allow: s(&["/proj"]),
+            deny: vec![],
+        };
+        let out = permissions_report(false, &perms, &launch, &[], &[], &s(&["/proj/src"]));
+        assert!(
+            out.contains(&format!(
+                "    {GREEN}Allowed directories:{RESET}\n      {GREEN}✓{RESET} /proj\n{line}"
+            )),
+            "got:\n{out}"
         );
     }
 

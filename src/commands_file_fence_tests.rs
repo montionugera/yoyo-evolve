@@ -281,7 +281,7 @@ fn no_restrictions_inline_exactly_as_before() {
 // ---------------------------------------------------------------------
 
 use crate::cd_deny::DenyAdditions;
-use crate::commands_file_fence::{admit_for_add_with, CD_DENY_SOURCE_NOTE, TEST_CD_DIR_DENY};
+use crate::commands_file_fence::{admit_for_add_with, CD_DIR_SOURCE_NOTE, TEST_CD_DIR_DENY};
 
 fn cd_list(entries: &[&Path]) -> DenyAdditions {
     std::sync::Arc::new(std::sync::Mutex::new(
@@ -300,7 +300,7 @@ fn with_cd_list<T>(list: DenyAdditions, f: impl FnOnce() -> T) -> T {
 /// The exact line for a `/cd`-list refusal, spelled out from literals.
 fn expected_cd_deny_line(path: &str, denied: &str) -> String {
     let reason = format!(
-        "Access denied: '{path}' is under restricted directory '{denied}' (a [directories] deny entry applied by /cd)"
+        "Access denied: '{path}' is under restricted directory '{denied}' (a [directories] entry applied by /cd)"
     );
     if crate::format::is_plain_output() {
         format!("warning: {path} not sent to the model - {reason}")
@@ -311,10 +311,7 @@ fn expected_cd_deny_line(path: &str, denied: &str) -> String {
 
 #[test]
 fn cd_deny_note_names_the_cd_source() {
-    assert_eq!(
-        CD_DENY_SOURCE_NOTE,
-        "(a [directories] deny entry applied by /cd)"
-    );
+    assert_eq!(CD_DIR_SOURCE_NOTE, "(a [directories] entry applied by /cd)");
 }
 
 #[test]

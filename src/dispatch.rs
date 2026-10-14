@@ -1457,13 +1457,14 @@ pub(crate) async fn dispatch_command(ctx: &mut DispatchContext<'_>) -> CommandRe
                             );
                             // #869 slice (Day 218): the new directory's deny entries
                             // only narrow, so they apply now (bash, both executors,
-                            // append-only; Day 226: [directories] deny, file tools);
+                            // append-only; Day 226: [directories] deny, file tools; Day 228:
+                            // [directories] allow, replaced by each /cd);
                             // everything else is still only disclosed.
                             let reading = crate::cd_config_note::read_cd_config(&target);
                             crate::cd_deny::append_cd_deny(crate::cd_config_note::deny_entries(
                                 &reading,
                             ));
-                            crate::cd_config_note::append_cd_dir_deny(&target, &reading);
+                            crate::cd_config_note::apply_cd_dir_fence(&target, &reading);
                             crate::cd_config_note::print_cd_config_note(&target, &reading);
                         }
                         Err(e) => {
