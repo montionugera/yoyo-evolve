@@ -1,0 +1,90 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; wc -l src/promp… ✓ (7ms)
+  ▶ $ sed -n 1,318p src/prompt/retry_safe_pipe.rs ✓ (6ms)
+  ▶ $ sed -n 1,25p src/prompt/retry_safe_pipe.rs; sed -n 120,232p src/prompt/retry_saf… ✓ (8ms)
+  ▶ $ sed -n 40,80p src/prompt/interrupt.rs; sed -n 30,50p src/prompt/sigterm.rs; sed … ✓ (8ms)
+  ▶ $ grep -n "fn write_stream_text" -A25 src/prompt.rs src/*.rs src/*/*.rs | head -40… ✓ (15ms)
+  ▶ $ grep -rn "tokio::spawn\|spawn_blocking\|catch_unwind\|panic::set_hook\|take_hook… ✓ (28ms)
+  ▶ $ f=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.3 2>/dev/null | head -1); echo $f… ✓ (7ms)
+  ▶ $ f=$(grep -A2 'name = "yoagent"' Cargo.lock | grep version | head -1 | cut -d'"' … ✓ (11ms)
+  ▶ $ python3 - <<'EOF' (81 lines) ✓ (29.3s)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 2m 13s (9 ✓)
+
+Before-reading confirmed: left: "" — held bytes lost on panic. Now the Drop and the near-miss tests.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (106 lines) ✓ (16.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ python3 - <<'EOF' (12 lines) ✓ (29.3s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 56.9s (2 ✓)
+
+Positive control, one atomic command (mutate → run → restore → run):
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ f=src/prompt/retry_safe_pipe.rs; cp $f /tmp/rsp.bak && pytho… (9 lines) ✓ (57.8s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control reds 3 tests by name (both flush tests plus the anti-vacuous row), near-misses stay green, restore is clean. Now stale prose:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ sed -n 25,42p src/prompt/sigterm.rs; grep -n -i "panic\|SIGQUIT\|SIGHUP\|held" d… ✓ (8ms)
+  ▶ $ sed -n 36,40p src/prompt/sigterm.rs | cut -c1-600 ✓ (3ms)
+  ▶ $ grep -n "still OPEN" -A3 src/prompt/sigterm.rs ✓ (16ms)
+  ▶ $ python3 - <<'EOF' (19 lines) ✓ (22ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ python3 - <<'EOF' (12 lines) ✓ (20.1s)
+  ▶ $ cargo test 2>&1 | grep -E "^test result|FAILED|panicked" | sort | uniq -c | head… ✓ (3m 41s)
+  ▶ $ cargo test 2>&1 | grep -E "^test result" | grep -v " 0 failed" ; echo "---"; git… ✓ (3m 8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 7m 53s (7 ✓)
+
+All green, no markers left. Committing with the before-reading and limits in the body:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ git add -A && git commit -q -F - <<'EOF' && git log --onelin… (35 lines) ✓ (47ms)
+  ▶ $ gh issue view 1016 --json state,title 2>&1 | head -3; gh iss… (14 lines) ✓ (3.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 24.0s (2 ✓)
+
+Piped -p no longer loses held text when its event loop panics. Committed as 31f83097 ("Part of #1016"), and the details are in a comment on #1016, which stays open.
+
+What the probe showed. Before the fix, I built a filtering RetrySafeGate writing into an in-memory buffer, left text held with no MessageEnd, and dropped the gate inside catch_unwind. The buffer read "", so the held bytes really were lost on a panic.
+
+The fix is impl Drop for RetrySafeGate in src/prompt/retry_safe_pipe.rs. It writes only while std::thread::panicking() is true and the filter is on. It writes two things, in order:
+• text the gate had already released to the loop but the loop hadn't printed yet;
+• then the text still held.
+
+The first part goes slightly beyond the task: when the panic happens in the middle of printing a finished attempt, the rest of that attempt is sitting in the gate's queue and would be lost too. A normal drop writes nothing, the same as before, so an attempt thrown away for a retry can never reach stdout this way. Write errors are ignored, and nothing in Drop can panic.
+
+Tests compare the full bytes with assert_eq!:
+• panic while text is held → "HELD_"
+• panic with a finished attempt still waiting to print → "ONE "
+• normal drop with text held → "" (today's value)
+• an attempt discarded for a retry → "", both on a panic and on a normal drop. A control row shows the same failure without the retry does flush PARTIAL_, so the empty result really comes from the retry.
+• filter off → "" on a panic
+
+For the positive control I turned the write into a no-op, ran the tests, put it back and ran again, all in one command. The three flush tests failed by name, the near-miss tests stayed green, and nothing was left behind after the restore. Clippy, fmt and the full cargo test run all pass.
+
+Limits:
+• I checked by reading the code, not by running yoyo, that a panic actually reaches the gate. The gate is a local variable in handle_prompt_events, and single-shot runs go through #[tokio::main] with no tokio::spawn in between, so a panic in the loop unwinds through it.
+• A panic inside yoagent's own spawned agent task isn't covered: the gate just sees the stream end normally.
+• Also not covered: a panic after the gate was already dropped normally, and builds with panic = "abort", where Drop never runs.
+• The exit code on a panic stays Rust's default, 101.
+• `Drop` writes the text raw, without the usual leading-blank-line filter.
+
+Something I found but didn't test: the Ctrl+C and SIGTERM path (finish_interrupted_turn) flushes only the held text, not text waiting in the gate's queue. If a signal arrives while that queue has text in it, that text would likely be lost. That comes from reading the code only, and I noted it on #1016.
+
+I also updated the docs to match: the panic case is now in docs/src/usage/piped-mode.md, the "still open" note in src/prompt/sigterm.rs is corrected, and ARCHITECTURE.md has a new entry with the old claim marked as superseded.
+  watch: no files changed this turn — skipping

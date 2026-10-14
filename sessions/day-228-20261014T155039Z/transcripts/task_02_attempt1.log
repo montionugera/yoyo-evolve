@@ -1,0 +1,72 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1295,1420p src/commands_pro… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "pub fn path_guard_refusal… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 262,320p src/cd_config_note… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn cd_dir_deny_list" -A8 … ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn score_files" -A5 src/c… ✓ (21ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "struct RelevanceResult" -… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 700,734p src/cd_config_note… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "const AUTO_CONTEXT_M" src… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=1300 && NR<=1318 {print N… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (51 lines) ✓ (1.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (10 lines) ✓ (25ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (10.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "GRACE\|grace\|WARN\|fn co… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  14 tools completed in 1m 17s (14 ✓)
+
+Now the tests.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (53 lines) ✓ (129ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo select_auto_… ✓ (28.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (14 lines) ✓ (29.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (19.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (3m 54s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (3m 7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn -i "a… (9 lines) ✓ (27ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "auto_context\|UNWIRED_CHE… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (16 lines) ✓ (50ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 540,546p docs/src/configura… ✓ (306ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 9m 7s (10 ✓)
+
+The task's residue list says "permissions.deny reload" is still missing, but the docs say /cd already applies [permissions] deny. So I'm correcting my note to use the documented list.
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (8 lines) ✓ (2.0s)
+
+The full suite and clippy were green before the doc-only edits. Committing now.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (16 lines) ✓ (50ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comment 869 --body "Day 2… ✓ (801ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 16.8s (2 ✓)
+
+Auto-context no longer puts files from a /cd-denied directory into the model's prompt. Before this, after /cd into a project whose .yoyo.toml denies a directory, read_file would refuse a file there, but auto-context (which runs on every REPL turn) could still attach it. It's committed as 9c44eba9, not pushed yet, and I commented the new register count on #869.
+
+What changed
+• The per-file decision moved out of auto_context_for_prompt into a new function, select_auto_context_paths, which takes the /cd deny list as a parameter. It calls path_guard_refusal_with, which checks the startup fence first (same results as before) and then the /cd list. The real function passes in the same list handle /rename uses.
+• **The task assumed a shortcut that isn't there.** Step 1 expected an early return when there are no startup restrictions, like the one `/rename` had. This function has none: each check returns early on its own only when its list is empty, so a session with no startup fence still reaches the /cd check.
+• **Test:** test_select_auto_context_paths_honours_cd_deny uses a local deny list and absolute temp paths, and compares the full returned list with assert_eq!:
+  • with an empty `/cd` list, the result is unchanged from before;
+  • denying secret with no startup restrictions excludes secret/f.rs, but secrets2/f.rs stays in, because matching is by path component, not by name prefix;
+  • the same exclusion happens when unrelated startup restrictions are set.
+• **Positive control:** I swapped the new call back to the old startup-only check and ran the test. It failed on the no-startup-restrictions case, then I restored the code.
+• **Register: `src/commands_project.rs` came off `UNWIRED_CHECK_PATH_READERS`, which goes from 3 rows to 2**: src/context.rs and src/skill_fence.rs.
+• **Size gate:** the file's entry in `tests/module_size.rs` is now 3709 (+56 from the 3653 starting count) with a dated Day 228 comment. That is inside the 100-line drift grace band.
+• **Docs:** `permissions.md` now lists auto-context among the surfaces that honour the `/cd` list. I also changed its "other readers" sentence, which named "the project-description commands" as using the startup fence. That file had no other fence check, so the claim didn't match the code. I added a Day 228 note to ARCHITECTURE.md under commands_project.rs.
+
+What's left on #869: besides those two register rows, /cd still doesn't reload [permissions] allow, [directories] allow, hooks, MCP servers or skills. My task file also listed permissions.deny reload as missing. According to permissions.md (I didn't open cd_deny to confirm), /cd already adds those patterns to bash's deny list, so I left it off the residue and said so in the commit and on #869.
+
+Clippy (-D warnings), fmt and the full cargo test run passed before the last edits. Those edits only touched docs and ARCHITECTURE.md, and after them fmt, the module-size tests and the register guard passed again.
+  watch: no files changed this turn — skipping

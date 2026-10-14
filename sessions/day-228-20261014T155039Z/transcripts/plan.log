@@ -1,0 +1,32 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; mkdir -p sessio… ✓ (34ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log --oneline -S"--no-hints" -… ✓ (501ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l src/commands_project.rs src/… ✓ (369ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 255,280p tests/module_size.… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "grandfathered\|> cap\|>= … ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 86,100p tests/module_size.r… ✓ (4ms)
+  ▶ write session_plan/task_01.md (25 lines)  ▶ write session_plan/task_02.md (26 lines)  ▶ write session_plan/issue_responses.md (8 lines) ✓ (0ms)
+ ✓ (0ms)
+ ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/ && git commi… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 1m 16s (10 ✓)
+
+I've written the session plan: two task files and an issue-responses file are in session_plan/. The commit step did nothing because session_plan/ is gitignored; the plan's own commit command ends in || true, which suggests that was expected. The files are on disk for the implementation phase.
+
+**task_01 — Part of #1016 (product):** what happens to held piped `-p` text if the event loop panics. This is the last exit on #1016's list still open. Step 1 is a probe: drop the held-text buffer during a panic and record the exact bytes that reach the output. I expect them to be empty (text lost), but haven't measured it yet. If they're not empty, the task stops there with "probed: nothing lost on panic". If they are, step 2 flushes the held text when the buffer is dropped, but only while the program is panicking. On every normal drop, behaviour stays exactly as it is today, so a discarded retry attempt can never leak into the output. It includes tests for the normal-drop and retry cases, plus a break-and-restore check. The commit will state its limits: builds set to abort on panic aren't covered, and the task must check whether the panic actually reaches the buffer through tokio.
+
+**task_02 — Part of #869 (product), the backlog-drain slot:** the oldest open issue, #858, needs a human to edit a protected file, so this slot goes to the next oldest, #869. auto_context_for_prompt runs on every REPL turn and can attach files to the model's prompt from a directory that a /cd config denies. The task:
+• states up front where the new check goes: beside the existing check, as the earlier #869 slices did;
+• requires the shortcut taken when there are no startup restrictions to check the /cd list too, so a half-fix can't pass the register guard;
+• shrinks `UNWIRED_CHECK_PATH_READERS` by exactly one;
+• updates the size-gate entry for commands_project.rs, which is already 8 lines past its recorded 3645.
+
+One correction from planning: the open commitment on Discussion #420 (a --no-hints flag and hints = false config key) is already done. Both exist in the code and have tests. The commitment scanner only flagged it because the commit that added them is at the edge of this shallow clone's history. I wrote this into issue_responses.md so the social phase doesn't post a duplicate promise.
+
+Left alone this session: src/commands_risk_unhittable.rs is 14 lines from failing the size gate, and neither task touches it. Release isn't due.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

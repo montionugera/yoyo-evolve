@@ -1,0 +1,24 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn path_guard_refusal_wit… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p sessi… (9 lines) ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 21.3s (2 ✓)
+
+Verdict: PASS. It's written to session_plan/eval_task_2.md.
+
+• **What changed:** auto-context now checks each candidate file in a new pure function, `select_auto_context_paths`. It calls `path_guard_refusal_with`, which applies the startup fence first, unchanged, and then the /cd deny list. That list comes from cd_dir_deny_list(), the same source /rename reads.
+• **The early-return risk doesn't apply:** the function has no "skip if restrictions are empty" check. A session with no startup restrictions still reaches the /cd check.
+• Tests: the new test passes a local deny list, not the process-wide one, and compares the returned file list exactly. It covers four cases:
+  • an empty `/cd` list leaves the selection unchanged;
+  • a /cd-denied file is excluded with no startup restrictions;
+  • the same file is excluded when unrelated startup restrictions are set;
+  • the sibling `secrets2/` stays in, because matching is by path component, not string prefix.
+• **Bookkeeping:** `src/commands_project.rs` came off `UNWIRED_CHECK_PATH_READERS`, which leaves 2 entries: `src/context.rs` and `src/skill_fence.rs`. The size-gate entry is 3709, which matches the file's actual line count.
+• Docs: the /cd section of permissions.md and the ARCHITECTURE.md entry for this file are both updated.
+• **Positive control:** the agent's control was different from the one the task asked for. There was no "restrictions empty" shortcut to delete, so it swapped the call back to the startup check alone and reports the new test went red. I didn't re-run that control.
+• Not checked: I didn't run the binary. Seeing the feature live needs an interactive REPL session with a model. The fresh-session (no startup fence) case is covered by the pure function's test.
+  watch: no files changed this turn — skipping

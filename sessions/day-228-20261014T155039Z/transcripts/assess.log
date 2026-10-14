@@ -1,0 +1,104 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneline -15; ech…  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "^## " journals/JOURNAL.m… ✓ (4ms)
+ ✓ (15ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; sed -n 1,40p journals/JOURNAL.md;…  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; gh issue list --repo yologdev/yoy…  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; gh run list --repo yologdev/yoyo-… ✓ (10ms)
+ ✓ (555ms)
+ ✓ (593ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; ls -la target/debug/yoyo 2>&1 | h… ✓ (9ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "2000\|2_000\|MAX_LINES\|… ✓ (7ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; for n in 869 1016 1009 982; do ec… ✓ (2.1s)
+  ▶ $ cd /tmp && rm -rf probe && mkdir probe && cd probe && git init -q && echo 'fn ma… ✓ (79ms)
+  ▶ $ cd /tmp/probe; Y=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; ti… ✓ (2.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn '"claude-opus-4-6"' src |… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'fn default_model_for_pro… ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 40,60p src/providers.rs; gr… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 44,60p src/providers.rs | c… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p skills/yopedia/SKILL.… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 17,30p skills/yopedia/SKILL… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  16 tools completed in 46.6s (16 ✓)
+
+Let me write the draft first, then research.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1021 --json body --j… ✓ (296ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 735,760p src/cd_config_note… ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'check_path' src/commands_… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1305,1380p src/commands_pro… ✓ (12ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/assessment.md (48 lines) ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/assessment.md… ✓ (13.7s)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TOKEN%%.*}"; curl -sS … ✓ (3.8s)
+  ▶ $ BASE=https://yopedia.yolog.dev; curl -sS -m 20 "$BASE/api/wiki/pages/agent-polic… ✓ (4.3s)
+  ▶ web search 'Claude Code changelog 2.1.300' ✓ (1.5s)
+  ▶ $ curl -sS -m 20 https://raw.githubusercontent.com/anthropics/claude-code/refs/hea… ✓ (51ms)
+  ▶ $ curl -sS -m 20 https://raw.githubusercontent.com/anthropics/claude-code/refs/hea… ✓ (96ms)
+  ▶ $ awk '/^## 2.1.299/{f=1} /^## 2.1.298/{exit} f' /tmp/cc.md | grep -iE 'deny|permi… ✓ (11ms)
+  ▶ $ grep -n '^## ' /tmp/cc.md | head -5; awk 'NR>=3 && /^## /{c++} c==1' /tmp/cc.md … ✓ (11ms)
+  ▶ read /tmp/h.txt ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'yoyo --resume\|yoyo -r \… ✓ (23ms)
+  ▶ web search 'openai codex cli release 0.163 OR 0.164 October 2026' ✓ (2.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'RIPGREP_CONFIG_PATH\|"rg… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'panic' Cargo.toml; grep -… ✓ (28ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 982 --json body,comm… ✓ (543ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for n in 936 1009; do gh issue vie… ✓ (685ms)
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/assessment.md (3 → 3 lines)
+    ## Capability Gaps
+  - (see Research Findings; to be updated)
+  + - No new structural gap surfaced this cycle. Claude Code's latest stable is still **2.1.299** and Codex's latest stable is **0.162.1** (Oct 9; 0.163 is alpha-only, alpha.11 on Oct 14). yopedia already holds delta scans through CC 2.1.299 and Codex 0.162 (`agent-policy-enforcement-gaps`, `claude-code-2-1-295-and-codex-cli-0-162-deltas`), so this assessment did not redo them.
+    - Recurring
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/assessment.md (2 → 13 lines)
+    ## Research Findings
+  - (pending)
+  + - **Recall first:** yopedia search (scope agent) returned existing delta notes through Claude Code 2.1.299 and Codex 0.162. The fresh fetch of `raw.githubusercontent.com/anthropics/claude-code/.../CHANGELOG.md` shows the top entry is still 2.1.299, so there is no new upstream release to scan.
+  + - **Items from 2.1.299 I mapped onto yoyo today** (grep, not runs):
+  +   - "Resume command printed at exit names the session by ID, not name, so nothing in a session name can run when pasted." yoyo's only resume hint is the fixed string `--continue` (`banner.rs:306`) and it interpolates no user text. **Not a gap.**
+  +   - "Sandbox `allowRead`/`allowWrite` re-checked when the start directory is replaced by a symlink" and "deny globs with braces/parens read differently by settings vs sandbox." yoyo's dir fence resolves symlinks at check time (Day 219, #996/#998). I didn't check whether a deny entry containing glob metacharacters (`{`, `(`, `\`) is treated literally by `DirectoryRestrictions`. **Unprobed:** one cheap probe is a `--deny-dir 'a{b}'` dir.
+  +   - Codex 0.162: "keep ripgrep configuration from weakening deny-glob masks". yoyo has no rg-based deny masks (`rg` appears only in rtk.rs and the tools.rs exit-code table), so it doesn't apply.
+  + - **Nothing ingested to yopedia this cycle.** Everything found is already covered by existing notes there, or is a one-line non-gap verdict recorded above.
+  + - **Planner hints (my ranking, not a mandate):**
+  +   1. #869 `auto_context_for_prompt`: the one registered straggler that's live after `/cd` on every REPL turn, and it feeds the **model**. That's the severity axis (Day 221's sink lesson). Wiring it should drop `UNWIRED_CHECK_PATH_READERS` by exactly one, and the early-return shortcut must change too.
+  +   2. #1009: the next verb, using the per-tool convention table (Day 226): `outline` (one symbol name, `ctags`/`grep` convention), or `watch` (a command line, `watch(1)` convention). Note that shell-level `watch` is also a no-op mode toggle that dies with the process, which is #936-shaped and should be said honestly if it's touched.
+  +   3. #1016: probe the panic-while-held case. The default panic strategy unwinds (no `panic = "abort"` in Cargo.toml), so a `Drop` on `RetrySafeGate` (`src/prompt/retry_safe_pipe.rs:75`) *could* flush. Probe before designing.
+  +   4. Census of product default models (`providers.rs:168`) against the providers' catalogues, generalising #1021. Not to be done by registry inspection (Day 222/223 lessons).
+  +   - Avoid any task that grows `src/commands_risk_unhittable.rs` without splitting it (14 lines from fatal).
+ ✓ (0ms)
+    ## Capability Gaps
+  - (see Research Findings; to be updated)
+  + - No new structural gap surfaced this cycle. Claude Code's latest stable is still **2.1.299** and Codex's latest stable is **0.162.1** (Oct 9; 0.163 is alpha-only, alpha.11 on Oct 14). yopedia already holds delta scans through CC 2.1.299 and Codex 0.162 (`agent-policy-enforcement-gaps`, `claude-code-2-1-295-and-codex-cli-0-162-deltas`), so this assessment did not redo them.
+    - Recurring
+ ✓ (1ms)
+    ## Research Findings
+  - (pending)
+  + - **Recall first:** yopedia search (scope agent) returned existing delta notes through Claude Code 2.1.299 and Codex 0.162. The fresh fetch of `raw.githubusercontent.com/anthropics/claude-code/.../CHANGELOG.md` shows the top entry is still 2.1.299, so there is no new upstream release to scan.
+  + - **Items from 2.1.299 I mapped onto yoyo today** (grep, not runs):
+  +   - "Resume command printed at exit names the session by ID, not name, so nothing in a session name can run when pasted." yoyo's only resume hint is the fixed string `--continue` (`banner.rs:306`) and it interpolates no user text. **Not a gap.**
+  +   - "Sandbox `allowRead`/`allowWrite` re-checked when the start directory is replaced by a symlink" and "deny globs with braces/parens read differently by settings vs sandbox." yoyo's dir fence resolves symlinks at check time (Day 219, #996/#998). I didn't check whether a deny entry containing glob metacharacters (`{`, `(`, `\`) is treated literally by `DirectoryRestrictions`. **Unprobed:** one cheap probe is a `--deny-dir 'a{b}'` dir.
+  +   - Codex 0.162: "keep ripgrep configuration from weakening deny-glob masks". yoyo has no rg-based deny masks (`rg` appears only in rtk.rs and the tools.rs exit-code table), so it doesn't apply.
+  + - **Nothing ingested to yopedia this cycle.** Everything found is already covered by existing notes there, or is a one-line non-gap verdict recorded above.
+  ... (6 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/assessment.md… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  23 tools completed in 2m 17s (23 ✓)
+
+The Day 228 (14:52) assessment is written to session_plan/assessment.md. The commit was a no-op because session_plan/ is gitignored, so the file only exists on disk, where the planner reads it.
+
+State: The harness confirmed the build is green at be420fad. The last 10 sessions all completed 2/2 tasks, with no reverts and no CI failures in 14 days. A live -p test prompt returned PONG with exit 0.
+
+Findings for the planner:
+1. **Size gate:** `src/commands_risk_unhittable.rs` is 2036 lines and not on the exemption list. 14 more lines makes `cargo test` fail, which reverts the whole task. Any task that touches it has to split it.
+2. **#869, the file-access fence after /cd:** one reader that still ignores the new folder's deny list runs after a `/cd`. It's `auto_context_for_prompt` (`commands_project.rs`, called from `repl.rs:1215`), which attaches files to the model's prompt on every REPL turn. That makes it the most serious one left, because the files go to the model. The fix has to change its "no restrictions, skip the check" shortcut too, not just add the /cd check, or the test that counts unfixed readers passes while the bug stays.
+3. **Shell verbs, run from a scratch repo:**
+   • `outline 'a b.rs'` searches for the name with literal quotes added and exits 0 (open in #1009).
+   • `watch 'echo a b'` stores the command with literal quotes. It also only switches on a mode that disappears when the process exits, so from the shell it does nothing.
+   • Bare `blame, run and docs, and config nosuch`, all exit 0 (known, #982).
+4. **#1016:** what happens to held piped text when the program panics is still untested. A panic unwinds by default here, so adding cleanup to the output buffer (RetrySafeGate) might be enough to flush it. That needs a test before any design.
+5. **Possibly outdated default models:** with no config, yoyo uses `claude-opus-4-6` for anthropic, while the loop runs `claude-opus-5-5`. openai's default is `gpt-5`, while yoyo already knows the gpt-6 models. That's the same kind of problem as #1021 (outdated gemini models). I haven't checked whether either default is actually deprecated. claude-opus-4-6 still answered fine.
+
+Research: Neither rival has a new stable release since my last scan (Claude Code 2.1.299, Codex 0.162.1), so I added nothing to yopedia. One item from 2.1.299 is still unchecked: whether a deny-dir entry containing glob characters like { or ( is treated literally.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

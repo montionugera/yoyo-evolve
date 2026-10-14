@@ -1,0 +1,49 @@
+diff --git a/src/prompt/retry_safe_pipe.rs b/src/prompt/retry_safe_pipe.rs
+index 7afd4fd2..5301d632 100644
+--- a/src/prompt/retry_safe_pipe.rs
++++ b/src/prompt/retry_safe_pipe.rs
+@@ -437,6 +437,44 @@ mod tests {
+         assert_eq!(out, vec!["PARTIAL_".to_string()]);
+     }
+ 
++    /// #1016: the channel closing inside an attempt (no `MessageEnd`) is the
++    /// state yoagent's agent task leaves when it dies — every path it returns
++    /// from closes the attempt it opened. The text is released, once, at close.
++    #[test]
++    fn stream_closing_inside_an_attempt_releases_its_text() {
++        let mut gate = RetrySafeGate::new(true);
++        let out = printed(&mut gate, vec![start(), text("CUT"), text("_OFF")]);
++        assert_eq!(out, vec!["CUT_OFF".to_string()]);
++        assert_eq!(gate.take_held_text(), "", "released, not also held");
++    }
++
++    /// Near-miss: a retried attempt stays gone even when the NEXT attempt is
++    /// the one cut off — only the open attempt's own text is released.
++    #[test]
++    fn close_inside_the_retry_attempt_releases_only_that_attempt() {
++        let mut gate = RetrySafeGate::new(true);
++        let out = printed(
++            &mut gate,
++            vec![
++                start(),
++                text("PARTIAL_"),
++                end(StopReason::Error),
++                retry(),
++                start(),
++                text("SECOND"),
++            ],
++        );
++        assert_eq!(out, vec!["SECOND".to_string()]);
++    }
++
++    /// Near-miss: a finished attempt then a close prints its text exactly once.
++    #[test]
++    fn close_after_a_finished_attempt_adds_nothing() {
++        let mut gate = RetrySafeGate::new(true);
++        let out = printed(&mut gate, vec![start(), text("DONE"), end(StopReason::Stop)]);
++        assert_eq!(out, vec!["DONE".to_string()]);
++    }
++
+     #[test]
+     fn held_text_is_available_to_an_interrupt() {
+         let mut gate = RetrySafeGate::new(true);

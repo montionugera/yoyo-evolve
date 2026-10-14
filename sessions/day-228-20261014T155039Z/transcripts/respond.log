@@ -1,0 +1,83 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show 31f83097 --stat; git show… ✓ (62ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1016 --repo yologdev… ✓ (931ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 14.6s (3 ✓)
+
+I'm not posting anything this session. Every issue on the list either already has its update or saw no work from me.
+
+#1016 (piped `-p` held text lost on exit): I worked on this today (31f83097, the crash fix), but the issue already has two comments from this session:
+• **The panic row:** a crash used to lose the held text (the probe read `""`). Now a crash writes the held text to stdout, but a normal drop still writes nothing. The comment lists the limits.
+• **A correction from the reflection:** I wrote that a crash inside yoagent's own worker "looks like a normal ending" to the gate. From reading the code, the gate *can* tell the two apart, because text left over when the stream closes means the reply never got its end. I haven't run anything to confirm that. The comment gives the next check: close the stream partway through a reply and read stdout.
+
+A third comment would break the one-comment rule. It stays open: the yoagent-worker case is unchecked, and so is a smaller gap I found by reading. When a signal arrives, the shutdown step can drop text that was cleared for printing but not printed yet.
+
+#869: Task 2 (9c44eba9) is part of #869. Auto-context, which quietly attaches files to the model's prompt, now checks the "never touch this folder" list of a directory entered with /cd. #869 wasn't on this list, so I didn't comment there either.
+
+#991 (retry-safe output on a pipe): the crash fix lives in the gate this issue added, but its two open items are untouched. The first is the leftover text handling in stream-json output. The second is the two retry edge cases from #989. I have no news on either.
+
+#997, #1018, #1014, #1012, #1011, #1009, #988, #982, #944, #936, #902, #879: no work this session, so there's nothing to report.
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --short | head; wc -l s… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 200,468p src/prompt/retry_s… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6.6s (2 ✓)
+
+First the remaining #1016 item: does the stream closing partway through a reply lose its text? I'll check yoagent's finish() before writing the probe.
+  ╭─ Turn 3 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/.cargo/registry/src/*/; ls -d yoagent-*; cd yoagent-0.25.*/ 2>/dev/null || … ✓ (9ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+yoagent's finish() drops an open attempt and only logs a warning, which matches the correction I posted. Next: what does yoyo's loop do when next() returns None?
+  ╭─ Turn 4 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "RetrySafeGate\|gate\.next… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1075,1100p src/prompt.rs; s… ✓ (7ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/; grep -n "tokio::spawn\|JoinHandle\|p…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "pub async fn run_prompt_a… ✓ (5ms)
+ ✓ (5ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/; grep -n "MessageEnd" src/agent_loop.… ✓ (5ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2/; sed -n 2000,2160p src/agent_loop.rs ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 108,122p src/prompt/retry_s… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 122,135p src/prompt/retry_s… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 49.0s (8 ✓)
+
+No test pins the drop. Now the probe: a full-byte assertion on what the loop would print when the channel closes mid-attempt.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/prompt/retry_safe_pipe.rs (2 → 40 lines)
+  +     /// #1016: the channel closing inside an attempt (no `MessageEnd`) is the
+  +     /// state yoagent's agent task leaves when it dies — every path it returns
+  +     /// from closes the attempt it opened. The text is released, once, at close.
+  +     #[test]
+  +     fn stream_closing_inside_an_attempt_releases_its_text() {
+  +         let mut gate = RetrySafeGate::new(true);
+  +         let out = printed(&mut gate, vec![start(), text("CUT"), text("_OFF")]);
+  +         assert_eq!(out, vec!["CUT_OFF".to_string()]);
+  +         assert_eq!(gate.take_held_text(), "", "released, not also held");
+  +     }
+  + 
+  +     /// Near-miss: a retried attempt stays gone even when the NEXT attempt is
+  +     /// the one cut off — only the open attempt's own text is released.
+  +     #[test]
+  +     fn close_inside_the_retry_attempt_releases_only_that_attempt() {
+  +         let mut gate = RetrySafeGate::new(true);
+  +         let out = printed(
+  +             &mut gate,
+  +             vec![
+  +                 start(),
+  ... (20 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo retry_safe_p…
+  (interrupted)
