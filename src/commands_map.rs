@@ -47,19 +47,29 @@ pub fn build_repo_map_with_backend(
 /// goes through [`crate::config::DirectoryRestrictions::check_path`] — the one
 /// resolver, symlinks included (#996) — **before** the file is read, so a denied
 /// file's symbols are never extracted, not merely filtered after rendering.
-/// The third return value counts the files the fence omitted. `None` (and an
-/// empty fence, which `check_path` short-circuits) takes the unfenced path.
+/// The third return value counts the files the fence omitted, split by which
+/// list refused them. `None` takes the unfenced path; an empty startup fence
+/// (which `check_path` short-circuits) plus an empty `/cd` list (which
+/// `cd_denied_dir_refusal_with` short-circuits) omits nothing.
+///
+/// #869: a fenced build checks the startup fence first (verdict unchanged),
+/// then the `/cd`-appended `[directories] deny` list. Today the only fenced
+/// caller is the startup prompt map, which runs before any `/cd`, so the `/cd`
+/// list is empty there; the check makes any later rebuild fail closed. `/map`
+/// itself passes `None` — a display to the user, not the provider (#1002).
 fn build_repo_map_core(
     files: &[String],
     toplevel: Option<&str>,
     root: Option<&str>,
     public_only: bool,
     force_regex: bool,
-    fence: Option<&crate::config::DirectoryRestrictions>,
-) -> (Vec<FileSymbols>, MapBackend, usize) {
+    fence: Option<(
+        &crate::config::DirectoryRestrictions,
+        &crate::cd_deny::DenyAdditions,
+    )>,
+) -> (Vec<FileSymbols>, MapBackend, MapOmitted) {
     let mut result = Vec::new();
-    let mut omitted = 0usize;
-    let fence = fence.filter(|f| !f.is_empty());
+    let mut omitted = MapOmitted::default();
 
     // Check ast-grep availability once upfront
     let use_ast_grep = !force_regex && is_ast_grep_available();
@@ -94,9 +104,13 @@ fn build_repo_map_core(
             path.clone()
         };
         // The fence is checked before the read: symbol names are file content.
-        if let Some(f) = fence {
+        if let Some((f, cd_list)) = fence {
             if f.check_path(&abs_path).is_err() {
-                omitted += 1;
+                omitted.fence += 1;
+                continue;
+            }
+            if crate::cd_config_note::cd_denied_dir_refusal_with(cd_list, &abs_path).is_some() {
+                omitted.cd += 1;
                 continue;
             }
         }
@@ -128,6 +142,15 @@ fn build_repo_map_core(
     // Sort by line count descending (biggest/most important files first)
     result.sort_by_key(|b| std::cmp::Reverse(b.lines));
     (result, backend, omitted)
+}
+
+/// Files a fenced repo-map build left out, by the list that refused them:
+/// `fence` for the startup `--deny-dir`/`--allow-dir`/`[directories]` fence,
+/// `cd` for a `[directories] deny` entry appended by `/cd` (#869).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct MapOmitted {
+    fence: usize,
+    cd: usize,
 }
 
 /// Format the repo map with ANSI colors for REPL display.
@@ -332,22 +355,27 @@ pub fn generate_repo_map_for_prompt(
 ) -> Option<String> {
     let files = list_project_files();
     let toplevel = crate::git::run_git(&["rev-parse", "--show-toplevel"]).ok();
-    let (map, omitted) = repo_map_for_prompt_fenced(
+    let (map, omitted) = repo_map_for_prompt_fenced_with(
+        &crate::cd_config_note::cd_denied_dirs_handle(),
         &files,
         toplevel.as_deref(),
         restrictions,
         false,
         REPO_MAP_MAX_CHARS,
     );
-    if let Some(msg) = repo_map_fence_note(omitted, crate::format::is_plain_output()) {
+    let plain = crate::format::is_plain_output();
+    if let Some(msg) = repo_map_fence_note(omitted.fence, plain) {
+        eprintln!("{YELLOW}{msg}{RESET}");
+    }
+    if let Some(msg) = repo_map_cd_deny_note(omitted.cd, plain) {
         eprintln!("{YELLOW}{msg}{RESET}");
     }
     map
 }
 
-/// The fenced prompt map over an explicit file list (the testable seam behind
-/// [`generate_repo_map_for_prompt`]). Returns the map and how many files the
-/// fence omitted.
+/// [`repo_map_for_prompt_fenced_with`] with an empty `/cd` list: the startup
+/// fence alone. Returns the map and how many files that fence omitted.
+#[cfg(test)]
 fn repo_map_for_prompt_fenced(
     files: &[String],
     toplevel: Option<&str>,
@@ -355,8 +383,36 @@ fn repo_map_for_prompt_fenced(
     force_regex: bool,
     max_chars: usize,
 ) -> (Option<String>, usize) {
-    let (entries, _backend, omitted) =
-        build_repo_map_core(files, toplevel, None, true, force_regex, Some(restrictions));
+    let empty = crate::cd_deny::DenyAdditions::default();
+    let (m, omitted) = repo_map_for_prompt_fenced_with(
+        &empty,
+        files,
+        toplevel,
+        restrictions,
+        force_regex,
+        max_chars,
+    );
+    (m, omitted.fence)
+}
+
+/// The fenced prompt map over an explicit file list and an injected `/cd`
+/// deny list (the testable seam behind [`generate_repo_map_for_prompt`]).
+fn repo_map_for_prompt_fenced_with(
+    cd_list: &crate::cd_deny::DenyAdditions,
+    files: &[String],
+    toplevel: Option<&str>,
+    restrictions: &crate::config::DirectoryRestrictions,
+    force_regex: bool,
+    max_chars: usize,
+) -> (Option<String>, MapOmitted) {
+    let (entries, _backend, omitted) = build_repo_map_core(
+        files,
+        toplevel,
+        None,
+        true,
+        force_regex,
+        Some((restrictions, cd_list)),
+    );
     (render_repo_map_for_prompt(entries, max_chars), omitted)
 }
 
@@ -373,6 +429,21 @@ pub(crate) fn repo_map_fence_note(omitted: usize, plain: bool) -> Option<String>
     } else {
         format!("⚠ repo map omitted {omitted} {files} blocked by the directory fence (--deny-dir/--allow-dir)")
     })
+}
+
+/// The stderr note when a `/cd`-appended `[directories] deny` entry omitted
+/// files from the repo map (#869). `None` at zero. Count only, never names;
+/// ends with `CD_DENY_SOURCE_NOTE`; glyph-free under plain output.
+pub(crate) fn repo_map_cd_deny_note(omitted: usize, plain: bool) -> Option<String> {
+    if omitted == 0 {
+        return None;
+    }
+    let files = if omitted == 1 { "file" } else { "files" };
+    let note = crate::commands_file_fence::CD_DENY_SOURCE_NOTE;
+    let marker = if plain { "warning:" } else { "⚠" };
+    Some(format!(
+        "{marker} repo map omitted {omitted} {files} blocked by the directory fence {note}"
+    ))
 }
 
 /// Handle the `/map` REPL command: show structural symbols from the codebase.
@@ -811,6 +882,105 @@ mod tests {
             );
             let plain = repo_map_fence_note(2, true).unwrap();
             assert!(plain.is_ascii(), "plain note must be glyph-free: {plain}");
+        }
+
+        /// #869: the `/cd`-appended deny list, injected (never the global).
+        fn cd_list(dirs: &[&std::path::Path]) -> crate::cd_deny::DenyAdditions {
+            let list = crate::cd_deny::DenyAdditions::default();
+            crate::sync_util::lock_or_recover(&list)
+                .extend(dirs.iter().map(|d| d.display().to_string()));
+            list
+        }
+
+        fn map_with(
+            cd: &crate::cd_deny::DenyAdditions,
+            files: &[String],
+            proj: &std::path::Path,
+            fence: &DirectoryRestrictions,
+        ) -> (String, MapOmitted) {
+            let (m, omitted) = repo_map_for_prompt_fenced_with(
+                cd,
+                files,
+                Some(&proj.to_string_lossy()),
+                fence,
+                true,
+                REPO_MAP_MAX_CHARS,
+            );
+            (m.unwrap_or_default(), omitted)
+        }
+
+        #[test]
+        fn cd_deny_entry_omits_its_subdirectory_and_keeps_the_sibling() {
+            let (_tmp, proj, files) = fixture();
+            let empty = DirectoryRestrictions::default();
+            // Anti-vacuous: with no lists at all, the denied token is in the map.
+            let (unfenced, _) = map(&files, &proj, &empty);
+            assert!(unfenced.contains(DENIED_TOKEN), "{unfenced}");
+            let (fenced, omitted) =
+                map_with(&cd_list(&[&proj.join("private")]), &files, &proj, &empty);
+            assert!(
+                !fenced.contains(DENIED_TOKEN),
+                "/cd-denied symbol leaked: {fenced}"
+            );
+            assert!(!fenced.contains("private/keys.rs"), "path leaked: {fenced}");
+            assert_eq!(omitted, MapOmitted { fence: 0, cd: 1 });
+            // Near-miss: the sibling renders exactly as an unfenced map of it alone.
+            let (sibling_only, _) = map(&files[1..], &proj, &empty);
+            assert_eq!(fenced, sibling_only);
+            // The note attributes the omission to /cd, not to --deny-dir.
+            let note = repo_map_cd_deny_note(omitted.cd, true).unwrap();
+            assert_eq!(
+                note,
+                format!(
+                    "warning: repo map omitted 1 file blocked by the directory fence {}",
+                    crate::commands_file_fence::CD_DENY_SOURCE_NOTE
+                )
+            );
+        }
+
+        #[test]
+        fn empty_cd_list_and_unrelated_cd_entry_are_byte_identical() {
+            let (_tmp, proj, files) = fixture();
+            let other = proj.join("vendor");
+            std::fs::create_dir_all(&other).unwrap();
+            for fence in [
+                DirectoryRestrictions::default(),
+                deny(&proj.join("private")),
+            ] {
+                let (before, before_omitted) = map(&files, &proj, &fence);
+                for cd in [cd_list(&[]), cd_list(&[&other])] {
+                    let (after, omitted) = map_with(&cd, &files, &proj, &fence);
+                    assert_eq!(after, before);
+                    assert_eq!(
+                        omitted,
+                        MapOmitted {
+                            fence: before_omitted,
+                            cd: 0
+                        }
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn startup_fence_keeps_its_verdict_when_the_cd_list_names_the_same_dir() {
+            let (_tmp, proj, files) = fixture();
+            let private = proj.join("private");
+            let (m, omitted) = map_with(&cd_list(&[&private]), &files, &proj, &deny(&private));
+            assert!(!m.contains(DENIED_TOKEN));
+            // Counted (and so reported) as the startup fence, which refused first.
+            assert_eq!(omitted, MapOmitted { fence: 1, cd: 0 });
+        }
+
+        #[test]
+        fn cd_deny_note_is_silent_at_zero_and_glyph_free_when_plain() {
+            assert_eq!(repo_map_cd_deny_note(0, false), None);
+            assert_eq!(repo_map_cd_deny_note(0, true), None);
+            assert_eq!(
+                repo_map_cd_deny_note(3, false).as_deref(),
+                Some("⚠ repo map omitted 3 files blocked by the directory fence (a [directories] deny entry applied by /cd)")
+            );
+            assert!(repo_map_cd_deny_note(2, true).unwrap().is_ascii());
         }
     }
 

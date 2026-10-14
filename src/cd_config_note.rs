@@ -734,10 +734,6 @@ mod tests {
     /// register's length is the class's remaining size.
     const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
         (
-            "src/commands_map.rs",
-            "#869: repo-map fence; the prompt map is built at startup, `/map` is unfenced",
-        ),
-        (
             "src/commands_project.rs",
             "#869: /context-style project reads still see only the startup fence",
         ),
