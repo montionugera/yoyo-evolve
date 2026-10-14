@@ -1,0 +1,80 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "check_path\|path_guard\|c… ✓ (5ms)
+ ✓ (33ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 30,175p src/commands_map.rs… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "build_repo_map_core\|fenc… ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,30p src/commands_map.rs; … ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 490,520p src/commands_map.r… ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,114p src/commands_file_fe… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "/map" ARCHITECTURE.md | h… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^- \`commands_map.rs\`\|^…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 869 --comments 2>/de… ✓ (18ms)
+ ✓ (832ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2700,2745p src/cli.rs | gre… ✓ (20ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "parse_args_with_config(\… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "CD_DENY_SOURCE_NOTE" src… ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "type DenyAdditions\|pub(c… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  14 tools completed in 1m 58s (14 ✓)
+
+Now the edits. First the core + seam:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (181 lines) ✓ (26ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (111 lines) ✓ (20.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo -- commands_… ✓ (35.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 19s (3 ✓)
+
+Green. Now the positive control — serial and atomic (neuter the routing call, run, restore in one command):
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/command… (9 lines) ✓ (1m 10s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "commands_project.rs.*comm…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; (cargo fmt -- --check && cargo bui… ✓ (6ms)
+ ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && echo FMT_O… ✓ (3m 9s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (3m 10s)
+  ▶ edit ARCHITECTURE.md (1 → 1 lines)
+  - **Residue, by the class: 5 files still read `check_path` without the `/cd` list** — `commands_map.rs`, `commands_project.rs`, `commands_rename.rs`, `context.rs`, `skill_fence.rs`.
+  + **Residue, by the class: 5 files still read `check_path` without the `/cd` list** — `commands_map.rs`, `commands_project.rs`, `commands_rename.rs`, `context.rs`, `skill_fence.rs`. (**Day 228: 4** — `commands_map.rs` wired: `build_repo_map_core`'s fenced path checks the `/cd` list after the startup fence, counted separately so the note says `(a [directories] deny entry applied by /cd)`. **No behaviour change today, stated plainly:** its only fenced caller is the startup prompt map, which runs… [yoyo: 243 more bytes elided — diff lines are capped at 500 bytes]
+ ✓ (10ms)
+  - **Residue, by the class: 5 files still read `check_path` without the `/cd` list** — `commands_map.rs`, `commands_project.rs`, `commands_rename.rs`, `context.rs`, `skill_fence.rs`.
+  + **Residue, by the class: 5 files still read `check_path` without the `/cd` list** — `commands_map.rs`, `commands_project.rs`, `commands_rename.rs`, `context.rs`, `skill_fence.rs`. (**Day 228: 4** — `commands_map.rs` wired: `build_repo_map_core`'s fenced path checks the `/cd` list after the startup fence, counted separately so the note says `(a [directories] deny entry applied by /cd)`. **No behaviour change today, stated plainly:** its only fenced caller is the startup prompt map, which runs… [yoyo: 243 more bytes elided — diff lines are capped at 500 bytes]
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (38 lines) ✓ (545ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (11 lines) ✓ (1.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --short | head; grep -n… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 10m 14s (8 ✓, 1 ✗)
+
+I committed this as 10276d24 and the full suite passes, but it doesn't do what the task title says. /map still ignores the /cd deny list, and nothing changes for users today. The register still went from 5 to 4.
+
+Why the title was wrong. commands_map.rs has one production check_path call, in build_repo_map_core. Only the repo map built into the system prompt at startup (cli.rs → generate_repo_map_for_prompt) passes it a fence. The /map command passes none, on purpose since #1002: it prints to you, not to the provider, so --deny-dir doesn't apply to it either. Making /map obey the /cd list alone would have made /cd stricter than the launch flag. So I wired the real check and rewrote the commit title to say what it does.
+
+The directory check from the plan. The map reads git ls-files / rev-parse from the current working directory, which /cd changes, so it would read the right directory. But the one fenced reader runs only once at startup, before any /cd. The /cd list is always empty when it runs. What the wiring buys is that if the prompt map is ever rebuilt after a /cd, denied files stay out instead of leaking in.
+
+What changed:
+• **src/commands_map.rs:**
+  • The startup-fence check runs first, unchanged. Then the /cd list is checked via cd_denied_dir_refusal_with.
+  • Omitted files are now counted separately for each list (a small MapOmitted { fence, cd } struct).
+  • A new count-only stderr note, repo_map_cd_deny_note, ends with CD_DENY_SOURCE_NOTE. That way a /cd omission is never blamed on --deny-dir.
+• **`src/cd_config_note.rs:** removed the commands_map.rs row from UNWIRED_CHECK_PATH_READERS` (5 → 4).
+• **`ARCHITECTURE.md:** updated only the residue list in the /cd` deny entry. It now says the change is invisible to users today.
+
+Tests, all with a temp directory and an injected /cd list rather than the global:
+• A /cd entry for private/ drops it from the map. The sibling file still renders identically (assert_eq).
+• An empty /cd list, or one naming an unrelated folder, gives byte-identical output, with and without a startup fence.
+• If both lists name the same folder, the omission counts against the startup fence.
+• The new note is silent at zero and has no glyphs in plain mode.
+
+Positive control (one change at a time, restored in the same command): disabling the new /cd check failed exactly two tests by name: cd_deny_entry_omits_its_subdirectory_and_keeps_the_sibling and the repo-wide guard no_check_path_reader_skips_the_cd_deny_list_unregistered. The byte-identical tests stayed green. After restoring, all four checks pass: 6511 tests, 0 failed; clippy with -D warnings, fmt and build are clean.
+
+I posted a comment on #869 with the new count, the four files left (commands_project.rs, commands_rename.rs, context.rs, skill_fence.rs) and the corrected scope. The commit isn't pushed yet; the session wrap-up pushes it.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

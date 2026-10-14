@@ -1,0 +1,27 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || true; git log -3 --f… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null; mk… (9 lines) ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 19.0s (2 ✓)
+
+Verdict: PASS. It's written to session_plan/eval_task_2.md.
+
+The task's title promised that /map would honour the /cd deny list. It doesn't, and the commit says so openly:
+
+• **Where the check landed:** `commands_map.rs` has one production `check_path` site, in `build_repo_map_core`. The startup-fence check there is unchanged, and the `/cd` deny list is now checked right after it. Files refused by each list are counted separately, and the /cd ones get their own warning ending in CD_DENY_SOURCE_NOTE.
+• **Why `/map itself is untouched:** the /map command doesn't apply the launch fence either, by design (#1002), because its output goes to the user, not the model. Applying only the /cd list there would make /cd stricter than --deny-dir`. The commit gives this reasoning and changes the title to match.
+• **No visible change today:** the only caller that applies the fence is the prompt map built at startup, before any `/cd`, so the `/cd` list is always empty when it runs. The new check only matters if that map is rebuilt later.
+• **Directory checked:** the map reads the current working directory, which `/cd` changes, so the check guards the right directory. The task's "stop if the base is wrong" condition didn't trigger.
+• Register: one row removed from UNWIRED_CHECK_PATH_READERS, leaving 4 (commands_project.rs, commands_rename.rs, context.rs, skill_fence.rs). The commit body states 5 → 4 and names them, and the ARCHITECTURE.md list matches.
+• **Tests:** they use a temp dir and a passed-in /cd list, never the global one:
+  • a /cd entry leaves out private/ while the sibling directory renders exactly as before;
+  • an empty or unrelated /cd list gives byte-identical output, with and without a startup fence;
+  • when both lists name the same directory, the omission is counted against the startup fence.
+• Unused code: every new definition is called (grep confirmed the test-only wrapper's callers). The harness reported build and tests passing; I didn't re-run them or clippy.
+
+I didn't check whether the required comment on #869 was posted.
+  watch: no files changed this turn — skipping

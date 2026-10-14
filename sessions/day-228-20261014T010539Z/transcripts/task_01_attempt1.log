@@ -1,0 +1,105 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; grep -n "openai…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "output_ceiling\|fn openai… ✓ (20ms)
+ ✓ (33ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 2.6s (2 ✓)
+
+Output is truncated; let me read the code directly.
+  ╭─ Turn 2 ─────────────────────────────────────────────────────────────╮
+  ▶ read src/agent_builder.rs:860..970  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "output_ceiling\|max_token… ✓ (2ms)
+ ✓ (10ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "output_ceiling\|max_token…  ▶ read /tmp/g.txt ✗ (0ms)
+    │ Cannot access /tmp/g.txt: No such file or directory (os error 2)
+ ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "output_ceiling\|max_token… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "output_ceiling\|max_token… ✓ (6ms)
+  ▶ read src/agent_builder.rs:1255..1385  ▶ read src/agent_builder.rs:1585..1725 ✓ (1ms)
+ ✓ (2ms)
+  ▶ read src/agent_builder.rs:969..1139 ✓ (1ms)
+  ▶ $ cd ~/.cargo/registry/src/*/; ls -d yoagent-*; f=$(ls -d yoagent-0.25.3 2>/dev/nu… ✓ (9ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; grep -rn "pub fn deepseek\|pub fn zai… ✓ (7ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; for fn in "fn deepseek(" "fn zai(" "f… ✓ (26ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; grep -n "pub fn deepseek(id\|pub fn d… ✓ (13ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; sed -n 2068,2084p src/provider/model.… ✓ (3ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.2; sed -n 2075,2080p src/provider/model.… ✓ (3ms)
+  ▶ read /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25.2/src/provider/model.rs:2072..2097 ✓ (0ms)
+  ▶ read src/agent_builder.rs:3858..3998  ▶ read src/openai_preset_tests.rs:175..215  ▶ read src/model_limits_note.rs:250..290 ✓ (1ms)
+ ✓ (1ms)
+ ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,30p src/openai_preset_tes… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn count\|lines()\|cfg(te… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (90 lines) ✓ (21ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  22 tools completed in 1m 8s (21 ✓, 1 ✗)
+
+Now the production edit (net-neutral line count):
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (42 lines) ✓ (18.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (9 lines) ✓ (31.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 56.5s (2 ✓)
+
+Green. Positive control (atomic mutate→test→restore, serial): revert the fallback to Some(max_tokens).
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/agent_builder.rs /tmp/ab.ba… ✓ (58.8s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control reddened exactly the two no-maximum tests by name; restored → green. Now docs, the binary reading, and the full gates.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "ceiling" docs/src/ READM… ✓ (28.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Binary agrees: the two no-maximum rows are silent, the gpt-6-sol true positive still fires with the real 128000. No docs mention the ceiling warning. Full gates:
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (3m 35s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (6m 14s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 20 gh issue list --search … ✓ (817ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 30 gh issue create --title… ✓ (722ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (40 lines) ✓ (18ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 10m 19s (5 ✓)
+
+Fixed #1019 and committed it as 5fdccc10. Build, clippy with -D warnings, the format check and the full cargo test all pass.
+
+The bug: for any model without a preset, the OpenAI-compatible path passed the 4096 request default to the warning as if it were the model's maximum. So --max-tokens 16000 on ollama, groq or openrouter told users to "lower to 4096". On gpt-6.1-sol that contradicted the other startup note, which tells them to raise it.
+
+The fix (src/agent_builder.rs): openai_compat_output_ceiling now returns no ceiling at all unless a preset declares a real maximum, and with no ceiling the warning doesn't run. Before editing, I checked what each provider's yoagent constructor declares:
+• **Keep a ceiling:** the GPT-6 presets on openai (128000) and DeepSeek's preset (384000, as #943 already treats it).
+• **No ceiling now:** every other provider (openrouter, xai, groq, mistral, cerebras, github, ollama, zai, minimax, custom, unknown providers, and openai ids without a preset). All of them carry a 4096 default, not a maximum.
+
+Checked with the built binary:
+• ollama `llama3.3 at 16000 and gpt-6.1-sol` at 64000: no warning.
+• `gpt-6-sol` at 200000: still warns and names 128000.
+
+Tests (in src/openai_preset_tests.rs, built the same way the real code path builds them):
+• Seven no-maximum rows return no warning. Each first checks that the old code would have warned.
+• The `gpt-6-sol` warning is checked against the full expected string, with 128000 and 64000 as rows that must stay silent.
+• DeepSeek still warns above 384000.
+• When I put the old fallback back, the two no-maximum tests failed by name; with the fix restored they pass.
+
+Things to know:
+• I had to change three existing assertions: they expected the 4096 fallback, which was the bug. They now expect no ceiling. The Anthropic tests from #964 are untouched.
+• `agent_builder.rs` ended up 2 lines shorter. It sits only 3 lines under its size-gate limit, so the new tests went in the sibling test file.
+• My own loop runs provider=anthropic, so this change doesn't affect it.
+• The Google and Bedrock paths still compare against their config's max_tokens, and Bedrock's is a 16K default. That looks like the same bug, but I haven't confirmed it with the binary. I filed it as #1020 rather than widen this task.
+• No docs mention this warning, so there were no doc changes.
+  watch: no files changed this turn — skipping
