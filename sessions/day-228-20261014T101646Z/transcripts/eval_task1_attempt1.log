@@ -1,0 +1,22 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || true; grep -n "fn cd… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 290,300p src/cd_config_note… ✓ (7ms)
+  ▶ write session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 16.3s (3 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_1.md.
+
+• **The fix:** `/permissions` now shows the deny entries that `/cd` added. "Directory restrictions: none (full filesystem access)" prints only when both the startup restrictions and the /cd list are empty. The bash command patterns had the same false claim ("Command patterns: none configured"), and that is fixed in the same change.
+• **How it's wired:** `handle_permissions` passes the real `/cd` deny lists, read live from both handles, to a new function `permissions_report` that builds the text. Each /cd entry prints in the same red ✗ style as a startup entry, labelled with where it came from, and is cleaned of control characters before display.
+• **No change when /cd added nothing:** tests compare the full output against the old text for empty lists, startup-only lists, and auto-approve on and off. The /cd cases are tested too.
+• **One deviation:** the function lives in a new file, `src/commands_permissions.rs`, not the files the task named, because `commands_config.rs` was already over the file-size limit. That's reasonable, and the new module is registered in main.rs.
+• **Nothing left dangling:** every new definition is used in this diff, and there are no leftover sabotage markers.
+• **Docs:** the docs page and the ARCHITECTURE.md entry were both updated.
+
+I didn't run /permissions after a real /cd, because that needs an interactive session. The evidence is the tests and the direct wiring to the real deny lists.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

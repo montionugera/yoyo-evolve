@@ -1,0 +1,90 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (26ms)
+  ▶ $ cat src/prompt/sigterm.rs; grep -rn "SIGHUP\|sighup\|HUP\|129" tests/*.rs | head… ✓ (8ms)
+  ▶ $ sed -n 1,30p src/prompt/sigterm.rs; sed -n 2080,2215p tests/print_stdout_contrac… ✓ (5ms)
+  ▶ read src/prompt/sigterm.rs (35 lines)  ▶ $ wc -l tests/print_stdout_contract.rs; grep -n "fn run_yoyo_signal" -A40 tests/pr… ✓ (1ms)
+ ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 15.3s (5 ✓)
+
+Note: the module doc records SIGQUIT as "not handled, by decision". This task reverses that decision; I'll mark the old sentence superseded in place. Probe first — add the test and run at HEAD.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (45 lines) ✓ (2.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Probe at HEAD: stdout="", code=None (died by signal). Now the fix.
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ $ sed -i 's|/// #1016: SIGQUIT (Ctrl+\\\\ from|/// #1016: SIGQ… (53 lines) ✓ (37ms)
+  ▶ $ sed -n 1195,1225p src/prompt.rs; grep -n "interrupted_exit_code_from\|fn interru… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 5.0s (2 ✓)
+
+Routing is generic (exit code stored in TERMINATED), so no further match arms. Update the call-site comment, check other sigterm::recv sites, then run.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ sed -i 's|// #1015/#1016: SIGTERM (what `timeout` sends) or … (2 lines) ✓ (15.1s)
+
+Green. Positive control, atomically (mutate → test → restore):
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/prompt/sigterm.rs /tmp/sigterm.bak && sed -i 's|^    arm(SignalKind::quit… ✓ (24.2s)
+
+Control reddened by name and restored green. Now docs, caller grep, and the full gate.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -rn "QUIT\|-3 " scripts/ .github/; echo "---"; grep -n "129\|SIGHUP\|143" d… ✓ (10ms)
+  ▶ $ sed -n 539,545p ARCHITECTURE.md | cut -c1-600 ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -n "SIGHUP" ARCHITECTURE.md | cut -c1-400 ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 14.6s (3 ✓)
+
+The Day-227 SIGHUP work has no ARCHITECTURE entry; I'll add one bullet after the #1015 one covering SIGQUIT (and noting SIGHUP), then update the docs page.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (14 lines) ✓ (39ms)
+  ▶ $ grep -o "Ctrl+\\\\*" ARCHITECTURE.md | sort | uniq -c | head; cargo build 2>&1 |… ✓ (4m 2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cargo test 2>&1 | grep -E "FAILED|panicked|failed;" | grep -v " 0 failed" | head… ✓ (3m 17s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7m 32s (3 ✓)
+
+All green. Committing with the probe readings in the message.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ git add -A && git commit -q -F - <<'EOF' (32 lines) ✓ (55ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Pressing Ctrl+\ (SIGQUIT) during a piped yoyo -p ... | tee log run now writes out the text produced so far and exits 131. Before, everything was lost. Committed as 77f17d71, with the build, all tests, clippy, fmt and harness_logic.sh passing.
+
+Before the fix: I wrote the new exact-bytes test first and ran it on the old code. Stdout was empty and the process died by signal, with no exit code.
+
+After: stdout is exactly PARTIAL_ANSWER_7Q\n, the (interrupted) note goes to stderr, and the exit code is 131.
+
+What changed:
+• In `src/prompt/sigterm.rs, SIGQUIT is now caught alongside SIGHUP and SIGTERM, with a new SIGQUIT_EXIT = 131`. It goes through the same code that already turns a stored signal into an exit code, so no `match` needed updating. I also updated the call-site comment in src/prompt.rs.
+• **This reverses an earlier decision.** The module's own doc said SIGQUIT was left alone "by decision", as a core-dump request rather than a polite stop. I marked that sentence superseded in place rather than deleting it.
+• **The trade:** SIGQUIT no longer produces a core dump while the handler is active. It is only active when piped `-p` output is being held, exactly when the SIGHUP/SIGTERM handlers are. Terminal runs, the REPL, --print and the json modes keep the normal behaviour, core dump included.
+• **Does this affect my own loop?** No. Grepping `scripts/` and `.github/` for `QUIT` or `-3 ` found nothing that sends SIGQUIT; `evolve.sh` stops runs with `timeout`, which sends SIGTERM and was already handled.
+
+Tests:
+• New test sigquit_during_piped_print_prompt_flushes_held_text_and_exits_131, plus a 131 row in the exit-code table test in interrupt.rs.
+• The existing SIGINT, SIGTERM and SIGHUP tests were not edited and still pass.
+• Check that the test really guards the fix: with only the SIGQUIT line commented out, the new test failed by name; restored, it passes and the marker is gone.
+
+Docs: piped-mode.md now lists 131 and the no-core-dump note. Its old sentence saying SIGQUIT loses the held text was now wrong, so I replaced it. ARCHITECTURE.md gets a Day-228 entry. The Day-227 SIGHUP change never got its own entry there, so the new one mentions it.
+
+Still open in #1016: a panic while text is held hasn't been tested, and since nothing flushes the held text on a panic, it is probably lost. SIGPIPE is unhandled on reasoning alone (whatever was reading the pipe is gone); I didn't test it.
+  watch: no files changed this turn — skipping
