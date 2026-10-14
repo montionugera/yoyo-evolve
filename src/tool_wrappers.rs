@@ -123,7 +123,15 @@ impl AgentTool for GuardedTool {
                 return Err(yoagent::types::ToolError::Failed(reason));
             }
         }
-        self.inner.execute(params, ctx).await
+        // `search`/`list_files` take a ROOT: fence what they return too (#1022).
+        let result = self.inner.execute(params, ctx).await?;
+        let refused =
+            |p: &str| crate::cd_config_note::path_guard_refusal(&self.restrictions, p).is_some();
+        Ok(crate::fence_result_filter::fence_tool_result(
+            self.inner.name(),
+            result,
+            &refused,
+        ))
     }
 }
 
@@ -201,7 +209,15 @@ impl AgentTool for ArcGuardedTool {
                 return Err(yoagent::types::ToolError::Failed(reason));
             }
         }
-        self.inner.execute(params, ctx).await
+        // `search`/`list_files` take a ROOT: fence what they return too (#1022).
+        let result = self.inner.execute(params, ctx).await?;
+        let refused =
+            |p: &str| crate::cd_config_note::path_guard_refusal(&self.restrictions, p).is_some();
+        Ok(crate::fence_result_filter::fence_tool_result(
+            self.inner.name(),
+            result,
+            &refused,
+        ))
     }
 }
 
