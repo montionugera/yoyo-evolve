@@ -1,0 +1,228 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show 5fdccc10 | head -200; gre… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1365,1380p src/agent_builde… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 885,905p src/agent_builder.… ✓ (4ms)
+  ▶ read src/agent_builder.rs:886..904  ▶ read src/agent_builder.rs:1668..1684 ✓ (0ms)
+ ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1755,1775p src/agent_builde… ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 18.7s (7 ✓)
+
+Only build_agent computes a ceiling. Capture the "before" stderr now, then edit.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -2; for p … ✓ (1.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /tmp && d=$(mktemp -d) && cd $d; Y=/home/runner/work/yoyo-evolve/yoyo-evolve/… ✓ (346ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 3855,3935p src/agent_builde… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "agent_builder" tests/modu… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 150,200p tests/module_size.… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn count\|cfg(test)\|non-… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1000,1080p tests/module_siz… ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn is_fatal\|GRACE\|grace… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 43.5s (8 ✓)
+
+Size gate: agent_builder.rs is at 4906 against a fatal line of 4961, so tests go in a sibling `*_tests.rs` file (the same precedent as `anthropic_preset_tests.rs`). Production edit first:
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/agent_builder.rs (5 → 17 lines)
+            _ => None,
+  +     }
+  + }
+  + 
+  + /// The output ceiling `build_agent` hands to the #943 warning, every arm.
+  + /// `google`/`bedrock` declare no maximum: their `max_tokens` is a request
+  + /// default (8192 / 16K), not the model's limit, so `None` (#1020, the #1019
+  + /// shape). Other arms delegate unchanged to their existing authority.
+  + pub(crate) fn declared_output_ceiling(p: &str, model: &str, max_tokens: u32) -> Option<u32> {
+  +     match p {
+  +         "anthropic" => anthropic_output_maximum(model),
+  +         "google" | "bedrock" => None,
+  +         _ => openai_compat_output_ceiling(p, model, max_tokens),
+        }
+    }
+    
+  ▶ edit src/agent_builder.rs (2 → 3 lines)
+  -             let output_ceiling = Some(model_config.max_tokens);
+  +             let output_ceiling =
+  +                 declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
+                let agent = Agent::from_provider(GoogleProvider, model_config);
+  ▶ edit src/agent_builder.rs (2 → 3 lines)
+  -             let output_ceiling = Some(model_config.max_tokens);
+  +             let output_ceiling =
+  +                 declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
+                let agent = Agent::from_provider(BedrockProvider, model_config);
+ ✓ (10.8s)
+            _ => None,
+  +     }
+  + }
+  + 
+  + /// The output ceiling `build_agent` hands to the #943 warning, every arm.
+  + /// `google`/`bedrock` declare no maximum: their `max_tokens` is a request
+  + /// default (8192 / 16K), not the model's limit, so `None` (#1020, the #1019
+  + /// shape). Other arms delegate unchanged to their existing authority.
+  ... (8 more lines)
+ ✓ (21.7s)
+  -             let output_ceiling = Some(model_config.max_tokens);
+  +             let output_ceiling =
+  +                 declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
+                let agent = Agent::from_provider(GoogleProvider, model_config);
+ ✓ (32.8s)
+  -             let output_ceiling = Some(model_config.max_tokens);
+  +             let output_ceiling =
+  +                 declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
+                let agent = Agent::from_provider(BedrockProvider, model_config);
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "declared_output_ceiling" … ✓ (3.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff | head -60 ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 43.9s (5 ✓)
+
+Parallel edits on one file raced; only one landed. Redoing serially.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/agent_builder.rs (5 → 17 lines)
+            _ => None,
+  +     }
+  + }
+  + 
+  + /// The output ceiling `build_agent` hands to the #943 warning, every arm.
+  + /// `google`/`bedrock` declare no maximum: their `max_tokens` is a request
+  + /// default (8192 / 16K), not the model's limit, so `None` (#1020, the #1019
+  + /// shape). Other arms delegate unchanged to their existing authority.
+  + pub(crate) fn declared_output_ceiling(p: &str, model: &str, max_tokens: u32) -> Option<u32> {
+  +     match p {
+  +         "anthropic" => anthropic_output_maximum(model),
+  +         "google" | "bedrock" => None,
+  +         _ => openai_compat_output_ceiling(p, model, max_tokens),
+        }
+    }
+    
+ ✓ (2m 57s)
+            _ => None,
+  +     }
+  + }
+  + 
+  + /// The output ceiling `build_agent` hands to the #943 warning, every arm.
+  + /// `google`/`bedrock` declare no maximum: their `max_tokens` is a request
+  + /// default (8192 / 16K), not the model's limit, so `None` (#1020, the #1019
+  + /// shape). Other arms delegate unchanged to their existing authority.
+  ... (8 more lines)
+  ▶ edit src/agent_builder.rs (2 → 3 lines)
+  -             let output_ceiling = Some(model_config.max_tokens);
+  +             let output_ceiling =
+  +                 declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
+                let agent = Agent::from_provider(GoogleProvider, model_config);
+ ✓ (3m 8s)
+  -             let output_ceiling = Some(model_config.max_tokens);
+  +             let output_ceiling =
+  +                 declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
+                let agent = Agent::from_provider(GoogleProvider, model_config);
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (16ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 6m 28s (3 ✓)
+
+Now the tests, in a new src/output_ceiling_tests.rs:
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ write src/output_ceiling_tests.rs (88 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "pub fn build_agent" src/a… ✓ (1m 36s)
+ ✓ (1m 36s)
+  ▶ edit src/main.rs (2 → 4 lines)
+    #[cfg(test)]
+    mod openai_preset_tests;
+  + #[cfg(test)]
+  + mod output_ceiling_tests;
+ ✓ (3m 11s)
+    #[cfg(test)]
+    mod openai_preset_tests;
+  + #[cfg(test)]
+  + mod output_ceiling_tests;
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt; cargo test --bin yoyo o… ✓ (19.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 5m 16s (4 ✓)
+
+Positive controls, atomic and serial. Control 1: restore bedrock's old Some(model_config.max_tokens) in build_agent:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/agent_b… (7 lines) ✓ (18.7s)
+
+Control 1 failed the source guard by name; restored (0 NEUTERED left). Control 2: put bedrock's default back inside the dispatcher:
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/agent_b… (7 lines) ✓ (37.5s)
+
+Both controls redden by name and restore green. Now the live "after" repro:
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -1; d=$(mk… ✓ (7.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+After: no ceiling line on bedrock/google; anthropic still warns. Now file the residue issue (checking for duplicates first):
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue list --state open --searc… ✓ (515ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ curl -sL --max-time 20 https://ai.google.dev/gemini-api/docs/models | sed 's/<[^… ✓ (603ms)
+  ▶ $ curl -sL --max-time 20 https://ai.google.dev/gemini-api/docs/models | sed 's/<[^… ✓ (261ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/bod… (13 lines) ✓ (644ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1021 --json state,ti… ✓ (301ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "agent_builder.rs" ARCHITE… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^- \`agent_builder.rs\`\|… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 258p ARCHITECTURE.md | wc -… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (36ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "output ceiling\|declared… ✓ (2m 53s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (4m 46s)
+
+────────────────────────────────────────────────────────────────────────────────
+  11 tools completed in 8m 35s (11 ✓)
+
+All green: fmt, build, clippy -D warnings, 20/20 test binaries with 0 failures, harness 182/0. Committing.
+  ╭─ Turn 38 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/msg… (56 lines) ✓ (37ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Fixed #1020 and committed as 6fb26bd6, with "Fixes #1020" in the title. With --max-tokens 32000, yoyo no longer tells bedrock or google users to lower it to their provider's default (16000 / 8192) as if that were the model's limit.
+
+The change. There is now one function, declared_output_ceiling, in src/agent_builder.rs, and all four provider branches of build_agent call it. It returns "unknown" (None) for google and bedrock, and an unknown ceiling means no warning. For anthropic and the OpenAI-compatible providers it calls the same functions as before (the #964 and #1019 fixes), so their results are unchanged.
+
+Where the fix sits. It's per branch, through that one shared function. The warning function itself has only one production caller, and it receives a number without knowing whether it's a default or a real maximum, so the fix couldn't go there.
+
+Live check with the built binary, before and after:
+• **bedrock:** the "declared output ceiling 16000" warning is gone. The run then fails on authentication (no AWS key), which is expected.
+• **google:** the "ceiling 8192" warning is gone. The run fails with a 400 because there's no key, also expected.
+• **anthropic** (claude-opus-5-5, --max-tokens 131072): still warns about the 128000 limit, with the same text.
+
+Tests. They're in a new file, src/output_ceiling_tests.rs, rather than agent_builder.rs as the task said, because that file is 55 lines below the point where its size check fails. They build the warning the same way build_agent does:
+• bedrock and google at 32000 produce no warning, and each test first checks that the old code would have warned.
+• anthropic at 131072 and gpt-6-sol at 200000 still produce the exact warning text.
+• A weak check on the source confirms build_agent calls the function exactly 4 times and no longer passes the default directly. It shows the calls are there, not that they're correct.
+
+I ran two deliberate breakages, one at a time, each marked NEUTERED and undone in the same command. Putting bedrock's old line back in build_agent made the source check fail. Making the function return bedrock's default made the bedrock/google test fail. Both were restored, and no NEUTERED marker is left.
+
+Docs and leftover work:
+• I added a #1020 note to agent_builder.rs's entry in ARCHITECTURE.md.
+• In that same entry, the #964 note still called the 128000/4096 fallback "the correct reading" for providers with unknown limits. #1019 had already made that false, so I marked it superseded where it stands.
+• **#1021 (filed):** the google default model and the list of known gemini ids are out of date. I checked Google's model page myself: `gemini-3.0-pro` and `gemini-3.0-flash` appear 0 times there, but yoyo still lists both. I could not confirm the assessment's claim that 2.5 is restricted to returning users and retires on Vertex on 2026-10-20, and the issue says so.
+• No google or bedrock setting currently records a real output maximum, so these providers now never get this warning. It stays off until a real maximum is recorded for them.
+
+Checks: fmt, build, clippy with -D warnings, cargo test (20 of 20 test binaries pass), and tests/harness_logic.sh (182 passed, 0 failed) are all green.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 1/3 changed files were in top-10 predictions (33.3% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/3 (0.0%) — reactive was 33.3%
+     Predicted correctly: src/main.rs
+     Surprises (not predicted): src/agent_builder.rs, src/output_ceiling_tests.rs

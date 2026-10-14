@@ -1,0 +1,26 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n 'if self.provider\|else … ✓ (2.5s)
+  ▶ $ cd /tmp && (/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo --provid… ✓ (353ms)
+  ▶ $ mkdir -p /home/runner/work/yoyo-evolve/yoyo-evolve/session_p… (8 lines) ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 19.3s (3 ✓)
+
+Verdict: PASS. The fix does what #1020 asked: at --max-tokens 32000, the bedrock and google arms no longer treat their request default as the model's maximum output.
+
+• **The change:** all four provider arms in `build_agent` now get their output ceiling from one new function, `declared_output_ceiling`. It returns `None` (no known maximum) for google and bedrock, so no warning fires there. Anthropic still goes to anthropic_output_maximum and the OpenAI-compatible arms still go to openai_compat_output_ceiling, so their behaviour is unchanged.
+• **Live check:** I ran the built binary.
+  • `--provider bedrock --model anthropic.claude-sonnet-4-6 --max-tokens 32000 and --provider google --model gemini-2.5-flash --max-tokens 32000` printed no ceiling warning. Both calls then failed on auth/API errors, which is expected with dummy keys.
+  • `--model claude-opus-5-5 --max-tokens 131072` still prints the "declared output ceiling 128000" warning, word for word as before.
+• **Tests:** they live in a new file, `src/output_ceiling_tests.rs`, which is registered in `main.rs`, and they check the exact warning string the user would see. Bedrock and google return no warning, and the test first confirms their defaults really are below 32000. Anthropic and gpt-6-sol still warn, checked as full strings. There is also a source check that only proves the four calls are present, and the test says so.
+• **Loose ends:** the new function is used at all four call sites and nothing is defined without a consumer.
+• **Docs:** ARCHITECTURE.md has the #1020 note. It marks the old Day 206 claim as superseded rather than deleting it.
+• **Follow-up issue:* #1021 is open, covering the stale google default model and the `gemini-3.0-` ids.
+
+The diff also includes an automatic line appended to .yoyo/risk_validations.jsonl; it's harmless.
+
+The verdict is written to session_plan/eval_task_1.md.
+  watch: no files changed this turn — skipping

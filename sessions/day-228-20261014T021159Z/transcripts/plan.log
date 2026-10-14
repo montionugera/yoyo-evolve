@@ -1,0 +1,31 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md; grep -rn "UNWIRED_CHECK_P… ✓ (310ms)
+  ▶ $ sed -n 735,760p src/cd_config_note.rs; grep -n "google\|bedrock" src/agent_build… ✓ (4ms)
+  ▶ $ cat > session_plan/task_01.md <<'EOF' (58 lines) ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 39.0s (3 ✓)
+
+I wrote the Day 228 plan as two task files in session_plan/. The commit step didn't take: session_plan/ is in .gitignore, so git add refused. The files are on disk, and I'm assuming the harness reads them from there. If it expects them committed, git add -f session_plan/ would do it.
+
+Task 01: Fixes #1020 (product; src/agent_builder.rs, ARCHITECTURE.md)
+• **Problem:** on the bedrock and google providers, yoyo warns about a model's "declared output ceiling", but that ceiling is just yoyo's own request default. Today's assessment reproduced it:
+  • bedrock with --max-tokens 32000 says to lower it to 16000;
+  • google says 8192, while Google lists gemini-2.5-flash's output limit as 65,536. So the warning tells users to cut a valid setting by 8x.
+• **Fix:** no ceiling (so no warning) unless a preset declares the model's real maximum. This reuses the #1019 fix (5fdccc10) instead of adding a second check.
+• **Tests:** the two live repros must stop warning. Two cases must still warn with identical text: an anthropic model and an OpenAI preset that each declare a real maximum. Plus a sabotage test (put the old ceiling back, watch the new test fail, restore), and before/after stderr from the binary in the commit body.
+• **Not fixed here:** yoyo's default google model and its known-model id lists look stale. `gemini-3.0-pro`/`-flash` aren't in Google's list, and 2.5 is restricted for new users and retires on Vertex on 2026-10-20. That isn't verified with a real key. The task files it as its own issue.
+
+Task 02: Part of #869 (product; src/commands_rename.rs, src/cd_config_note.rs, ARCHITECTURE.md)
+• Problem: after /cd, /rename still filters files against the startup deny list only (commands_rename.rs:85). It can rewrite files in a directory the new project's config denies.
+• **Fix:** route it through the same /cd-aware check the other wired readers use, and drop it from the list of unwired readers (4 → 3).
+• Tests: a temp-dir test that a file under a /cd-denied directory is left alone. A check that with no /cd deny list the file set is byte-identical. A sabotage test like task 01's. Then a comment on #869 with the new count.
+• **Why this one:** the backlog-drain rule applies (14 open self-filed issues, over the limit of 12). The oldest, #858, is blocked on a protected file only a human can edit, so #869 is the oldest one I can act on.
+
+Issue responses (session_plan/issue_responses.md): no community issues today. #858 gets no comment because nothing new happened. No release, since it isn't due (v0.2.0 was 9 days ago).
+
+Both tasks avoid src/commands_risk_unhittable.rs, which is 14 lines from the size limit where cargo test fails and the whole task gets reverted.
+  watch: no files changed this turn — skipping
