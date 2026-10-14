@@ -124,6 +124,8 @@ mod model_limits_note;
 #[cfg(test)]
 mod openai_preset_tests;
 #[cfg(test)]
+mod output_ceiling_tests;
+#[cfg(test)]
 mod tool_wrappers_cancel_tests;
 #[cfg(test)]
 mod tools_child_bash_tests;

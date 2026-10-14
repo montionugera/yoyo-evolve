@@ -902,6 +902,18 @@ pub(crate) fn openai_compat_output_ceiling(p: &str, model: &str, max_tokens: u32
     }
 }
 
+/// The output ceiling `build_agent` hands to the #943 warning, every arm.
+/// `google`/`bedrock` declare no maximum: their `max_tokens` is a request
+/// default (8192 / 16K), not the model's limit, so `None` (#1020, the #1019
+/// shape). Other arms delegate unchanged to their existing authority.
+pub(crate) fn declared_output_ceiling(p: &str, model: &str, max_tokens: u32) -> Option<u32> {
+    match p {
+        "anthropic" => anthropic_output_maximum(model),
+        "google" | "bedrock" => None,
+        _ => openai_compat_output_ceiling(p, model, max_tokens),
+    }
+}
+
 /// Build the ModelConfig for the default Anthropic path: fleet preset when
 /// the model name matches one, generic Anthropic config otherwise.
 /// Callers still apply `insert_client_headers` afterwards.
@@ -1663,21 +1675,24 @@ impl AgentConfig {
             // #964: NOT `model_config.max_tokens` — on every Anthropic preset
             // that field is the request DEFAULT (64K of opus-5's 128K), so
             // comparing against it would warn on a correct 128000.
-            let output_ceiling = anthropic_output_maximum(&self.model);
+            let output_ceiling =
+                declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
             let agent = Agent::from_provider(AnthropicProvider, model_config);
             self.configure_agent(agent, context_window, output_ceiling)
         } else if self.provider == "google" {
             // Google uses its own provider
             let model_config = create_model_config(&self.provider, &self.model, base_url);
             let context_window = model_config.context_window;
-            let output_ceiling = Some(model_config.max_tokens);
+            let output_ceiling =
+                declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
             let agent = Agent::from_provider(GoogleProvider, model_config);
             self.configure_agent(agent, context_window, output_ceiling)
         } else if self.provider == "bedrock" {
             // Bedrock uses AWS SigV4 signing with ConverseStream protocol
             let model_config = create_model_config(&self.provider, &self.model, base_url);
             let context_window = model_config.context_window;
-            let output_ceiling = Some(model_config.max_tokens);
+            let output_ceiling =
+                declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
             let agent = Agent::from_provider(BedrockProvider, model_config);
             self.configure_agent(agent, context_window, output_ceiling)
         } else {
@@ -1686,7 +1701,7 @@ impl AgentConfig {
             let context_window = model_config.context_window;
             // Default != maximum: `None` unless a preset declares one (#1019).
             let output_ceiling =
-                openai_compat_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
+                declared_output_ceiling(&self.provider, &self.model, model_config.max_tokens);
             // An id with no preset runs on the base config's guessed limits
             // (128K / max_tokens 4096), which silently caps every reply.
             // Volume chosen from that severity: stderr, once per
