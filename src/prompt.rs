@@ -1202,7 +1202,7 @@ async fn handle_prompt_events(
             _ = tokio::signal::ctrl_c() => {
                 return interrupt::finish_interrupted_turn(state, &mut gate, agent);
             }
-            // #1015/#1016: SIGTERM (what `timeout` sends) or SIGHUP flushes the same way;
+            // #1015/#1016: SIGTERM (what `timeout` sends), SIGHUP or SIGQUIT flushes the same way;
             // armed only when the gate holds text, else it never resolves.
             _ = sigterm::recv(&mut term) => {
                 return interrupt::finish_interrupted_turn(state, &mut gate, agent);

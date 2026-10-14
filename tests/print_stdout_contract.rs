@@ -2208,6 +2208,40 @@ fn sighup_during_piped_print_prompt_flushes_held_text_and_exits_129() {
     );
 }
 
+/// #1016: SIGQUIT (Ctrl+\ from a terminal while stdout is piped, as in
+/// `yoyo -p ... | tee log`). Measured before the fix: 0 bytes on stdout,
+/// death by signal. Now it rides the SIGHUP/SIGTERM watcher and exits 131
+/// (128 + 3). Trade: no core dump from SIGQUIT while the handler is armed.
+#[cfg(unix)]
+#[test]
+fn sigquit_during_piped_print_prompt_flushes_held_text_and_exits_131() {
+    let run = run_yoyo_signal(&["-p", "hi"], PARTIAL_LINE, "-QUIT");
+    assert!(run.stub_hit, "anti-vacuous: stub never received a POST");
+    eprintln!(
+        "PROBE #1016 SIGQUIT: stdout={:?} code={:?} stderr_tail={:?}",
+        String::from_utf8_lossy(&run.stdout),
+        run.code,
+        run.stderr.lines().rev().take(3).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        run.stdout,
+        PARTIAL_LINE.as_bytes(),
+        "#1016: the text streamed before SIGQUIT must be on stdout, exactly once; stderr={}",
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("(interrupted)"),
+        "#1016: the interrupt note belongs on stderr; stderr={}",
+        run.stderr
+    );
+    assert_eq!(
+        run.code,
+        Some(131),
+        "#1016: SIGQUIT exits 131 (SIGHUP 129, SIGTERM 143, SIGINT 130); stderr={}",
+        run.stderr
+    );
+}
+
 /// A tool turn whose only call is `bash` running `sleep 30`.
 #[cfg(unix)]
 fn sse_bash_sleep_body() -> String {

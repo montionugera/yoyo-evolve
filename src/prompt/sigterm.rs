@@ -15,7 +15,7 @@
 //!   `--print`, json and stream-json never register it and still die by
 //!   default), and
 //! - the handler is a process-lifetime watcher task that ALWAYS ends the
-//!   process with 143 (129 for SIGHUP): when a text loop is listening it hands the loop the
+//!   process with 143 (129 for SIGHUP, 131 for SIGQUIT): when a text loop is listening it hands the loop the
 //!   signal (the loop flushes and returns) and exits after a grace if `main`
 //!   has not already; when no loop is listening it flushes stdout and exits.
 //!
@@ -24,10 +24,20 @@
 //! `kill -HUP` mid-stream left 0 of the 18 streamed bytes on stdout and the
 //! process died by signal. Same registration condition, same flush, exit 129
 //! (128 + 1). The module keeps its name; it now owns every *terminating*
-//! signal yoyo handles on the held-text population. Not handled (#1016):
-//! by decision, SIGQUIT (measured: 0 bytes; a "dump core" request, not a
-//! polite stop), SIGKILL (unflushable), SIGPIPE (the reader is gone); still
-//! OPEN, not decided: a panic (RetrySafeGate has no Drop, read not run).
+//! signal yoyo handles on the held-text population.
+//!
+//! **SIGQUIT rides it too (Day 228, #1016), exit 131 (128 + 3).** Ctrl+\
+//! from a terminal while stdout is piped (`yoyo -p ... | tee log`) measured
+//! 0 bytes on stdout and death by signal. Superseded claim, recorded rather
+//! than erased: this doc said SIGQUIT was "not handled, by decision ... a
+//! 'dump core' request, not a polite stop". The decision is reversed because
+//! the user reaching for "harder Ctrl+C" lost everything already produced.
+//! The trade, stated: while the handler is armed, SIGQUIT no longer dumps
+//! core; it is armed in exactly the window SIGHUP/SIGTERM are (the filtering
+//! population only), so every other run keeps the core-dump default.
+//! Still not handled: SIGKILL (unflushable), SIGPIPE (the reader is gone;
+//! by reasoning, not probed); still OPEN: a panic (RetrySafeGate has no
+//! Drop, read not run).
 
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::OnceLock;
@@ -37,6 +47,8 @@ use tokio::sync::watch;
 pub(super) const SIGTERM_EXIT: i32 = 143;
 /// #1016: 128 + SIGHUP(1).
 pub(super) const SIGHUP_EXIT: i32 = 129;
+/// #1016: 128 + SIGQUIT(3).
+pub(super) const SIGQUIT_EXIT: i32 = 131;
 
 /// The exit code of the first terminating signal received (0 = none).
 static TERMINATED: AtomicI32 = AtomicI32::new(0);
@@ -45,7 +57,8 @@ static LISTENING: AtomicUsize = AtomicUsize::new(0);
 static CHANNEL: OnceLock<watch::Sender<bool>> = OnceLock::new();
 
 /// The exit code owed to a terminating signal this process received:
-/// 143 for SIGTERM (#1015), 129 for SIGHUP (#1016), `None` if neither.
+/// 143 for SIGTERM (#1015), 129 for SIGHUP, 131 for SIGQUIT (#1016),
+/// `None` if none.
 pub(super) fn terminated_exit_code() -> Option<i32> {
     match TERMINATED.load(Ordering::SeqCst) {
         0 => None,
@@ -94,6 +107,8 @@ fn install() -> watch::Sender<bool> {
     arm(SignalKind::terminate(), SIGTERM_EXIT);
     // #1016: same watcher, same flush, its own exit code.
     arm(SignalKind::hangup(), SIGHUP_EXIT);
+    // #1016: Ctrl+\ — same watcher; trades SIGQUIT's core dump for the flush.
+    arm(SignalKind::quit(), SIGQUIT_EXIT);
     tx
 }
 

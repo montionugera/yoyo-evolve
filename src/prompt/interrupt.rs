@@ -118,5 +118,9 @@ mod tests {
         // #1016: SIGHUP likewise wins over the interrupted flag, with 129.
         assert_eq!(interrupted_exit_code_from(hup, true), Some(129));
         assert_eq!(interrupted_exit_code_from(hup, false), Some(129));
+        // #1016: SIGQUIT likewise, with 131.
+        let quit = Some(super::super::sigterm::SIGQUIT_EXIT);
+        assert_eq!(interrupted_exit_code_from(quit, true), Some(131));
+        assert_eq!(interrupted_exit_code_from(quit, false), Some(131));
     }
 }
