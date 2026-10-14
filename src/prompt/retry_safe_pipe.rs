@@ -22,7 +22,7 @@
 //! before its end, and Ctrl+C can flush whatever is still held.
 
 use std::collections::VecDeque;
-use std::io::IsTerminal;
+use std::io::{IsTerminal, Write};
 
 use yoagent::retry::RetrySafeEvents;
 use yoagent::{AgentEvent, AgentMessage, Message, StopReason, StreamDelta};
@@ -81,6 +81,9 @@ pub(super) struct RetrySafeGate {
     /// Raw text of an attempt that ended with Error/Aborted and is held until
     /// the next event says whether it was retried.
     failed_text: String,
+    /// #1016: where [`Drop`] writes unprinted text if the event loop panics
+    /// while this gate is alive. Stdout in production; a buffer in tests.
+    panic_sink: Box<dyn std::io::Write + Send>,
 }
 
 impl RetrySafeGate {
@@ -91,7 +94,16 @@ impl RetrySafeGate {
             closed: false,
             open_text: String::new(),
             failed_text: String::new(),
+            panic_sink: Box::new(std::io::stdout()),
         }
+    }
+
+    /// Test seam: the same gate, writing its panic flush into `sink`.
+    #[cfg(test)]
+    fn with_panic_sink(filtering: bool, sink: Box<dyn std::io::Write + Send>) -> Self {
+        let mut gate = Self::new(filtering);
+        gate.panic_sink = sink;
+        gate
     }
 
     /// Is the filter on? (Off: every event is passed through untouched.)
@@ -176,6 +188,37 @@ impl RetrySafeGate {
     }
 }
 
+/// #1016: a panic in the event loop unwinds through the loop's frame and
+/// drops this gate (Cargo.toml sets no `panic = "abort"`). Without this, the
+/// text the gate holds, plus any text it already released into `queue` that
+/// the loop had not printed yet, died with it. Flushes ONLY while panicking:
+/// a normal drop writes nothing, exactly as before, so an attempt discarded
+/// for a retry can never reach stdout this way (#991's double-attempt glue).
+/// Never panics: write errors are ignored, nothing is unwrapped.
+impl Drop for RetrySafeGate {
+    fn drop(&mut self) {
+        if !std::thread::panicking() || self.filter.is_none() {
+            return;
+        }
+        let mut text: String = self
+            .queue
+            .drain(..)
+            .filter_map(|e| match e {
+                AgentEvent::MessageUpdate {
+                    delta: StreamDelta::Text { delta },
+                    ..
+                } => Some(delta),
+                _ => None,
+            })
+            .collect();
+        text.push_str(&self.take_held_text());
+        if !text.is_empty() {
+            let _ = self.panic_sink.write_all(text.as_bytes());
+            let _ = self.panic_sink.flush();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,6 +270,113 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Stand-in for stdout that the test can read after the gate is gone.
+    #[derive(Clone, Default)]
+    struct Sink(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+    impl std::io::Write for Sink {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    impl Sink {
+        fn bytes(&self) -> String {
+            String::from_utf8(self.0.lock().unwrap_or_else(|e| e.into_inner()).clone())
+                .expect("utf8")
+        }
+    }
+
+    /// Feed `events` into a filtering gate over `sink`, then end its life
+    /// either by a panic (`panic = true`, caught here) or a normal drop.
+    fn gate_dies(sink: &Sink, events: Vec<AgentEvent>, panic: bool) {
+        let mut gate = RetrySafeGate::with_panic_sink(true, Box::new(sink.clone()));
+        for e in events {
+            gate.feed(Some(e));
+        }
+        if panic {
+            let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+                let _gate = gate;
+                panic!("probe: the event loop panicked while text was held");
+            }));
+            assert!(caught.is_err(), "the probe really panicked");
+        } else {
+            drop(gate);
+        }
+    }
+
+    #[test]
+    fn panic_while_text_is_held_flushes_it() {
+        let sink = Sink::default();
+        gate_dies(&sink, vec![start(), text("HEL"), text("D_")], true);
+        assert_eq!(sink.bytes(), "HELD_");
+    }
+
+    #[test]
+    fn panic_flushes_released_but_unprinted_text_before_the_held_attempt() {
+        // A finished attempt is released into the queue at its MessageEnd; the
+        // loop panics before printing it, while the next attempt is held.
+        let sink = Sink::default();
+        let mut gate = RetrySafeGate::with_panic_sink(true, Box::new(sink.clone()));
+        for e in [start(), text("ONE "), end(StopReason::Stop)] {
+            gate.feed(Some(e));
+        }
+        // Anti-vacuous: the released attempt really is sitting in the queue.
+        assert!(!gate.queue.is_empty());
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let _gate = gate;
+            panic!("probe");
+        }));
+        assert!(caught.is_err());
+        assert_eq!(sink.bytes(), "ONE ");
+    }
+
+    #[test]
+    fn normal_drop_with_held_text_writes_nothing_as_before() {
+        // Near-miss: today's (pre-#1016) value of a non-panicking drop is "".
+        let sink = Sink::default();
+        gate_dies(&sink, vec![start(), text("HELD_")], false);
+        assert_eq!(sink.bytes(), "");
+    }
+
+    #[test]
+    fn a_retried_attempt_never_reaches_stdout_through_drop() {
+        let retried = vec![start(), text("PARTIAL_"), end(StopReason::Error), retry()];
+        for panic in [false, true] {
+            let sink = Sink::default();
+            gate_dies(&sink, retried.clone(), panic);
+            assert_eq!(sink.bytes(), "", "panic={panic}");
+        }
+        // Anti-vacuous: the same failure WITHOUT the retry is still held, and
+        // a panic flushes it, so the empty rows above are the retry's doing.
+        let sink = Sink::default();
+        gate_dies(
+            &sink,
+            vec![start(), text("PARTIAL_"), end(StopReason::Error)],
+            true,
+        );
+        assert_eq!(sink.bytes(), "PARTIAL_");
+    }
+
+    #[test]
+    fn filter_off_gate_never_writes_on_panic() {
+        // Off: the loop printed every delta itself; Drop must not repeat any.
+        let sink = Sink::default();
+        let mut gate = RetrySafeGate::with_panic_sink(false, Box::new(sink.clone()));
+        gate.feed(Some(text("SHOWN")));
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let _gate = gate;
+            panic!("probe");
+        }));
+        assert!(caught.is_err());
+        assert_eq!(sink.bytes(), "");
     }
 
     #[test]

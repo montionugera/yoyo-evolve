@@ -36,8 +36,8 @@
 //! core; it is armed in exactly the window SIGHUP/SIGTERM are (the filtering
 //! population only), so every other run keeps the core-dump default.
 //! Still not handled: SIGKILL (unflushable), SIGPIPE (the reader is gone;
-//! by reasoning, not probed); still OPEN: a panic (RetrySafeGate has no
-//! Drop, read not run).
+//! by reasoning, not probed); a panic while text is held is
+//! flushed by `RetrySafeGate`'s `Drop` (Day 228, probed: before it, `""`).
 
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::OnceLock;
