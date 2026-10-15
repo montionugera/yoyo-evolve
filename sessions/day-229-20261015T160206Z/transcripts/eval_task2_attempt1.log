@@ -1,0 +1,31 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "allow" src/tools.rs | gre… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "permissions\.allow\|perm… ✓ (11ms)
+  ▶ write session_plan/eval_task_2.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 17.4s (3 ✓)
+
+Verdict: PASS. I wrote the verdict to session_plan/eval_task_2.md. I judged the diff and checked the source with grep. I did not run the binary or test /cd by hand.
+
+• **The fix is in the right place.** The change goes inside `PermissionConfig::check`, which every allow check goes through. The bash tool's confirm step calls it (`tools.rs:1233`). A search found no other code that matches allow patterns without going through check.
+• **Startup and /cd are both wired.** At startup, yoyo records the launch project's allow patterns, but only when no `--allow`/`--deny` flags were given and the config in use is the project's own .yoyo.toml. On each /cd:
+  • Inside the launch project's folder (or any folder below it), nothing is suspended.
+  • Anywhere else, the launch project's patterns stop auto-approving, except ones the user's own config also lists.
+• **`/permissions` shows the change.** Suspended patterns move out of the ✓ list into their own section.
+• **Tests cover the cases the task asked for:**
+  • a launch-project pattern is dropped after /cd
+  • a pattern also in the user's config survives
+  • flag sessions record nothing to suspend
+  • `/work/ab is not treated as inside /work/a`
+  • going back into the launch folder restores the patterns
+  • with nothing suspended, every test command gets the same answer as before
+• **Every new function and constant is used in this diff,** and all callers of the changed /permissions report function were updated.
+• **Docs are updated:** permissions.md, commands.md and ARCHITECTURE.md.
+• **Users without a /cd or a trusted project allow list see no change.** Nothing gets more permissive, and no defaults or flags changed.
+
+One small cleanup note: the diff also carries an unrelated line added to .yoyo/risk_validations.jsonl by the harness.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
