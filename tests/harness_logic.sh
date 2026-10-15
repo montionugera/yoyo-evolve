@@ -925,6 +925,42 @@ check "skill-evolve: diagnosis and Refine trigger on complaint_signals alone" \
 check "skill-evolve: (wins/uses) < 0.5 appears only in the note that it never fired" \
     "$(grep -c 'wins/uses) < 0.5' "$SE_SPEC")" "1"
 
+# ── skill-evolve retire cleans up its own pointers (evt-0041, evt-0042) ──────
+# Retiring explore-codebase left blindspot and synthesis saying "use
+# `explore-codebase`", and no rule could repair them: a pointer is not a
+# complaint, and synthesis is unmeasured so it is never retired. The Retire step
+# now greps for pointers and fixes them in the same event. Run its grep.
+SE_PTR=$(awk '/^#### Retire/{f=1} f&&/^grep -nE /{print; exit}' "$SE_SPEC")
+if require "skill-evolve: retire pointer grep extracted" "$SE_PTR"; then
+    se_ptr=$( set +e; d=$(mktemp -d); cd "$d" || exit 1; mkdir -p skills/a skills/b skills/c skills/d
+        printf 'use `gone` first\n' > skills/a/SKILL.md
+        printf 'see skills/gone/SKILL.md\n' > skills/b/SKILL.md
+        printf 'the gone days\n' > skills/c/SKILL.md            # bare word: prose, not a pointer
+        printf 'see skills/gone-v2/ and `gone-v2`\n' > skills/d/SKILL.md  # a different skill
+        eval "${SE_PTR//<name>/gone}" | cut -d: -f1 | tr '\n' ' '; rm -rf "$d" )
+    check "skill-evolve: retire pointer grep finds backticked and path pointers only" "$se_ptr" "skills/a/SKILL.md skills/b/SKILL.md "
+fi
+check "skill-evolve: hard rule 3 counts pointer cleanup as part of the retire" \
+    "$(grep -c '^- a retirement .*pointer cleanup.*same mutation' "$SE_SPEC")" "1"
+check "skill-evolve: no live skill points at a skill in the attic" \
+    "$(for a in "$ROOT"/skills_attic/*/; do n=$(basename "$a"); grep -lE "\`$n\`|skills/$n([^a-z0-9-]|$)" "$ROOT"/skills/*/SKILL.md; done | grep -v '/skill-evolve/' | wc -l | tr -d ' ')" "0"
+
+# ── skill-evolve saturation: the flag the spec writes is now read (evt-0035) ─
+SAT_FN=$(awk '/^latest_event_saturated\(\) \{/,/^\}/' "$SE")
+if require "skill_evolve.sh latest_event_saturated extracted" "$SAT_FN"; then
+    sat_case() { ( d=$(mktemp -d); printf "$1" > "$d/j"; eval "$SAT_FN"
+        latest_event_saturated "$d/j" && echo yes || echo no; rm -rf "$d" ) }
+    check "saturation: newest event saturated -> cooldown extends" \
+        "$(sat_case '## t evt-0001 NO-OP\n- evolution_saturation: true\n')" "yes"
+    check "saturation: an older saturated event does not count" \
+        "$(sat_case '## t evt-0001 NO-OP\n- evolution_saturation: true\n## t evt-0002 refine\n- evolution_saturation: false\n')" "no"
+    check "saturation: no flag -> normal cooldown" "$(sat_case '## t evt-0001 NO-OP\n')" "no"
+    check "saturation: missing journal -> normal cooldown" \
+        "$( eval "$SAT_FN"; latest_event_saturated /nonexistent/j && echo yes || echo no )" "no"
+fi
+check "skill_evolve.sh: diff-scope guard lists a retire by its attic path (-M)" \
+    "$(grep -c 'CHANGED_FILES=$(git diff --name-only -M ' "$SE")" "1"
+
 # ── refused wrap-up patches reach the next planner; the responder is read-only ─
 # Day 228 (14:52): the issue responder wrote three tests while "probing", the
 # wrap-up gate refused them, and nothing ever read the saved patch. Real git: an

@@ -221,7 +221,7 @@ def report_events(events: list[dict]) -> None:
     last_three = [e["type"] for e in events[-3:]]
     if last_three == ["NO-OP"] * 3:
         print()
-        print("  ⚠ Last 3 events are NO-OP — saturation likely. Cooldown should auto-extend.")
+        print("  ⚠ Last 3 events are NO-OP — saturation likely. The cooldown triples only while the newest event carries evolution_saturation: true.")
 
 
 def report_outcomes(outcomes: list[dict], status: str) -> None:

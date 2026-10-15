@@ -173,6 +173,20 @@ last=$(cat "$LAST_RUN_FILE" 2>/dev/null || echo 0)
 last=${last//[^0-9]/}
 last=${last:-0}
 
+# Saturation: the skill-evolve spec marks the third NO-OP in a row with
+# `evolution_saturation: true`. While the newest journal event carries it there
+# is nothing to do, so wait three cooldowns instead of one. A manual run
+# (FORCE_RUN) still bypasses the gate.
+latest_event_saturated() { # $1 = journal; true when its newest event sets the flag
+    awk '/^## .*evt-[0-9]+/ { sat = 0 }
+         /^- evolution_saturation: true/ { sat = 1 }
+         END { exit !sat }' "$1" 2>/dev/null
+}
+if [ "$FORCE_RUN" != "true" ] && latest_event_saturated skills/_journal.md; then
+    COOLDOWN=$((COOLDOWN * 3))
+    echo "skill-evolve: newest event is saturated — cooldown tripled to ${COOLDOWN}s"
+fi
+
 if [ "$FORCE_RUN" != "true" ] && [ "$last" -gt 0 ]; then
     elapsed=$((now - last))
     if [ "$elapsed" -lt "$COOLDOWN" ]; then
@@ -348,7 +362,10 @@ if [ "$HEAD_BEFORE" != "$HEAD_AFTER" ]; then
     # ── Diff-scope guard: enforce HARD RULES from skills/skill-evolve/SKILL.md ──
     # The meta-skill's three hard rules are LLM-compliance only; this is the
     # harness-side belt that turns them into actual constraints.
-    CHANGED_FILES=$(git diff --name-only "$HEAD_BEFORE..$HEAD_AFTER")
+    # -M explicitly: a retire is a `git mv` and must list as its attic path.
+    # Without rename detection it lists the deleted skills/<name>/SKILL.md too,
+    # which the provenance check refuses (evt-0041 found this rode on the default).
+    CHANGED_FILES=$(git diff --name-only -M "$HEAD_BEFORE..$HEAD_AFTER")
     VIOLATIONS=""
 
     while IFS= read -r f; do
