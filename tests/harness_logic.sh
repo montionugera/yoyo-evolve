@@ -884,6 +884,47 @@ check "skill-evolve: no retire rule is gated on score < 0.3 any more" \
 check "skill-evolve: unmeasured skills are exempt, naming the unlogged loops" \
     "$(grep -c 'never retired for silence.*social.*dream' "$SE_SPEC")" "1"
 
+# ── skill-evolve spec snippets: run the bash the agent copies (#858) ─────────
+# The enumeration loop and the event-number lines are executed as written, so
+# test them by running them, not by reading them.
+SE_ENUM=$(awk '/^### 2\. Enumerate eligible skills/{f=1} f&&/^```bash$/{g=1; next} g&&/^```$/{exit} g' "$SE_SPEC")
+if require "skill-evolve: enumeration snippet extracted" "$SE_ENUM"; then
+    se_enum=$( set +e; d=$(mktemp -d); cd "$d" || exit 1
+        mkdir -p skills/mine skills/creators skills/core skills/skill-evolve
+        printf -- '---\nname: mine\norigin: yoyo\n---\nbody\n' > skills/mine/SKILL.md
+        # origin: creator, but its body quotes a template carrying origin: yoyo
+        printf -- '---\nname: creators\norigin: creator\n---\n```\n---\norigin: yoyo\n---\n```\n' > skills/creators/SKILL.md
+        printf -- '---\nname: core\ncore: true\norigin: yoyo\n---\n' > skills/core/SKILL.md
+        printf -- '---\norigin: yoyo\n---\n' > skills/skill-evolve/SKILL.md
+        # no frontmatter; the body has origin: yoyo between two horizontal rules
+        mkdir -p skills/nofm skills/unclosed
+        printf -- '# nofm\n---\norigin: yoyo\n---\n' > skills/nofm/SKILL.md
+        # frontmatter never closes, so the quoted template in the body is not frontmatter
+        printf -- '---\nname: unclosed\norigin: creator\n```\norigin: yoyo\n```\n' > skills/unclosed/SKILL.md
+        eval "$SE_ENUM" | tr '\n' ' '; rm -rf "$d" )
+    check "skill-evolve: only frontmatter origin: yoyo is eligible (body, no-frontmatter and unclosed ignored)" "$se_enum" "mine "
+fi
+SE_EVT=$(awk '/^last=\$\(grep -oE .evt-/{f=1} f; f&&/^evt=/{exit}' "$SE_SPEC")
+if require "skill-evolve: event-number snippet extracted" "$SE_EVT"; then
+    se_evt() { ( set +e; d=$(mktemp -d); cd "$d" || exit 1; mkdir skills
+        printf '## x %s NO-OP\n' "$@" > skills/_journal.md
+        eval "$SE_EVT" 2>/dev/null; echo "${evt:-none}"; rm -rf "$d" ) }
+    check "skill-evolve: next event after evt-0007 is evt-0008" "$(se_evt evt-0006 evt-0007)" "evt-0008"
+    check "skill-evolve: next event after evt-0008 is evt-0009 (not an octal error)" "$(se_evt evt-0008)" "evt-0009"
+    check "skill-evolve: next event after evt-0015 is evt-0016 (not octal 14)" "$(se_evt evt-0011 evt-0015)" "evt-0016"
+    check "skill-evolve: a journal with no events starts at evt-0001" "$(se_evt)" "evt-0001"
+    check "skill-evolve: a missing journal starts at evt-0001" \
+        "$( set +e; d=$(mktemp -d); cd "$d" || exit 1; mkdir skills; eval "$SE_EVT" 2>/dev/null; echo "${evt:-none}"; rm -rf "$d" )" "evt-0001"
+fi
+check "skill-evolve: complaint signals need skills/<name> or a backticked name" \
+    "$(grep -c '^- \*\*Complaint signals\*\*.*never the bare word' "$SE_SPEC")" "1"
+# wins == uses for every skill, so a wins-ratio trigger can never fire: both the
+# diagnosis step and the Refine action trigger on complaints alone.
+check "skill-evolve: diagnosis and Refine trigger on complaint_signals alone" \
+    "$(grep -cE '^(For each skill where `complaint_signals ≥ 2`, open|2\. \*\*Refine\*\*: if any skill has `complaint_signals ≥ 2` and has not)' "$SE_SPEC")" "2"
+check "skill-evolve: (wins/uses) < 0.5 appears only in the note that it never fired" \
+    "$(grep -c 'wins/uses) < 0.5' "$SE_SPEC")" "1"
+
 # ── refused wrap-up patches reach the next planner; the responder is read-only ─
 # Day 228 (14:52): the issue responder wrote three tests while "probing", the
 # wrap-up gate refused them, and nothing ever read the saved patch. Real git: an
