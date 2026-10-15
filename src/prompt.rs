@@ -15,6 +15,7 @@ use crate::session::{ChangeKind, SessionChanges};
 #[cfg(test)]
 mod cancel_mid_tool_tests;
 mod interrupt;
+mod output_limit;
 mod retry_after_partial;
 mod retry_safe_pipe;
 mod sigterm;
@@ -967,7 +968,7 @@ impl PromptEventState {
                             }
                         }
                     }
-                    StopHandling::Ignore => {}
+                    StopHandling::Ignore | StopHandling::OutputLimit => {}
                 }
             }
         }
@@ -1120,7 +1121,7 @@ async fn handle_prompt_events(
                         let _ = io::stderr().flush();
                     }
                     AgentEvent::AgentEnd { messages, .. } => {
-                        state.handle_agent_end(messages, model);
+                        output_limit::end_turn(&mut state, messages, model, agent.max_tokens);
                     }
                     AgentEvent::InputRejected { reason } => {
                         if let Some(s) = state.spinner.take() { s.stop(); }

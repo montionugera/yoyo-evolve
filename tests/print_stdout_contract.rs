@@ -2390,3 +2390,67 @@ fn sigterm_during_a_long_tool_call_on_a_pipe_still_terminates() {
         "#1015: SIGTERM mid-tool exits 143; stderr={stderr}"
     );
 }
+
+/// A reply cut off at the output-token limit (Anthropic `stop_reason:
+/// "max_tokens"`, yoagent `StopReason::Length`) used to end silently: exit 0,
+/// nothing on stderr. Now stderr carries one warning naming the cause and the
+/// fix; stdout and the exit code (0, by decision) are unchanged. The twin
+/// below is the same stream with `end_turn`, and the two stdouts must be
+/// byte-identical.
+fn run_with_stop_reason(print: bool, stop_reason: &str) -> Run {
+    let body = sse_turn("msg_len", vec![text_block(&["1 2 3 ", "4 5"])], stop_reason);
+    let mut extra = vec!["--max-tokens", "30", "-p", "numbers 1 to 200"];
+    if print {
+        extra.push("--print");
+    }
+    run_yoyo_with(
+        &["--no-tools", "--max-turns", "1"],
+        &extra,
+        None,
+        vec![body],
+    )
+}
+
+const OUTPUT_LIMIT_NOTE: &str = "reply stopped at the output limit (max_tokens = 30)";
+
+#[test]
+fn reply_cut_off_at_output_limit_warns_on_stderr_and_keeps_stdout() {
+    for print in [false, true] {
+        assert_cut_off_reply_warns(print);
+    }
+}
+
+fn assert_cut_off_reply_warns(print: bool) {
+    let cut = run_with_stop_reason(print, "max_tokens");
+    assert_reached_stub(&cut);
+    let normal = run_with_stop_reason(print, "end_turn");
+    assert_reached_stub(&normal);
+    let stdout = String::from_utf8(cut.stdout.clone()).expect("utf-8 stdout");
+    assert!(
+        stdout.contains("1 2 3 4 5"),
+        "anti-vacuous: the streamed text must reach stdout; stdout={stdout:?}"
+    );
+    assert_eq!(
+        cut.stdout, normal.stdout,
+        "stdout must be exactly the streamed bytes, cut or not; stderr={}",
+        cut.stderr
+    );
+    assert!(
+        cut.stderr.contains(OUTPUT_LIMIT_NOTE),
+        "a cut-off reply must say so on stderr; stderr={}",
+        cut.stderr
+    );
+    assert!(
+        cut.stderr
+            .contains("raise --max-tokens or max_tokens in .yoyo.toml"),
+        "the note must name the fix; stderr={}",
+        cut.stderr
+    );
+    assert_eq!(occurrences(&cut.stderr, OUTPUT_LIMIT_NOTE), 1);
+    // Near-miss: a normal ending prints no such line.
+    assert!(
+        !normal.stderr.contains("output limit"),
+        "a normal end_turn must not warn; stderr={}",
+        normal.stderr
+    );
+}

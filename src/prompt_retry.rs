@@ -25,9 +25,10 @@ pub enum StopHandling {
     /// `StopReason::Refusal` — print a notice telling the user to rephrase;
     /// deliberately non-retryable.
     RefusalNotice,
-    /// Normal completions (`Stop`, `Length`, `ToolUse`, `Aborted`) — no
-    /// error handling needed.
+    /// Normal completions (`Stop`, `ToolUse`, `Aborted`) — nothing to do.
     Ignore,
+    /// `StopReason::Length` — the reply was cut off; warn (`prompt/output_limit.rs`).
+    OutputLimit,
 }
 
 /// Classify a terminal `stop_reason` for AgentEnd handling.
@@ -60,9 +61,8 @@ pub fn classify_stop_reason(stop_reason: &StopReason) -> StopHandling {
     match stop_reason {
         StopReason::Error => StopHandling::InspectError,
         StopReason::Refusal => StopHandling::RefusalNotice,
-        StopReason::Stop | StopReason::Length | StopReason::ToolUse | StopReason::Aborted => {
-            StopHandling::Ignore
-        }
+        StopReason::Length => StopHandling::OutputLimit,
+        StopReason::Stop | StopReason::ToolUse | StopReason::Aborted => StopHandling::Ignore,
         // Forced by `#[non_exhaustive]` upstream — see the doc comment above for
         // why an unknown reason is surfaced rather than ignored or named.
         _ => StopHandling::InspectError,
@@ -843,13 +843,12 @@ mod tests {
 
     #[test]
     fn test_classify_stop_reason_normal_stops_untouched() {
-        // Stop/Length/ToolUse/Aborted get no error handling at all.
-        for sr in [
-            StopReason::Stop,
-            StopReason::Length,
-            StopReason::ToolUse,
-            StopReason::Aborted,
-        ] {
+        // Stop/ToolUse/Aborted get no handling at all; Length is OutputLimit.
+        assert_eq!(
+            classify_stop_reason(&StopReason::Length),
+            StopHandling::OutputLimit
+        );
+        for sr in [StopReason::Stop, StopReason::ToolUse, StopReason::Aborted] {
             assert_eq!(
                 classify_stop_reason(&sr),
                 StopHandling::Ignore,
