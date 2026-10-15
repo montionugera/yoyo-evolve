@@ -124,6 +124,17 @@ impl AgentTool for GuardedTool {
             }
         }
         // `search`/`list_files` take a ROOT: fence what they return too (#1022).
+        // The root as the inner tool will see it (yoagent defaults to `.`), and
+        // whether ANY fence source is live, for the fail-closed mode (#1023).
+        let root = params
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".")
+            .to_string();
+        let fence_active = !self.restrictions.is_empty()
+            || !crate::cd_config_note::cd_dir_fence_is_empty(
+                &crate::cd_config_note::cd_denied_dirs_handle(),
+            );
         let result = self.inner.execute(params, ctx).await?;
         let refused =
             |p: &str| crate::cd_config_note::path_guard_refusal(&self.restrictions, p).is_some();
@@ -131,6 +142,8 @@ impl AgentTool for GuardedTool {
             self.inner.name(),
             result,
             &refused,
+            fence_active,
+            &root,
         ))
     }
 }
@@ -210,6 +223,17 @@ impl AgentTool for ArcGuardedTool {
             }
         }
         // `search`/`list_files` take a ROOT: fence what they return too (#1022).
+        // The root as the inner tool will see it (yoagent defaults to `.`), and
+        // whether ANY fence source is live, for the fail-closed mode (#1023).
+        let root = params
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".")
+            .to_string();
+        let fence_active = !self.restrictions.is_empty()
+            || !crate::cd_config_note::cd_dir_fence_is_empty(
+                &crate::cd_config_note::cd_denied_dirs_handle(),
+            );
         let result = self.inner.execute(params, ctx).await?;
         let refused =
             |p: &str| crate::cd_config_note::path_guard_refusal(&self.restrictions, p).is_some();
@@ -217,6 +241,8 @@ impl AgentTool for ArcGuardedTool {
             self.inner.name(),
             result,
             &refused,
+            fence_active,
+            &root,
         ))
     }
 }
