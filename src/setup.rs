@@ -786,6 +786,21 @@ pub fn run_setup_wizard() -> Option<WizardResult> {
     run_wizard_interactive(&mut reader, &mut writer)
 }
 
+/// Exit code for an explicit `yoyo setup` whose stdin is not a terminal (#1024):
+/// 2, the usage code the #982 refusals use.
+pub(crate) const SETUP_NOT_INTERACTIVE_EXIT: i32 = 2;
+
+/// #1024: the explicit `yoyo setup` door must be gated like the auto-offered
+/// wizard (`run_setup_wizard_if_needed`, gated on `stdin().is_terminal()`).
+/// Ungated, EOF on piped stdin took every default, wrote `.yoyo.toml` and
+/// printed "All set! Starting yoyo..." while starting nothing. `Some(msg)` means
+/// refuse before anything is read or written; `None` means run the wizard.
+pub(crate) fn setup_stdin_refusal(stdin_is_terminal: bool) -> Option<&'static str> {
+    (!stdin_is_terminal).then_some(
+        "yoyo setup is interactive: run it in a terminal (stdin is not a TTY). Nothing was written.",
+    )
+}
+
 /// Pure decision helper: should we offer the setup wizard?
 ///
 /// The question this answers is **"can yoyo actually start?"** — not "does a
@@ -863,6 +878,25 @@ mod tests {
     use super::*;
     use crate::cli::KNOWN_PROVIDERS;
     use serial_test::serial;
+
+    /// #1024: non-TTY stdin refuses with exit 2 and a message saying nothing
+    /// was written; the refusal must not claim the wizard ran or yoyo started.
+    #[test]
+    fn setup_refuses_when_stdin_is_not_a_terminal() {
+        let msg = setup_stdin_refusal(false).expect("non-TTY stdin must refuse");
+        assert_eq!(
+            msg,
+            "yoyo setup is interactive: run it in a terminal (stdin is not a TTY). Nothing was written."
+        );
+        assert!(!msg.contains("Starting yoyo"));
+        assert_eq!(SETUP_NOT_INTERACTIVE_EXIT, 2);
+    }
+
+    /// Near-miss: an interactive terminal proceeds to the wizard unchanged.
+    #[test]
+    fn setup_proceeds_when_stdin_is_a_terminal() {
+        assert_eq!(setup_stdin_refusal(true), None);
+    }
 
     /// The decision matrix for "can yoyo actually start?" — one row per
     /// (provider, key_from_env, key_in_config) shape that reaches the wizard

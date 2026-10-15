@@ -317,7 +317,15 @@ pub(crate) fn try_dispatch_subcommand_in(
             }
             "setup" => {
                 match project {
-                    None => drop(crate::setup::run_setup_wizard()),
+                    None => {
+                        use std::io::IsTerminal;
+                        let tty = std::io::stdin().is_terminal();
+                        if let Some(msg) = crate::setup::setup_stdin_refusal(tty) {
+                            eprintln!("{msg}");
+                            exit_if_nonzero(crate::setup::SETUP_NOT_INTERACTIVE_EXIT);
+                        }
+                        drop(crate::setup::run_setup_wizard())
+                    }
                     Some(p) => {
                         let mut input = p.input;
                         let out = &mut std::io::stdout();

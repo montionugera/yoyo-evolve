@@ -2071,6 +2071,50 @@ fn wizard_does_not_trigger_when_config_file_exists() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// #1024: explicit `yoyo setup` with non-terminal stdin used to take every
+/// default on EOF, write `.yoyo.toml`, print "All set! Starting yoyo..." and
+/// exit 0 while starting nothing. It must now refuse: exit 2, stderr says so,
+/// and no `.yoyo.toml` (or `.bak`) appears in the cwd or HOME.
+#[test]
+fn explicit_setup_with_non_tty_stdin_refuses_and_writes_nothing() {
+    let dir = std::env::temp_dir().join(format!("yoyo_test_setup_non_tty_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+
+    let output = yoyo_cmd()
+        .arg("setup")
+        .current_dir(&dir)
+        .env("HOME", &dir)
+        .env("XDG_CONFIG_HOME", dir.join(".config"))
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run yoyo");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stdout: {stdout}\nstderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("yoyo setup is interactive") && stderr.contains("Nothing was written"),
+        "stderr should name the refusal: {stderr}"
+    );
+    assert!(!stdout.contains("Starting yoyo"), "false success: {stdout}");
+    assert!(
+        !dir.join(".yoyo.toml").exists(),
+        ".yoyo.toml must not be written"
+    );
+    assert!(!dir.join(".yoyo.toml.bak").exists());
+    assert!(
+        !dir.join(".config").exists(),
+        "nothing under XDG config either"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn wizard_does_not_trigger_with_prompt_flag() {
     // --prompt / -p is single-shot mode (non-interactive), wizard should not run.

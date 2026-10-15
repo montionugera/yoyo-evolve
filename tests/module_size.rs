@@ -394,7 +394,9 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // (+100 drift already at HEAD from arms landed since Day 224; +15 this
     // task: the config arm's exit call and the in-process test moved to a
     // source-level pin, since the arm now exits), pasted.
-    ("src/dispatch_sub.rs", 2328),
+    // Day 229 (#1024): 2328 -> 2336 (+8), the non-TTY refusal in the `setup` arm; the
+    // decision itself lives in setup.rs (`setup_stdin_refusal`), pasted.
+    ("src/dispatch_sub.rs", 2336),
     // Day 209: 3439 -> 3455 (+16, within the drift band, pasted rather than left to absorb).
     // #937 option 1: nine lines of doc above `builtin_model_pricing` naming both ignored
     // audit commands (deliverable 4 — an alarm nobody can find is the #745/#767/#769
@@ -564,7 +566,9 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // NOT free — this module's ~1200 lines of tests reach ~20 private helpers
     // through `use super::*`, so moving them out means making all of those
     // `pub(crate)` first. Filed as the follow-up rather than half-done here.
-    ("src/setup.rs", 2067),
+    // Day 229 (#1024): 2067 -> 2101 (+34), `setup_stdin_refusal` + its exit const and
+    // the refuse/proceed unit tests, pasted.
+    ("src/setup.rs", 2101),
     ("src/symbols.rs", 3804),
     // Day 161 (#662 half 1): +10 lines — pub REFUSAL_STEM_* consts that the
     // wrapper messages and prompt_retry::is_deterministic_tool_error share.

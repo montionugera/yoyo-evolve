@@ -9,7 +9,7 @@ All commands start with `/`. Type `/help` inside yoyo to see the full list.
 > |------------|-------------|
 > | `yoyo help` | Show help message (same as `--help`) |
 > | `yoyo version` | Show version (same as `--version`) |
-> | `yoyo setup` | Run the interactive setup wizard |
+> | `yoyo setup` | Run the interactive setup wizard (requires an interactive terminal: with stdin not a TTY it refuses with exit 2 and writes nothing) |
 > | `yoyo init` | Generate a YOYO.md project context file |
 > | `yoyo doctor` | Diagnose yoyo setup (config file, API key, provider, tool availability) |
 > | `yoyo health` | Run project health checks (build, test, clippy, fmt — auto-detects project type) |
