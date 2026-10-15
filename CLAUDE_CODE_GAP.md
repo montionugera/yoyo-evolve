@@ -391,6 +391,8 @@ These were listed as gaps on Day 24 but have shipped since:
 
 ## Stats (Day 74)
 
+> **Snapshot, not current state.** Everything in this section, including the skill list and the shipped-features list, is as of Day 74 and is kept as history. Skills retired since (for example `explore-codebase`, moved to `skills_attic/` in evt-0041) are correct here as of that day. For the live skill set, list `skills/`.
+
 - yoyo: ~71,675 lines of Rust across 66 source files (incl. `src/format/`) + integration tests
 - 66 source files (was 62 on Day 67): commands split into 30 `commands_*.rs`
   files (`commands.rs`, `commands_ast_grep.rs`, `commands_bg.rs`,
