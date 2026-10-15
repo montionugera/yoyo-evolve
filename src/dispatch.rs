@@ -1465,6 +1465,7 @@ pub(crate) async fn dispatch_command(ctx: &mut DispatchContext<'_>) -> CommandRe
                                 &reading,
                             ));
                             crate::cd_config_note::apply_cd_dir_fence(&target, &reading);
+                            crate::cd_allow::apply_cd_allow_suspension(&target); // Day 229
                             crate::cd_config_note::print_cd_config_note(&target, &reading);
                         }
                         Err(e) => {

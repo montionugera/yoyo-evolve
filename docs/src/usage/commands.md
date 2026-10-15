@@ -61,6 +61,10 @@ reloaded — use `/context` to review what was loaded.
 If the new directory has its own `.yoyo.toml` that sets `[permissions]`,
 `[directories]`, hooks or MCP servers, `/cd` names them and says they are **not**
 applied: the launch directory's settings stay in force until you restart yoyo there.
+The exceptions are the parts that only narrow, which `/cd` does apply: the new
+directory's deny lists and `[directories] allow`, and suspending the launch
+project's own `[permissions] allow` patterns while you are outside its tree
+(see [Permissions → After `/cd`](../configuration/permissions.md#after-cd)).
 
 ## Conversation
 

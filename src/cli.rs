@@ -1756,6 +1756,7 @@ fn parse_permission_and_dir_config(
         eprintln!("{YELLOW}{msg}{RESET}");
     }
     let permissions = gated.permissions;
+    crate::cd_allow::record_at_startup(from_cli_flags, &permissions.allow); // #869: for /cd
 
     // --allow-dir <dir> flags: collect all allowed directories (repeatable)
     let cli_allow_dirs = collect_repeatable_flag(args, "--allow-dir");

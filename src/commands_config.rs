@@ -941,6 +941,7 @@ pub fn handle_permissions(
         &crate::commands_permissions::snapshot(&crate::cd_deny::cd_added_deny_handle()),
         &crate::commands_permissions::snapshot(&crate::cd_config_note::cd_denied_dirs_handle()),
         &crate::commands_permissions::snapshot(&crate::cd_config_note::cd_allowed_dirs_handle()),
+        &crate::cd_allow::suspended_snapshot(),
     );
     print!("{report}");
 }

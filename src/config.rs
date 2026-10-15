@@ -15,7 +15,12 @@ pub struct PermissionConfig {
 impl PermissionConfig {
     /// Check a command against deny patterns first, then allow patterns.
     /// Returns `Some(true)` if allowed, `Some(false)` if denied, `None` if no match (prompt user).
+    /// Skips allow entries `/cd` suspended (#869; read here so every caller narrows).
     pub fn check(&self, command: &str) -> Option<bool> {
+        self.check_with_suspended(command, &crate::cd_allow::suspended_snapshot())
+    }
+    /// Pure [`Self::check`], the suspended entries passed in (`crate::cd_allow`).
+    pub(crate) fn check_with_suspended(&self, command: &str, suspended: &[String]) -> Option<bool> {
         // Deny takes priority — check deny patterns first.
         //
         // `deny` deliberately keeps plain `glob_match`, and this asymmetry is the point:
@@ -29,7 +34,7 @@ impl PermissionConfig {
             }
         }
         // Then check allow patterns.
-        for pattern in &self.allow {
+        for pattern in self.allow.iter().filter(|p| !suspended.contains(p)) {
             if glob_match(pattern, command)
                 && !allow_wildcard_swallows_options(pattern, command)
                 && !allow_wildcard_spans_a_command_chain(pattern, command)

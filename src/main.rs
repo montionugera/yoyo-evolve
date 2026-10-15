@@ -42,6 +42,7 @@ mod agent_limits_tests;
 mod anthropic_preset_tests;
 mod auto_check_scope;
 mod banner;
+mod cd_allow;
 mod cd_config_note;
 mod cd_deny;
 mod cli;

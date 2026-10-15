@@ -27,6 +27,10 @@ pub(crate) const CD_BASH_DENY_SOURCE_NOTE: &str = "(a deny entry applied by /cd)
 pub(crate) const CD_DIR_ALLOW_SOURCE_NOTE: &str =
     "(an allow entry applied by /cd; also required, replaced by the next /cd)";
 
+/// Heading over launch-project allow entries `/cd` suspended (Day 229).
+pub(crate) const CD_SUSPENDED_ALLOW_HEADING: &str =
+    "Suspended allow patterns (launch project's .yoyo.toml; not applied outside its tree):";
+
 /// The full `/permissions` text. `cd_bash_deny` / `cd_dir_deny` are the lists
 /// `/cd` has appended (`cd_deny::cd_added_deny_handle`,
 /// `cd_config_note::cd_denied_dirs_handle`), and `cd_dir_allow` is the allow
@@ -39,6 +43,7 @@ pub(crate) fn permissions_report(
     cd_bash_deny: &[String],
     cd_dir_deny: &[String],
     cd_dir_allow: &[String],
+    cd_suspended_allow: &[String],
 ) -> String {
     let mut out = String::new();
     let mut line = |s: String| {
@@ -67,10 +72,22 @@ pub(crate) fn permissions_report(
     if permissions.is_empty() && cd_bash_deny.is_empty() {
         line("    Command patterns: none configured".to_string());
     } else {
-        if !permissions.allow.is_empty() {
+        // Day 229 (#869): an entry `/cd` suspended is not live policy, so it is
+        // not listed under the ✓ heading — it gets its own block saying why.
+        let (live, suspended): (Vec<&String>, Vec<&String>) = permissions
+            .allow
+            .iter()
+            .partition(|p| !cd_suspended_allow.contains(p));
+        if !live.is_empty() {
             line(format!("    {GREEN}Allow patterns:{RESET}"));
-            for pat in &permissions.allow {
+            for pat in live {
                 line(format!("      {GREEN}✓{RESET} {pat}"));
+            }
+        }
+        if !suspended.is_empty() {
+            line(format!("    {DIM}{CD_SUSPENDED_ALLOW_HEADING}{RESET}"));
+            for pat in suspended {
+                line(format!("      - {pat}"));
             }
         }
         if !permissions.deny.is_empty() || !cd_bash_deny.is_empty() {
@@ -209,7 +226,7 @@ mod tests {
     fn cd_dir_deny_is_shown_and_full_access_is_not_claimed() {
         let perms = PermissionConfig::default();
         let dirs = DirectoryRestrictions::default();
-        let out = permissions_report(false, &perms, &dirs, &[], &s(&["/proj/secret"]), &[]);
+        let out = permissions_report(false, &perms, &dirs, &[], &s(&["/proj/secret"]), &[], &[]);
         assert!(
             !out.contains("full filesystem access"),
             "a live /cd fence must not be reported as full access:\n{out}"
@@ -237,7 +254,7 @@ mod tests {
     fn cd_bash_deny_is_shown_and_none_configured_is_not_claimed() {
         let perms = PermissionConfig::default();
         let dirs = DirectoryRestrictions::default();
-        let out = permissions_report(false, &perms, &dirs, &s(&["curl *"]), &[], &[]);
+        let out = permissions_report(false, &perms, &dirs, &s(&["curl *"]), &[], &[], &[]);
         assert!(!out.contains("none configured"), "got:\n{out}");
         let head = head_text(false, &perms, &dirs);
         let block = format!(
@@ -255,7 +272,7 @@ mod tests {
         let perms = PermissionConfig::default();
         let dirs = DirectoryRestrictions::default();
         for auto in [false, true] {
-            let out = permissions_report(auto, &perms, &dirs, &[], &[], &[]);
+            let out = permissions_report(auto, &perms, &dirs, &[], &[], &[], &[]);
             assert_eq!(out, head_text(auto, &perms, &dirs));
             // Anti-vacuous: HEAD's text really carries the claim this slice guards.
             assert!(out.contains("Directory restrictions: none (full filesystem access)"));
@@ -274,7 +291,7 @@ mod tests {
             deny: s(&["/etc", "/usr"]),
         };
         for auto in [false, true] {
-            let out = permissions_report(auto, &perms, &dirs, &[], &[], &[]);
+            let out = permissions_report(auto, &perms, &dirs, &[], &[], &[], &[]);
             assert_eq!(out, head_text(auto, &perms, &dirs));
         }
     }
@@ -295,6 +312,7 @@ mod tests {
             &dirs,
             &s(&["curl *"]),
             &s(&["/p/secret"]),
+            &[],
             &[],
         );
         let note = crate::commands_file_fence::CD_DIR_SOURCE_NOTE;
@@ -325,6 +343,7 @@ mod tests {
             std::slice::from_ref(&hostile),
             std::slice::from_ref(&hostile),
             std::slice::from_ref(&hostile),
+            &[],
         );
         assert!(
             !out.contains(&hostile),
@@ -336,7 +355,7 @@ mod tests {
     fn cd_dir_allow_is_listed_with_its_label_and_full_access_is_not_claimed() {
         let perms = PermissionConfig::default();
         let dirs = DirectoryRestrictions::default();
-        let out = permissions_report(false, &perms, &dirs, &[], &[], &s(&["/proj/src"]));
+        let out = permissions_report(false, &perms, &dirs, &[], &[], &s(&["/proj/src"]), &[]);
         // The exact line a user reads.
         let line =
             format!("      {GREEN}✓{RESET} /proj/src (an allow entry applied by /cd; also required, replaced by the next /cd)\n");
@@ -359,13 +378,48 @@ mod tests {
             allow: s(&["/proj"]),
             deny: vec![],
         };
-        let out = permissions_report(false, &perms, &launch, &[], &[], &s(&["/proj/src"]));
+        let out = permissions_report(false, &perms, &launch, &[], &[], &s(&["/proj/src"]), &[]);
         assert!(
             out.contains(&format!(
                 "    {GREEN}Allowed directories:{RESET}\n      {GREEN}✓{RESET} /proj\n{line}"
             )),
             "got:\n{out}"
         );
+    }
+
+    /// Day 229 (#869): a /cd-suspended allow entry leaves the ✓ list and is
+    /// shown as suspended; an unsuspended neighbour stays exactly where it was.
+    #[test]
+    fn suspended_allow_entry_is_not_listed_as_live() {
+        let perms = PermissionConfig {
+            allow: s(&["cargo *", "ls *"]),
+            deny: vec![],
+        };
+        let dirs = DirectoryRestrictions::default();
+        let out = permissions_report(false, &perms, &dirs, &[], &[], &[], &s(&["cargo *"]));
+        let head = head_text(false, &perms, &dirs);
+        assert_eq!(
+            out,
+            head.replace(
+                &format!("      {GREEN}✓{RESET} cargo *\n      {GREEN}✓{RESET} ls *\n"),
+                &format!(
+                    "      {GREEN}✓{RESET} ls *\n    {DIM}{CD_SUSPENDED_ALLOW_HEADING}{RESET}\n      - cargo *\n"
+                )
+            )
+        );
+        assert!(!out.contains(&format!("✓{RESET} cargo *")), "got:\n{out}");
+        // Every entry suspended: no empty ✓ heading.
+        let out = permissions_report(
+            false,
+            &perms,
+            &dirs,
+            &[],
+            &[],
+            &[],
+            &s(&["cargo *", "ls *"]),
+        );
+        assert!(!out.contains("Allow patterns:"), "got:\n{out}");
+        assert!(out.contains("      - ls *\n"), "got:\n{out}");
     }
 
     #[test]
