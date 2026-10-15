@@ -19,7 +19,9 @@
 //! dies for good keeps its partial answer on stdout; Ctrl+C keeps what was
 //! streamed, #993). So this gate shadows the raw text of the attempt in
 //! flight: a final failure gets its text back as one synthetic text delta just
-//! before its end, and Ctrl+C can flush whatever is still held.
+//! before its end, an attempt still open when the stream closes gets its text
+//! back as one synthetic delta at the close (#1016), and Ctrl+C can flush
+//! whatever is still held.
 
 use std::collections::VecDeque;
 use std::io::{IsTerminal, Write};
@@ -78,6 +80,9 @@ pub(super) struct RetrySafeGate {
     closed: bool,
     /// Raw text of the attempt currently open (held by the filter).
     open_text: String,
+    /// The `MessageStart` message of that open attempt, so a close inside it
+    /// can release its text as a well-formed update (#1016).
+    open_message: Option<AgentMessage>,
     /// Raw text of an attempt that ended with Error/Aborted and is held until
     /// the next event says whether it was retried.
     failed_text: String,
@@ -93,6 +98,7 @@ impl RetrySafeGate {
             queue: VecDeque::new(),
             closed: false,
             open_text: String::new(),
+            open_message: None,
             failed_text: String::new(),
             panic_sink: Box::new(std::io::stdout()),
         }
@@ -142,7 +148,12 @@ impl RetrySafeGate {
                 delta: StreamDelta::Text { delta },
                 ..
             }) => self.open_text.push_str(&delta),
-            Some(ref event) if is_assistant_start(event) => self.open_text.clear(),
+            Some(ref event) if is_assistant_start(event) => {
+                self.open_text.clear();
+                if let AgentEvent::MessageStart { message } = event {
+                    self.open_message = Some(message.clone());
+                }
+            }
             Some(ref event) if failed_assistant_end(event).is_some() => {
                 self.failed_text = std::mem::take(&mut self.open_text);
             }
@@ -152,8 +163,43 @@ impl RetrySafeGate {
                 self.open_text.clear();
                 self.failed_text.clear();
             }
-            None => self.closed = true,
+            None => {
+                self.release_unended_attempt();
+                self.closed = true;
+            }
             _ => {}
+        }
+    }
+
+    /// #1016: the raw stream closed while an attempt was still open (no
+    /// `MessageEnd`, no `ProviderRetry`). Keyed on that STATE, not on the cause
+    /// of the close: a panic inside yoagent's spawned agent task never unwinds
+    /// through this gate, it only closes the channel, so a cause-keyed flush
+    /// (the `Drop` below, `panicking()`) cannot see it.
+    ///
+    /// Policy: before the hold (#991) this text had already reached stdout,
+    /// token by token, so dropping it here would make this the one ending that
+    /// loses it -- SIGINT, SIGTERM/SIGHUP/SIGQUIT and a panic in yoyo's loop all
+    /// keep it. yoagent's own `RetrySafeEvents::finish()` drops `Held::Open`;
+    /// yoyo differs on purpose. The property #976/#989 protect is "no reader
+    /// receives two attempts it cannot tell apart", and an un-ended attempt
+    /// that is the LAST thing on the wire is one attempt, not two. A retried
+    /// attempt never gets here: `ProviderRetry` already cleared its text.
+    ///
+    /// Released as one synthetic text delta at the back of the queue, after
+    /// anything `finish()` released, so the loop prints it through its normal
+    /// path (markdown renderer, `collected_text`) exactly once, with no
+    /// `MessageEnd` -- the same shape the raw stream had before the hold.
+    fn release_unended_attempt(&mut self) {
+        let text = std::mem::take(&mut self.open_text);
+        let Some(message) = self.open_message.take() else {
+            return;
+        };
+        if !text.is_empty() {
+            self.queue.push_back(AgentEvent::MessageUpdate {
+                message,
+                delta: StreamDelta::Text { delta: text },
+            });
         }
     }
 
@@ -338,11 +384,112 @@ mod tests {
         assert_eq!(sink.bytes(), "ONE ");
     }
 
+    /// A non-panicking drop with NO close still writes nothing through `Drop`,
+    /// and that is not the defect. The Day-228 reading of this row ("it pins
+    /// the lost text") was narrower than it looked: the row never feeds
+    /// `None`, and the defect state is "stream CLOSED inside an un-ended
+    /// attempt", which production always reaches through `feed(None)` before
+    /// the gate drops. That state is now released into the queue at close (see
+    /// `stream_closing_inside_an_attempt_reaches_the_loop_exactly_once`), so
+    /// the loop prints it and this drop has nothing left to write. Production
+    /// leaves the loop without a close only through the signal returns, which
+    /// take the held text first (#993/#1015).
     #[test]
-    fn normal_drop_with_held_text_writes_nothing_as_before() {
-        // Near-miss: today's (pre-#1016) value of a non-panicking drop is "".
+    fn normal_drop_without_a_close_writes_nothing_through_drop() {
         let sink = Sink::default();
         gate_dies(&sink, vec![start(), text("HELD_")], false);
+        assert_eq!(sink.bytes(), "");
+    }
+
+    /// Drive the gate the way `handle_prompt_events` does: real channel, real
+    /// `next()`, until `None`. Returns the text deltas the loop would print.
+    async fn loop_prints(filtering: bool, events: Vec<AgentEvent>, sink: &Sink) -> String {
+        let mut gate = RetrySafeGate::with_panic_sink(filtering, Box::new(sink.clone()));
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        for e in events {
+            tx.send(e).expect("send");
+        }
+        drop(tx); // the agent task is gone: the channel closes
+        let mut out = String::new();
+        while let Some(event) = gate.next(&mut rx).await {
+            if let AgentEvent::MessageUpdate {
+                delta: StreamDelta::Text { delta },
+                ..
+            } = event
+            {
+                out.push_str(&delta);
+            }
+        }
+        drop(gate); // normal drop, not panicking
+        out
+    }
+
+    /// #1016, emission point. At HEAD before this fix the loop printed "" and
+    /// the sink got "": the cut-off attempt's text was lost on this one ending.
+    #[tokio::test]
+    async fn stream_closing_inside_an_attempt_reaches_the_loop_exactly_once() {
+        let sink = Sink::default();
+        let out = loop_prints(true, vec![start(), text("CUT"), text("_OFF")], &sink).await;
+        assert_eq!(out, "CUT_OFF");
+        assert_eq!(
+            sink.bytes(),
+            "",
+            "Drop must not repeat what the loop printed"
+        );
+    }
+
+    /// The near-miss that matters (#976/#989): a retried attempt, then the
+    /// stream closes with nothing new, prints nothing.
+    #[tokio::test]
+    async fn retried_attempt_then_close_prints_nothing() {
+        let sink = Sink::default();
+        let out = loop_prints(
+            true,
+            vec![start(), text("PARTIAL_"), end(StopReason::Error), retry()],
+            &sink,
+        )
+        .await;
+        assert_eq!(out, "");
+        assert_eq!(sink.bytes(), "");
+        // Same, when the retry's attempt was open but streamed no text yet.
+        let sink = Sink::default();
+        let out = loop_prints(
+            true,
+            vec![
+                start(),
+                text("PARTIAL_"),
+                end(StopReason::Error),
+                retry(),
+                start(),
+            ],
+            &sink,
+        )
+        .await;
+        assert_eq!(out, "");
+        assert_eq!(sink.bytes(), "");
+    }
+
+    /// A complete attempt then a close: byte-identical to before (once).
+    #[tokio::test]
+    async fn complete_attempt_then_close_prints_once() {
+        let sink = Sink::default();
+        let out = loop_prints(
+            true,
+            vec![start(), text("DONE"), end(StopReason::Stop)],
+            &sink,
+        )
+        .await;
+        assert_eq!(out, "DONE");
+        assert_eq!(sink.bytes(), "");
+    }
+
+    /// Filter off (terminal stdout): every delta passes through as before,
+    /// and the close adds nothing.
+    #[tokio::test]
+    async fn filter_off_close_inside_an_attempt_is_unchanged() {
+        let sink = Sink::default();
+        let out = loop_prints(false, vec![start(), text("CUT"), text("_OFF")], &sink).await;
+        assert_eq!(out, "CUT_OFF");
         assert_eq!(sink.bytes(), "");
     }
 
@@ -435,6 +582,47 @@ mod tests {
         );
         // Anti-vacuous: the retried copy is gone, the final one survives once.
         assert_eq!(out, vec!["PARTIAL_".to_string()]);
+    }
+
+    /// #1016: the channel closing inside an attempt (no `MessageEnd`) is the
+    /// state yoagent's agent task leaves when it dies — every path it returns
+    /// from closes the attempt it opened. The text is released, once, at close.
+    #[test]
+    fn stream_closing_inside_an_attempt_releases_its_text() {
+        let mut gate = RetrySafeGate::new(true);
+        let out = printed(&mut gate, vec![start(), text("CUT"), text("_OFF")]);
+        assert_eq!(out, vec!["CUT_OFF".to_string()]);
+        assert_eq!(gate.take_held_text(), "", "released, not also held");
+    }
+
+    /// Near-miss: a retried attempt stays gone even when the NEXT attempt is
+    /// the one cut off — only the open attempt's own text is released.
+    #[test]
+    fn close_inside_the_retry_attempt_releases_only_that_attempt() {
+        let mut gate = RetrySafeGate::new(true);
+        let out = printed(
+            &mut gate,
+            vec![
+                start(),
+                text("PARTIAL_"),
+                end(StopReason::Error),
+                retry(),
+                start(),
+                text("SECOND"),
+            ],
+        );
+        assert_eq!(out, vec!["SECOND".to_string()]);
+    }
+
+    /// Near-miss: a finished attempt then a close prints its text exactly once.
+    #[test]
+    fn close_after_a_finished_attempt_adds_nothing() {
+        let mut gate = RetrySafeGate::new(true);
+        let out = printed(
+            &mut gate,
+            vec![start(), text("DONE"), end(StopReason::Stop)],
+        );
+        assert_eq!(out, vec!["DONE".to_string()]);
     }
 
     #[test]
