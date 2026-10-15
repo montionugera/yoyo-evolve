@@ -116,6 +116,8 @@ api_key = "sk-ant-api03-..."
 max_tokens = 8192
 max_turns = 50
 temperature = 0.7
+# An unparseable max_tokens / max_turns / temperature / context_window
+# (e.g. "abc", -5) prints a warning on stderr and falls back to the default.
 
 # Display settings
 no_bell = false

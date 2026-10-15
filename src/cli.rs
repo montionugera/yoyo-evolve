@@ -1019,27 +1019,20 @@ pub fn resolve_system_prompt(
 ///
 /// Checks `args` for `flag_name`, parses the following value as `T`.
 /// Falls back to `file_config[config_key]` when the CLI flag is absent.
-/// Prints a warning on parse failure.
-fn parse_numeric_flag<T: std::str::FromStr + std::fmt::Display>(
+/// Prints a warning when either door's value fails to parse (#1028); the
+/// rule lives in `cli_config::resolve_numeric_setting`.
+fn parse_numeric_flag<T: std::str::FromStr>(
     args: &[String],
     flag_name: &str,
     file_config: &std::collections::HashMap<String, String>,
     config_key: &str,
 ) -> Option<T> {
-    args.iter()
-        .position(|a| a == flag_name)
-        .and_then(|i| args.get(i + 1))
-        .and_then(|s| {
-            s.parse::<T>().ok().or_else(|| {
-                eprintln!("{YELLOW}warning:{RESET} Invalid {flag_name} value '{s}', using default");
-                None
-            })
-        })
-        .or_else(|| {
-            file_config
-                .get(config_key)
-                .and_then(|s| s.parse::<T>().ok())
-        })
+    let (value, warnings) =
+        crate::cli_config::resolve_numeric_setting(args, flag_name, file_config, config_key);
+    for w in warnings {
+        eprintln!("{YELLOW}warning:{RESET} {w}");
+    }
+    value
 }
 
 /// Collect all values for a repeatable flag (e.g. `--allow pat1 --allow pat2`).

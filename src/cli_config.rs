@@ -236,9 +236,179 @@ pub struct Config {
     pub safe_mode: bool,
 }
 
+/// Resolve a numeric setting: `flag_name`'s value in `args` wins, else
+/// `file_config[config_key]`, else `None` (the caller's default).
+///
+/// Pure — returns the warnings instead of printing them, so tests see the
+/// exact text a user reads; `cli::parse_numeric_flag` prints each one.
+///
+/// Both doors warn when their value cannot be parsed (#1028: the config door
+/// used to drop `max_tokens = "abc"` silently and run on the default, which is
+/// how a user ends up cut off under a limit they think they changed). The
+/// config value is consulted — and so can only warn — when no valid flag
+/// supersedes it: with `--max-tokens 4096` the file's value is never used,
+/// so "using default" would be false about this run.
+///
+/// Why not `config::validate_config_value`: it judges *ranges* the runtime
+/// handles differently (it rejects temperature above 2.0 while the runtime
+/// clamps above 1.0 and says so; it rejects `max_tokens = 0`, which parses and
+/// is used) and it has no `context_window` arm. This warns exactly when the
+/// value is dropped, which is the silent case.
+pub(crate) fn resolve_numeric_setting<T: std::str::FromStr>(
+    args: &[String],
+    flag_name: &str,
+    file_config: &std::collections::HashMap<String, String>,
+    config_key: &str,
+) -> (Option<T>, Vec<String>) {
+    let mut warnings = Vec::new();
+    let from_flag = args
+        .iter()
+        .position(|a| a == flag_name)
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| {
+            let parsed = s.parse::<T>().ok();
+            if parsed.is_none() {
+                warnings.push(format!("Invalid {flag_name} value '{s}', using default"));
+            }
+            parsed
+        });
+    if from_flag.is_some() {
+        return (from_flag, warnings);
+    }
+    let from_config = file_config.get(config_key).and_then(|s| {
+        let parsed = s.parse::<T>().ok();
+        if parsed.is_none() {
+            warnings.push(format!(
+                "Invalid {config_key} value '{}' in config file, using default",
+                crate::cli::sanitize_for_display(s)
+            ));
+        }
+        parsed
+    });
+    (from_config, warnings)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn cfg(key: &str, value: &str) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([(key.to_string(), value.to_string())])
+    }
+
+    fn argv(rest: &[&str]) -> Vec<String> {
+        std::iter::once("yoyo")
+            .chain(rest.iter().copied())
+            .map(String::from)
+            .collect()
+    }
+
+    /// #1028 at the emission point: every value the assessment probed, for
+    /// each of the four numeric keys, yields exactly one warning naming key,
+    /// value and source, and the setting falls back to `None` (the default).
+    #[test]
+    fn bad_config_numeric_warns_once_naming_key_value_and_source() {
+        let cases: &[(&str, &str, &str)] = &[
+            ("--max-tokens", "max_tokens", "abc"),
+            ("--max-tokens", "max_tokens", "-5"),
+            ("--max-tokens", "max_tokens", "99999999999"),
+            ("--max-turns", "max_turns", "x"),
+            ("--context-window", "context_window", "big"),
+        ];
+        for (flag, key, value) in cases {
+            let (v, w) = resolve_numeric_setting::<u32>(&argv(&[]), flag, &cfg(key, value), key);
+            assert_eq!(v, None, "{key} = {value}");
+            assert_eq!(
+                w,
+                vec![format!(
+                    "Invalid {key} value '{value}' in config file, using default"
+                )]
+            );
+        }
+        let (t, w) = resolve_numeric_setting::<f32>(
+            &argv(&[]),
+            "--temperature",
+            &cfg("temperature", "hot"),
+            "temperature",
+        );
+        assert_eq!(t, None);
+        assert_eq!(
+            w,
+            vec!["Invalid temperature value 'hot' in config file, using default".to_string()]
+        );
+    }
+
+    /// Near-miss guard: a valid config value parses exactly as before and
+    /// says nothing — every user with a correct `.yoyo.toml`.
+    #[test]
+    fn valid_config_numeric_is_silent_and_unchanged() {
+        let (v, w) = resolve_numeric_setting::<u32>(
+            &argv(&[]),
+            "--max-tokens",
+            &cfg("max_tokens", "2048"),
+            "max_tokens",
+        );
+        assert_eq!((v, w), (Some(2048), Vec::<String>::new()));
+        let (t, w) = resolve_numeric_setting::<f32>(
+            &argv(&[]),
+            "--temperature",
+            &cfg("temperature", "0.5"),
+            "temperature",
+        );
+        assert_eq!((t, w), (Some(0.5), Vec::<String>::new()));
+        let (n, w) = resolve_numeric_setting::<u32>(
+            &argv(&[]),
+            "--max-tokens",
+            &std::collections::HashMap::new(),
+            "max_tokens",
+        );
+        assert_eq!((n, w), (None, Vec::<String>::new()));
+    }
+
+    /// Decision pinned: a valid flag wins and the bad config value does NOT
+    /// warn — it is never consulted, so "using default" would be false.
+    /// An invalid flag falls through to the config, and then both warn.
+    #[test]
+    fn flag_supersedes_bad_config_without_config_warning() {
+        let bad = cfg("max_tokens", "abc");
+        let (v, w) = resolve_numeric_setting::<u32>(
+            &argv(&["--max-tokens", "4096"]),
+            "--max-tokens",
+            &bad,
+            "max_tokens",
+        );
+        assert_eq!((v, w), (Some(4096), Vec::<String>::new()));
+        let (v, w) = resolve_numeric_setting::<u32>(
+            &argv(&["--max-tokens", "nope"]),
+            "--max-tokens",
+            &bad,
+            "max_tokens",
+        );
+        assert_eq!(v, None);
+        assert_eq!(
+            w,
+            vec![
+                "Invalid --max-tokens value 'nope', using default".to_string(),
+                "Invalid max_tokens value 'abc' in config file, using default".to_string(),
+            ]
+        );
+    }
+
+    /// The config value is repository-authored text: control bytes are
+    /// escaped before they reach the terminal.
+    #[test]
+    fn bad_config_value_is_sanitized_for_display() {
+        let hostile = "1\u{1b}[2J";
+        assert!(hostile.as_bytes().contains(&0x1b), "fixture must carry ESC");
+        let (_, w) = resolve_numeric_setting::<u32>(
+            &argv(&[]),
+            "--max-tokens",
+            &cfg("max_tokens", hostile),
+            "max_tokens",
+        );
+        assert_eq!(w.len(), 1);
+        assert!(!w[0].as_bytes().contains(&0x1b), "{:?}", w[0]);
+    }
 
     #[test]
     fn test_cli_config_constants() {
