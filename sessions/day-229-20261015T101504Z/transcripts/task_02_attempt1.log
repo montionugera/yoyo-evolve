@@ -1,0 +1,241 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; grep -rn "All set! Startin… ✓ (21ms)
+  ▶ $ pwd; sed -n 300,345p src/dispatch_sub.rs; grep -n "is_interactive" src/main.rs |… ✓ (7ms)
+  ▶ $ sed -n 115,140p src/dispatch_sub.rs; sed -n 310,322p src/dispatch_sub.rs; head -…  ▶ $ ls tests/ | head -40; grep -ln "Command::new(env!(\"CARGO_BIN_EXE" tests/*.rs | … ✓ (8ms)
+ ✓ (12ms)
+  ▶ $ sed -n 15,22p src/dispatch_sub.rs; grep -n "dispatch_sub" tests/module_size.rs; … ✓ (6ms)
+  ▶ $ sed -n 318,333p src/dispatch_sub.rs; wc -l src/setup.rs; grep -n "setup.rs" test… ✓ (9ms)
+  ▶ $ grep -n "const\|fn src_modules_respect_the_size_gate" tests/module_size.rs | hea… ✓ (8ms)
+  ▶ read src/dispatch_sub.rs:318..332  ▶ $ sed -n 80,127p tests/module_size.rs ✓ (1ms)
+ ✓ (3ms)
+  ▶ $ grep -n "fn yoyo_cmd" -A12 tests/integration.rs; grep -n "current_dir" tests/int… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 25.8s (10 ✓)
+
+First, the measurement before the fix (reproduce the bug), then write the failing tests.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cargo build -q 2>&1 | tail -3; d=$(mktemp -d); cd $d && HOME=$d ~/work/yoyo-evol… ✓ (154ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Reproduced: exit 0, .yoyo.toml written, false "Starting yoyo...". Now the gate + tests.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/setup.rs (2 → 17 lines)
+        run_wizard_interactive(&mut reader, &mut writer)
+  + }
+  + 
+  + /// Exit code for an explicit `yoyo setup` whose stdin is not a terminal (#1024):
+  + /// 2, the usage code the #982 refusals use.
+  + pub(crate) const SETUP_NOT_INTERACTIVE_EXIT: i32 = 2;
+  + 
+  + /// #1024: the explicit `yoyo setup` door must be gated like the auto-offered
+  + /// wizard (`run_setup_wizard_if_needed`, gated on `stdin().is_terminal()`).
+  + /// Ungated, EOF on piped stdin took every default, wrote `.yoyo.toml` and
+  + /// printed "All set! Starting yoyo..." while starting nothing. `Some(msg)` means
+  + /// refuse before anything is read or written; `None` means run the wizard.
+  + pub(crate) fn setup_stdin_refusal(stdin_is_terminal: bool) -> Option<&'static str> {
+  +     (!stdin_is_terminal).then_some(
+  +         "yoyo setup is interactive: run it in a terminal (stdin is not a TTY). Nothing was written.",
+  +     )
+    }
+  ▶ $ sed -n 875,882p src/setup.rs ✓ (19.0s)
+        run_wizard_interactive(&mut reader, &mut writer)
+  + }
+  + 
+  + /// Exit code for an explicit `yoyo setup` whose stdin is not a terminal (#1024):
+  + /// 2, the usage code the #982 refusals use.
+  + pub(crate) const SETUP_NOT_INTERACTIVE_EXIT: i32 = 2;
+  + 
+  + /// #1024: the explicit `yoyo setup` door must be gated like the auto-offered
+  ... (9 more lines)
+ ✓ (19.0s)
+  2 tools completed in 25.3s (2 ✓)
+
+Wire the consumer now (same edit discipline), then tests.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/dispatch_sub.rs (1 → 9 lines)
+  -                     None => drop(crate::setup::run_setup_wizard()),
+  +                     None => {
+  +                         use std::io::IsTerminal;
+  +                         let tty = std::io::stdin().is_terminal();
+  +                         if let Some(msg) = crate::setup::setup_stdin_refusal(tty) {
+  +                             eprintln!("{msg}");
+  +                             exit_if_nonzero(crate::setup::SETUP_NOT_INTERACTIVE_EXIT);
+  +                         }
+  +                         drop(crate::setup::run_setup_wizard())
+  +                     }
+  ▶ edit src/setup.rs (4 → 23 lines)
+        use super::*;
+        use crate::cli::KNOWN_PROVIDERS;
+        use serial_test::serial;
+  + 
+  +     /// #1024: non-TTY stdin refuses with exit 2 and a message saying nothing
+  +     /// was written; the refusal must not claim the wizard ran or yoyo started.
+  +     #[test]
+  +     fn setup_refuses_when_stdin_is_not_a_terminal() {
+  +         let msg = setup_stdin_refusal(false).expect("non-TTY stdin must refuse");
+  +         assert_eq!(
+  +             msg,
+  +             "yoyo setup is interactive: run it in a terminal (stdin is not a TTY). Nothing was written."
+  +         );
+  +         assert!(!msg.contains("Starting yoyo"));
+  +         assert_eq!(SETUP_NOT_INTERACTIVE_EXIT, 2);
+  +     }
+  + 
+  +     /// Near-miss: an interactive terminal proceeds to the wizard unchanged.
+  +     #[test]
+  +     fn setup_proceeds_when_stdin_is_a_terminal() {
+  ... (2 more lines)
+ ✓ (4m 10s)
+  -                     None => drop(crate::setup::run_setup_wizard()),
+  +                     None => {
+  +                         use std::io::IsTerminal;
+  +                         let tty = std::io::stdin().is_terminal();
+  +                         if let Some(msg) = crate::setup::setup_stdin_refusal(tty) {
+  +                             eprintln!("{msg}");
+  +                             exit_if_nonzero(crate::setup::SETUP_NOT_INTERACTIVE_EXIT);
+  +                         }
+  +                         drop(crate::setup::run_setup_wizard())
+  +                     }
+ ✓ (7m 53s)
+        use super::*;
+        use crate::cli::KNOWN_PROVIDERS;
+        use serial_test::serial;
+  + 
+  +     /// #1024: non-TTY stdin refuses with exit 2 and a message saying nothing
+  +     /// was written; the refusal must not claim the wizard ran or yoyo started.
+  +     #[test]
+  +     fn setup_refuses_when_stdin_is_not_a_terminal() {
+  ... (13 more lines)
+  2 tools completed in 7m 55s (2 ✓)
+
+Now the end-to-end binary test in integration.rs.
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ sed -n 2040,2075p tests/integration.rs ✓ (3ms)
+  ▶ edit tests/integration.rs (6 → 37 lines)
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    
+  + /// #1024: explicit `yoyo setup` with non-terminal stdin used to take every
+  + /// default on EOF, write `.yoyo.toml`, print "All set! Starting yoyo..." and
+  + /// exit 0 while starting nothing. It must now refuse: exit 2, stderr says so,
+  + /// and no `.yoyo.toml` (or `.bak`) appears in the cwd or HOME.
+    #[test]
+  - fn wizard_does_not_trigger_with_prompt_flag() {
+  + fn explicit_setup_with_non_tty_stdin_refuses_and_writes_nothing() {
+  +     let dir = std::env::temp_dir().join(format!("yoyo_test_setup_non_tty_{}", std::process::id()));
+  +     let _ = std::fs::remove_dir_all(&dir);
+  +     std::fs::create_dir_all(&dir).expect("create temp dir");
+  + 
+  +     let output = yoyo_cmd()
+  +         .arg("setup")
+  +         .current_dir(&dir)
+  +         .env("HOME", &dir)
+  +         .env("XDG_CONFIG_HOME", dir.join(".config"))
+  +         .stdin(Stdio::null())
+  ... (17 more lines)
+ ✓ (18.2s)
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    
+  + /// #1024: explicit `yoyo setup` with non-terminal stdin used to take every
+  + /// default on EOF, write `.yoyo.toml`, print "All set! Starting yoyo..." and
+  + /// exit 0 while starting nothing. It must now refuse: exit 2, stderr says so,
+  + /// and no `.yoyo.toml` (or `.bak`) appears in the cwd or HOME.
+    #[test]
+  ... (13 more lines)
+  2 tools completed in 26.1s (2 ✓)
+
+I dropped the next test's header; restore it.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ sed -n 2104,2110p tests/integration.rs ✓ (3ms)
+  ▶ edit tests/integration.rs (4 → 6 lines)
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    
+  + #[test]
+  + fn wizard_does_not_trigger_with_prompt_flag() {
+        // --prompt / -p is single-shot mode
+  ▶ $ cargo fmt && cargo test -q --test integration explicit_setup 2>&1 | tail -5; car… ✓ (3m 28s)
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    
+  + #[test]
+  + fn wizard_does_not_trigger_with_prompt_flag() {
+        // --prompt / -p is single-shot mode
+ ✓ (3m 28s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 3m 36s (3 ✓)
+
+Pasting the new sizes into the register, as the gate asks.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (7 lines)  ▶ $ sed -n 8,16p docs/src/usage/commands.md ✓ (2ms)
+ ✓ (22ms)
+  ▶ edit docs/src/usage/commands.md (1 → 1 lines)
+  - > | `yoyo setup` | Run the interactive setup wizard |
+  + > | `yoyo setup` | Run the interactive setup wizard (requires an interactive terminal: with stdin not a TTY it refuses with exit 2 and writes nothing) |
+ ✓ (0ms)
+  - > | `yoyo setup` | Run the interactive setup wizard |
+  + > | `yoyo setup` | Run the interactive setup wizard (requires an interactive terminal: with stdin not a TTY it refuses with exit 2 and writes nothing) |
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 5.1s (3 ✓)
+
+Positive control, atomic mutate→run→restore with a marker:
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/setup.rs /tmp/setup.rs.bak && sed -i 's|    (!stdin_is_terminal).then_som… ✓ (33.7s)
+
+Both tests red by name under sabotage, near-miss stayed green, restored (0 markers left). Full gate:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cargo fmt -- --check && cargo build -q 2>&1 | tail -2 && cargo clippy -q --all-t… ✓ (7m 56s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All green. Manual check against the rebuilt binary:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ d=$(mktemp -d); cd $d && HOME=$d ~/work/yoyo-evolve/yoyo-evolve/target/debug/yoy… ✓ (285ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Non-TTY: exit 2, nothing written, empty stdout. Under a real pty (script), the wizard still starts. Committing:
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ git add -A && git commit -q -m 'Day 229 (08:49): Fixes #1024… (9 lines) ✓ (25ms)
+
+I fixed #1024 and committed it as 5c5135b4. When stdin isn't a terminal, yoyo setup now refuses instead of quietly writing a config.
+
+Before the fix, I ran yoyo setup </dev/null in a temp directory. It exited 0, wrote .yoyo.toml, and printed All set! Starting yoyo... without starting anything. The wizard yoyo offers on its own at startup already checks for a terminal; the explicit setup command didn't.
+
+The change:
+• `src/setup.rs has a new function, setup_stdin_refusal(stdin_is_terminal). It checks the same thing main.rs already checks for the startup wizard (stdin().is_terminal()`), so there's no second definition of "interactive".
+• In the setup command in src/dispatch_sub.rs, a non-terminal stdin now prints yoyo setup is interactive: run it in a terminal (stdin is not a TTY). Nothing was written. to stderr and exits 2. That's the code the other #982 refusals use, and it goes through the file's existing exit helper. The path where tests inject their own input is unchanged.
+• `docs/src/usage/commands.md: the setup` row now says it needs an interactive terminal and refuses with exit 2 otherwise.
+• `tests/module_size.rs: both files are on the size gate's list of already-oversized modules, so I recorded their new sizes with a reason, as the gate asks (dispatch_sub.rs 2328→2336, setup.rs` 2067→2101).
+
+Tests:
+• Two unit tests in setup.rs: no terminal gives the exact refusal text and exit code 2; a terminal goes on to the wizard.
+• An integration test runs the real binary with null stdin in a temp directory. It checks for exit 2, the refusal on stderr, no "Starting yoyo", and no .yoyo.toml, .bak file, or XDG config directory.
+• To check the tests can actually fail, I broke the check (marked NEUTERED) so it always lets setup proceed. The two refusal tests failed by name and the terminal test stayed green. I restored it in the same command; no marker is left.
+• By hand after the fix: null stdin gives exit 2, an empty directory and empty stdout. Under a fake terminal (script), the wizard still opens ("Welcome to yoyo! 🐙 / Step 1").
+
+cargo fmt --check, build, clippy with -D warnings, and the full cargo test all pass.
+
+Nothing in scripts/ or .github/ runs setup, so the evolution loop isn't affected; the commit body says so. As #1024 asked, I left the stale claude-opus-4-6 default model alone.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/2 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/2 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/setup.rs, src/dispatch_sub.rs

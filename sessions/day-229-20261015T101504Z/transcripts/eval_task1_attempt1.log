@@ -1,0 +1,23 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'Command::new("rg")\|"rg"… ✓ (20ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -1 --format=%B | head -40;… ✓ (5ms)
+  ▶ write session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 17.3s (3 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_1.md. I judged the diff and checked the two spawn-site claims with grep; I didn't run the binary, since build and tests had already passed.
+
+What the change does. There is nowhere in yoyo to add --no-config: the model's search runs rg from inside yoagent, so yoyo never builds that command. Instead, while a fence is active and the search root is a directory, the result filter now drops any line before yoagent's footer that doesn't name a file under the searched root. Dropped lines get their own count. The rule lives inside fence_tool_result, which both guarded tool wrappers already send every result through, as the placement note asked.
+
+Spawn sites, confirmed. src/ has no Command::new("rg"). /grep and yoyo grep run grep (in commands_search.rs), so a ripgrep config never reaches them. The other "rg" strings in src/ (tools.rs, rtk.rs) are lookup tables, not places where rg gets started.
+
+Tests. They cover each output shape the probe found leaking (--no-filename, --null, --json, --path-separator, and -C1 context lines). With no fence, and for ordinary results outside the denied directory, output is checked to be byte-identical with assert_eq!. A separate test confirms that a single-file root is not put into the drop-everything mode.
+
+Docs and commit message. permissions.md and ARCHITECTURE.md are both updated. The commit body records the probe results and lists the rest of #1023 as still open: the stale (N matches) footer and warning lines that name a denied path.
+
+Trade-off: if a user has a ripgrep config that reshapes output and a fence is active, allowed matches are dropped too. This is documented, along with the remedy: unset RIPGREP_CONFIG_PATH.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

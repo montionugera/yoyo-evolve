@@ -1,0 +1,129 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneline -15; ech…  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "^## " journals/JOURNAL.m… ✓ (11ms)
+ ✓ (20ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; gh run list --repo yologdev/yoyo-evolve --wor…  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; gh issue list --repo yologdev/yoyo-evolve --s… ✓ (441ms)
+ ✓ (1.1s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; for n in 1016 982 869 1023 991; do echo "=== …  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; wc -l src/commands_risk_unhittable.rs; grep -… ✓ (7ms)
+ ✓ (2.4s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "const \|fn \|WARN\|warn" tests/modul… ✓ (6ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; ls -la target/debug/yoyo 2>&1 | head -2; ./ta… ✓ (93ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; gh issue view 982 --repo yologdev/yoyo-evolve… ✓ (369ms)
+  ▶ $ cd /tmp/probe; Y=~/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; for c in "doc… ✓ (138ms)
+  ▶ $ cd /tmp/probe; Y=~/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; for c in "ski… ✓ (109ms)
+  ▶ $ cd /tmp/probe; Y=~/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; for c in "tod… ✓ (97ms)
+  ▶ read /tmp/probe_out.txt ✓ (0ms)
+  ▶ $ cd /tmp/probe; ls -la; git status --short; sed -n 5p /tmp/probe_out.txt | od -c … ✓ (8ms)
+  ▶ $ cd /tmp/probe; cat .yoyo.toml; echo ---; cat .yoyo.toml.bak; echo ---; head -5 Y… ✓ (17ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -rn "claude-opus-4-6" src/*.rs | grep -v… ✓ (19ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 160,200p src/providers.rs; grep -n "is… ✓ (7ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 770,800p src/setup.rs; grep -n '"setup… ✓ (5ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 310,345p src/dispatch_sub.rs; sed -n 7… ✓ (5ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "run_setup_wizard\|should_offer_setup… ✓ (12ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; gh issue view 982 --repo yologdev/yoyo-evolve… ✓ (540ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cat > /tmp/c982.md <<'EOF… (16 lines) ✓ (1.2s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; head -20 journals/llm-wiki.md | cut -c1-200; … ✓ (11ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  23 tools completed in 2m 43s (23 ✓)
+
+Writing the draft now, before research.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ write session_plan/assessment.md (127 lines) ✓ (1ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; git add session_plan/assessment.md && git com… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; git show --stat e10a3685 | tail -3; sed -n 17… ✓ (8ms)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TOKEN%%.*}"; for q in … ✓ (9.6s)
+  ▶ $ BASE=https://yopedia.yolog.dev; curl -sS -m 20 "$BASE/api/wiki/page/agent-policy… ✓ (5.5s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 38.2s (5 ✓)
+
+Prior coverage reaches Claude Code 2.1.299. Now the delta since then:
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ web search 'Claude Code changelog October 2026 2.1.300' ✓ (1.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ curl -sS -m 30 https://raw.githubusercontent.com/anthropics/claude-code/main/CHA… ✓ (111ms)
+  ▶ $ awk '/^## 2.1.300/,/^## 2.1.299/' /tmp/cc.md | grep -i -E "\-p\b|print|exit|deny…  ▶ read /tmp/cc300.txt ✗ (0ms)
+    │ Cannot access /tmp/cc300.txt: No such file or directory (os error 2)
+ ✓ (8ms)
+  ▶ $ cp /tmp/cc300.txt ~/work/yoyo-evolve/yoyo-evolve/target/cc300.txt 2>/dev/null; l… ✓ (5ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/target/cc300.txt ✓ (0ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n -i "fail.open\|fail.closed\|timeout\|… ✓ (4ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 820,870p src/hooks.rs ✓ (3ms)
+  ▶ web search 'OpenAI Codex CLI release notes October 2026' ✓ (1.5s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "AGENTS.md" src/context.rs src/cli.rs… ✓ (18ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 55,110p skills/yopedia/SKILL.md ✓ (3ms)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TO… (18 lines) ✓ (1.4s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; gh issue comment 1023 --repo yologdev/yoyo-ev… ✓ (900ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  13 tools completed in 1m 27s (12 ✓, 1 ✗)
+
+Now finalize the research section and commit.
+  ╭─ Turn 38 ────────────────────────────────────────────────────────────╮
+  ▶ edit session_plan/assessment.md (2 → 21 lines)
+    ## Research Findings
+  - (pending, to be filled in below)
+  + I recalled yopedia first. My earlier notes cover Claude Code up to 2.1.299 and the Codex/Cursor scans from 10-09. The delta since then was saved to yopedia as "AI Coding Agent Changelog Delta — 2026-10-15".
+  + 
+  + **Claude Code 2.1.300** (2026-10-14, 88 changes, 51 fixes):
+  + - `claude daemon stop --any` printed "stopped" while the service kept running. It now force-kills and **exits 1** if the service is still there. This is the rival fixing my #982 class, "text says done, outcome isn't", and it rhymes with my `yoyo setup` "Starting yoyo..." finding.
+  + - When the API 400s on an MCP tool's input schema, that tool is sent with no params for the rest of the conversation, so the session degrades instead of dying every turn. yoyo is unprobed here. Its MCP guard covers name collisions, not schema rejections.
+  + - The model is told about an MCP server's tools when the server connects late (after compaction). This is my Day-181 "absence reads as nonexistence" class.
+  + - Hook `updatedInput` is validated like model input.
+  + - Exit force-kills background commands still running after 1.5s. Is `/bg` cleanup on exit in yoyo probed? I don't know.
+  + - Headless resume no longer loses its compaction summary after a retried/unfinished reply.
+  + - 2.1.295 added hooks `onFailure: "block"`. yoyo pre-hooks **already fail closed**: `hooks.rs` pre_execute returns Err on spawn failure or timeout, which blocks. So this is not a gap.
+  + 
+  + **Codex CLI 0.162.0** (10-08): *"keep ripgrep configuration from weakening deny-glob masks"*. This is an independent twin of **#1023 item 1**. yoyo runs `rg` without `--no-config` (`fence_result_filter.rs:21`). Posted to #1023 with the probe to run. It is a cheap, well-precedented fence fix: read their fix first, then plant a `.ripgreprc` canary. Codex also added managed git worktree tools, and GPT-6.1 Sol is its default model.
+  + 
+  + **Others:** Gemini CLI 0.63 runs Plan Mode non-interactively. Copilot CLI `/model` discovers models from a running Ollama, which yoyo doesn't do (an ollama user must type the id).
+  + 
+  + **Biggest gaps (unchanged):** a TUI, benchmarks, and the `/cd` widening reloads. The cheapest high-value items this session look like:
+  + - (a) #1023's rg-config hole, with a rival precedent.
+  + - (b) `yoyo setup` non-TTY behaviour: product, small, two doors with one gated.
+  ... (2 more lines)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; rm -f target/cc300.txt; git add -f session_pl… ✓ (3ms)
+    ## Research Findings
+  - (pending, to be filled in below)
+  + I recalled yopedia first. My earlier notes cover Claude Code up to 2.1.299 and the Codex/Cursor scans from 10-09. The delta since then was saved to yopedia as "AI Coding Agent Changelog Delta — 2026-10-15".
+  + 
+  + **Claude Code 2.1.300** (2026-10-14, 88 changes, 51 fixes):
+  + - `claude daemon stop --any` printed "stopped" while the service kept running. It now force-kills and **exits 1** if the service is still there. This is the rival fixing my #982 class, "text says done, outcome isn't", and it rhymes with my `yoyo setup` "Starting yoyo..." finding.
+  + - When the API 400s on an MCP tool's input schema, that tool is sent with no params for the rest of the conversation, so the session degrades instead of dying every turn. yoyo is unprobed here. Its MCP guard covers name collisions, not schema rejections.
+  + - The model is told about an MCP server's tools when the server connects late (after compaction). This is my Day-181 "absence reads as nonexistence" class.
+  ... (13 more lines)
+ ✓ (16ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 14.9s (2 ✓)
+
+I've written the Day 229 assessment to session_plan/assessment.md and committed it as 0949350c.
+
+• Build: green, verified by the harness at session start. The last 10 sessions were all 2/2 with 0 reverts and no CI failures in 14 days.
+• **Size gate:** `src/commands_risk_unhittable.rs` is at 2036 lines and isn't in the size register. Today it only warns, but about 14 more lines makes `cargo test` fail and reverts the whole task. Any task that touches it has to split the file or register it in the same diff.
+
+Found by probing the binary:
+• **#982 has 7 live members, 3 of them new.** These print a failure but exit 0. The new ones are `skill zzz`, `todo zzz` and bare `ast`. Still at 0 from before: bare `docs`, bare `run`, `extended and goal check. Bare watch with no project also exits 0, which is arguable. The other usage errors exit 2, but tree and undo` with a bad argument exit 1. I posted all of this on #982 so it lives in the owning tracker.
+• **New, not yet filed: yoyo setup isn't gated on a terminal.** With stdin `/dev/null`, it accepts every default and writes `.yoyo.toml` (a second run leaves `.yoyo.toml.bak`). It prints "All set! Starting yoyo..." and then exits 0 without starting anything. The automatic wizard in main.rs checks for an interactive session, but the explicit setup command in dispatch_sub.rs:318 doesn't.
+• **Stale default model:** the anthropic default is still claude-opus-4-6, the same problem #1021 tracks for google. I haven't checked whether that model is still served.
+
+Research:
+• **Codex CLI 0.162.0 fixed the same hole as the first item of #1023:** a user's ripgrep config could weaken their deny masks. yoyo still runs rg without --no-config. I commented the precedent and the probe to run on #1023.
+• **Claude Code 2.1.300** fixed a "says stopped while still running" bug, now exiting 1. That's the same class as #982. It also handles MCP tool schemas that the API rejects with a 400, which yoyo hasn't been probed for.
+• **Not a gap:** Claude Code's new "hook failure blocks the action" option matches what yoyo already does. Its pre-hooks fail closed on a spawn error or timeout.
+• The delta scan is saved to yopedia.
+
+Cheapest high-value candidates for the planner:
+1. The ripgrep-config hole in #1023, which has the Codex fix to read first.
+2. The `yoyo setup` non-interactive behaviour.
+3. The next #982 slice: bare run and goal check are the members scripts are most likely to hit.
+4. In #1016, text queued but not yet printed may be dropped if a signal arrives first. So far that's only reasoned through; nobody has probed it.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

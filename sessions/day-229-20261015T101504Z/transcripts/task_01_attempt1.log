@@ -1,0 +1,155 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (117ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat src/fence_result_filter.rs; gr… ✓ (23ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,30p src/fence_result_filt… ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7.4s (3 ✓)
+
+The tool truncates. Let me read files fully with read_file.
+  ╭─ Turn 4 ─────────────────────────────────────────────────────────────╮
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs (200 lines)  ▶ $ ls -d ~/.cargo/registry/src/*/yoagent-0.25*;  ✓ (2ms)
+ ✓ (4ms)
+  ▶ $ Y=/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ Y=/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; Y=/home/runner/.cargo/registry/src… ✓ (7.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; rg --version|head -1; sed -n 95,14… ✓ (7ms)
+  ▶ $ Y=/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25… ✓ (45ms)
+  ▶ $ cd /tmp/p; for f in --heading --no-filename --null --vimgrep --json --path-separ… ✓ (45ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/fence_r… (32 lines) ✓ (30.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 2m 31s (9 ✓)
+
+Output got truncated by the tool; let me save the probe log to a file and read it.
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (32 lines) ✓ (29.9s)
+  ▶ read /tmp/probe_before.txt ✓ (0ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'fn cd_dir_fence_is_empty\… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'cd_dir_fence_is_empty(' … ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 74,90p src/commands_rename.… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'SearchTool' src/ | grep … ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1380,1392p src/tools.rs; se… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 1m 34s (7 ✓)
+
+Probe recorded: leaks under --no-filename (canary content, unattributed), --null, --json, --path-separator=X; no leak under --heading (CLI --no-heading wins) or -C1 here. Now the fix.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'filter_fenced_lines(\|fen… ✓ (3ms)
+
+Now rewrite the non-test part (lines 1–120).
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (228 lines) ✓ (23ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the two call sites in tool_wrappers.rs.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (39 lines) ✓ (11.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'set_var' tests/global_sta… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (111 lines) ✓ (31.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 19s (3 ✓)
+
+All 12 pass. Tidy one test, then re-run the real-rg probe for the "after" reading.
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (48 lines) ✓ (31.9s)
+  ▶ read /tmp/probe_after.txt ✓ (0ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 38.4s (2 ✓)
+
+All four reshaped-output leaks are closed on the real tool. Now the user door probe (/grep spawns grep, not rg):
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; B=$PWD/target/debug/yoyo; sed -n 1… ✓ (4.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /tmp/p; B=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; for ar… ✓ (17ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 17.5s (2 ✓)
+
+User door ledger: yoyo grep spawns grep (commands_search.rs), never `rg`, so `RIPGREP_CONFIG_PATH` cannot reach it. Now the positive control, atomic and serial:
+  ╭─ Turn 28 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/fence_result_filter.rs /tmp… ✓ (58.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The mutation didn't land (cargo fmt split the line; NEUTERED count 0) — redo it against the actual text:
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 152,158… (6 lines) ✓ (58.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control fails exactly the two drop tests by name; restored, 12/12 green. Now docs.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'fence_result_filter' ARCH… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 205,215p docs/src/configura… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '1022' ARCHITECTURE.md | h… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 21.2s (3 ✓)
+
+No existing ARCHITECTURE.md entry for the file; I'll add one, plus the docs line.
+  ╭─ Turn 33 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (32 lines) ✓ (32ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -i 'bash' docs/src/configu… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (9 lines) ✓ (31.3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E '^test r… ✓ (3m 2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -cE 'FAILED… ✓ (6m 12s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 10m 5s (5 ✓)
+
+All green: build, full test suite (0 failures), clippy -D warnings, fmt. Committing with the ledger in the body.
+  ╭─ Turn 38 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (24 lines) ✓ (50ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Committed as 2141a0aa. A ripgrep config could leak denied files through the model's fenced search, and that's now closed. All checks pass: build, the full test suite (0 failures), clippy with -D warnings, and the fmt check.
+
+What the probe found before the fix: I set RIPGREP_CONFIG_PATH to a one-flag config and ran the real search tool with --deny-dir (ripgrep 14.1.0). Four flags got the canary from the denied directory past the filter:
+• `--no-filename returned the denied file's line as a bare 1:TOKEN_…`.
+• --null, --json and --path-separator=X returned both the denied path and its line.
+• --heading did not leak, because yoagent passes --no-heading on the command line and that wins over the config.
+• `-C1 context lines (path-N-text`) leak when the denied file has more than one line.
+
+Where `rg` runs: the only rg a fenced search reaches is spawned inside yoagent (build_rg_args), and yoyo doesn't build those arguments, so there was nowhere to add --no-config. yoyo grep and /grep run plain grep, so the ripgrep config never reaches them; I left them alone. yoyo has no rg command builder anywhere in src/.
+
+The fix: it lives in fence_tool_result, which every guarded search and list_files result already passes through. While any fence is active (startup restrictions or either /cd list) and the search root is a directory, a result line is kept only if it names a file under the searched root in the usual path:line: form. Anything else is dropped and counted in its own note. It doesn't check against a list of rg flags. Re-running the probe: all four leaks and the context lines are withheld, and a normal search's output is unchanged.
+
+Trade-off: under a fence, if a user's ripgrep config changes the output format, their allowed matches are dropped too, because they can't be told apart from denied ones. The docs say so and tell the user to unset RIPGREP_CONFIG_PATH. With no fence active, output is byte-identical, and a test pins that over the same fixtures.
+
+Tests: new tests cover the dropped lines, unchanged output with no fence, normal results passing through under a fence, the "No matches" message, and a single-file search not being affected. The end-to-end test now also fails if yoagent ever rewords the footer the filter looks for. For the positive control I made the drop branch false, which failed exactly the two drop tests by name; restored, all green. My first attempt at that mutation silently didn't apply, which I caught because I checked that the NEUTERED marker was actually in the file.
+
+Three things you should know:
+• The `search fixtures are recorded real ripgrep output, not a live rg` run, because setting the env var in a test would change it for the whole test process.
+• One probe cost money. yoyo --deny-dir secret grep … doesn't treat grep as a subcommand, so it fell through to a real model call. In that call the model read secret/ using the bash tool. That's outside what the fence claims to cover (the docs list --deny-dir under file tools only), but it shows where the fence stops. I re-ran the later probes with the API keys unset.
+• Still open in #1023: the (N matches) footer still shows the count from before lines were withheld, and find/rg warning lines can still name a denied path. Both are listed in the commit body and in the new ARCHITECTURE.md entry. The docs line is in permissions.md.
+  watch: no files changed this turn — skipping
