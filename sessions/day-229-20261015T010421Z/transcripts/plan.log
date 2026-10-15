@@ -1,0 +1,49 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p session_plan && rm -f ses… ✓ (2.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 879 | sed -n 60,120p… ✓ (1.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "YOYO_RESTRICTED\|fn is_r… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 879 --comments | sed… ✓ (1.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git fetch -q origin audit-log 2>/d… ✓ (1.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "no-hints\|\"hints\"" src… ✓ (620ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue edit … (3 lines) ✓ (2.3s)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 1m 34s (7 ✓)
+
+Now the task files.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ write session_plan/task_01.md (32 lines)  ▶ write session_plan/task_02.md (21 lines)  ▶ write session_plan/issue_responses.md (10 lines) ✓ (0ms)
+ ✓ (0ms)
+ ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/ && git commi… ✓ (10ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 11.1s (4 ✓)
+
+I've written the plan for this session: two task files plus the issue responses. The commit didn't happen because session_plan/ is gitignored and git refused to add it. The planned commit command ends in || true, so this looks expected, and the files are on disk for the next phase.
+
+Task 1 (self-driven, the piped-output subsystem): Part of #1016. Piped -p holds text until each reply finishes. If the event stream closes in the middle of a reply that never finished, that text is silently dropped today. The task flushes it on that condition, the gate's own state, rather than only when the program panics.
+• The idea comes from the Day 228 reflection comment on #1016, and the task names it as the source. It starts from the test in the patch the Day 228 wrap-up refused.
+• It probes first and records the actual bytes at HEAD. If the text turns out not to be lost, the task stops and corrects the premise on #1016 instead.
+• The check that matters most: an attempt that was retried must still print nothing, so a reader never gets two attempts glued together. yoagent drops this text itself; the doc comment will say why yoyo deliberately differs.
+• It keeps the trajectory's advice to stay out of cd_config (5 of the last 9 diffs).
+
+Task 2 (backlog drain): Part of #982. Bare yoyo blame and yoyo config <unknown> will exit 2 instead of 0. The code 2 copies what def, outline, grep, map and risk already do.
+• It re-probes first: config <unknown> hasn't been checked since Day 224.
+• Tests run the built binary, and their near-miss cases check that working commands keep their old exit codes.
+• It updates #982's issue body in place, keyed by command and condition.
+• The plan explains why each of the six older issues was skipped for this slot.
+
+Done during planning (non-code):
+• **#879:** before planning I searched `src/` and found that `--restricted` and `YOYO_RESTRICTED=1` both already exist. So I retitled #879 to the one thing still missing, a one-time prompt before file reads outside the working directory, and commented explaining why.
+• **Discussion #420:** the commitment check flagged the hints off-switch as unfulfilled. That's wrong: `--no-hints` / `hints = false` are in `src/cli.rs`, so no new post is needed.
+
+Deferred, with reasons in `issue_responses.md`: #858, #869, #1009 and #1021.
+
+Release isn't due yet, so neither task touches it.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

@@ -1,0 +1,85 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (313ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git show origin/audit-log:sessions… ✓ (8ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 11.3s (2 ✓)
+
+The output got truncated; let me read the file in pieces.
+  ╭─ Turn 3 ─────────────────────────────────────────────────────────────╮
+  ▶ read src/prompt/retry_safe_pipe.rs:1..26  ▶ read src/prompt/retry_safe_pipe.rs:95..375  ▶ $ sed -n 1,200p /tmp/r.patch | cat -A | sed 's/\$$//' | head -60 ✓ (1ms)
+ ✓ (2ms)
+ ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ sed -n 9,30p /tmp/r.patch; echo; sed -n 30,48p /tmp/r.patch ✓ (4ms)
+  ▶ read /tmp/r.patch ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git apply --check /tmp/r.patch && … ✓ (23ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1070,1200p src/prompt.rs ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=1086 && NR<=1330' src/pro… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1098,1112p src/prompt.rs; s… ✓ (6ms)
+  ▶ read src/prompt.rs:1098..1158 ✓ (0ms)
+  ▶ read src/prompt.rs:1195..1325 ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "handle_prompt_events" src… ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  12 tools completed in 53.5s (12 ✓)
+
+Now the probe: apply the refused patch's tests and run at HEAD.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git apply /tmp/r.patch && cargo te… ✓ (23.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (72 lines) ✓ (8.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (7 lines) ✓ (23.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "#\[tokio::test" src | he… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (109 lines) ✓ (24.9s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 2m 9s (5 ✓)
+
+Positive control, run as one atomic command (mutate → test → restore):
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/prompt/… (11 lines) ✓ (49.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (14 lines) ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (15 lines) ✓ (3m 3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (4m 58s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 9m 29s (4 ✓)
+
+All green: 6551 passed, 0 failed, clippy clean, fmt clean. Committing.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (38 lines) ✓ (38ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Fixed and committed as 20b9b9a1 (Part of #1016: …). Build, the full cargo test run (6551 passed, 0 failed), clippy with -D warnings and the format check all pass.
+
+Before the fix: I started from the Day 228 refused wrap-up patch, which applied cleanly. When the event stream closed partway through a reply that never got its end marker, the loop printed nothing (left: [], right: ["CUT_OFF"]) and the text was left stuck in the gate. A panic inside yoagent's background task ends the stream exactly this way, so the existing panic-only flush never saw it.
+
+The fix is in src/prompt/retry_safe_pipe.rs (src/prompt.rs didn't need to change). When the stream closes, a new release_unended_attempt() puts the unfinished reply's text at the back of the gate's queue, after anything already released and with no end marker added. That is how the raw stream looked before text was held, and the loop prints it once through its normal path. The panic-only Drop stays as it was and now has nothing left to write. A retried attempt never gets printed this way, because the retry event has already cleared its text. The doc comment explains why yoyo deliberately differs from yoagent's finish(), which drops an unfinished reply: an unfinished reply that is the last thing on the pipe is one attempt, not two that a reader can't tell apart.
+
+Tests compare the full bytes and run on a real channel through next(), the way the prompt loop does:
+• stream closes mid-reply → CUT_OFF printed once, and the Drop sink gets ""
+• retried attempt, then close, with and without a new empty attempt open → ""
+• complete reply, then close → DONE printed once
+• filter off (terminal stdout) → unchanged
+
+Positive control: I replaced the release call with a NEUTERED comment and ran the tests in one command, then restored it. The three release tests failed by name, the other tests stayed green, and the tree went back to green with no marker left behind.
+
+Where I went against the plan: the plan said to change the expected value of the old test "normal drop with held text → """. That test never closes the stream, so it isn't the broken case: production only drops the gate without a close on the signal paths, and those take the held text first. I renamed the test and added a doc comment explaining this instead of changing its value. Its expected value is still "".
+
+Docs: I added a Day 229 paragraph to the ARCHITECTURE.md entry, credited to the Day 228 reflection comment, and marked the Day 228 "Not covered" claim as probed and fixed where it stands.
+
+Still open on #1016 (also listed in the commit):
+• The exit code for this ending hasn't changed, and I didn't measure it end-to-end.
+• `finish_interrupted_turn` still writes out only the held text, not text already released but not yet printed. This fix doesn't go through that code.
+  watch: no files changed this turn — skipping

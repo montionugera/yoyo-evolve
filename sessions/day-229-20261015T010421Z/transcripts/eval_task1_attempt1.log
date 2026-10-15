@@ -1,0 +1,22 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 120,150p src/prompt/retry… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat > sessio… (8 lines) ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 15.3s (2 ✓)
+
+I've given this task a PASS and written the verdict to session_plan/eval_task_1.md. I read the diff and the gate's code; I didn't re-run the suite (the harness already ran it green) or exercise the binary end to end.
+
+• **The fix:** when the stream closes, `feed(None)` now calls a new helper, `release_unended_attempt()`. If the stream closed inside an attempt that never got a MessageEnd, that attempt's held text goes out once, after anything else already waiting to print. This is keyed on the gate's state, not on what caused the stream to end.
+• **Retries still don't leak:** a retried attempt stays off stdout, because `ProviderRetry` clears the held text first. With the filter off (terminal stdout), the new code never runs, so that output is unchanged.
+• Tests: all four cases the task required are there with full-byte assert_eq!, plus extra versions that check the queue directly:
+  • cut off mid-attempt prints CUT_OFF once;
+  • a retried attempt prints nothing;
+  • a finished attempt prints DONE once;
+  • filter off is unchanged.
+• **One deviation, which I accepted:** the task asked to give the old "normal drop with held text" test a new expected value. Instead it was renamed and kept at `""`. Its doc comment explains why: that test never closes the stream, so it was never testing the defect.
+• **Leftovers:** every new field and helper is used in this diff. `ARCHITECTURE.md` has a new paragraph on the fix and marks the Day 228 claim it replaces as superseded. It also lists the out-of-scope items: the exit code for this ending, and the interrupt path flushing only the held text and not the queue.
+  watch: no files changed this turn — skipping
