@@ -1,0 +1,127 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "interactive session\|int… ✓ (20ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 300,330p src/dispatch_sub.r… ✓ (14ms)
+  ▶ read src/dispatch_sub.rs:594..624  ▶ read src/dispatch_sub.rs:686..734  ▶ read src/dispatch_sub.rs:110..140 ✓ (1ms)
+ ✓ (1ms)
+ ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "Start yoyo and use\|need… ✓ (33ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "goal_args_need_session\|\… ✓ (27ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1055,1080p src/commands_lin… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn with_goal_base_dir\|fn… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2060,2110p src/dispatch_sub… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn '"extended"\|"check"' src… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,28p src/dispatch_near_mis…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2020,2058p src/dispatch_sub… ✓ (3ms)
+ ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (83 lines) ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "goal_shell_status\|extend… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  16 tools completed in 1m 18s (16 ✓)
+
+I forgot to write the file back. Rerunning with the write.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/pat… (73 lines) ✓ (27ms)
+
+Now lint fix and tests.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (57 lines) ✓ (42.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Positive control (atomic mutate → run → restore):
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/dispatc… (8 lines) ✓ (59.5s)
+
+Red by name at the goal-check line, restored to green. Now the binary probe:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; B=$PWD/target/debug/yoyo; T=$(mkte… ✓ (20ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (9 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff --stat; cargo fmt -- --ch… ✓ (1.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (3m 40s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (6m 32s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 12m 26s (4 ✓, 1 ✗)
+
+All 20 test binaries green. Quick doc check for stale exit-code claims:
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn -i "exit" docs/src README… ✓ (10ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Update the exit-code paragraph in the docs:
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (8 lines) ✓ (26ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (3m 18s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3m 33s (2 ✓)
+
+Green. Committing (the suggested one-liner has nested double quotes that would break the shell, so I'm using a message file with the same title):
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/msg… (39 lines) ✓ (21ms)
+
+Now step 3: update #982's body.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 982 --json state,bod… ✓ (332ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (1.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --short | head; git log… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 21.6s (3 ✓)
+
+The shell refusals for extended, goal check and lint fix now exit 2 instead of 0. Committed as 5443468c ("Part of #982", not "Fixes"). Format, clippy and the full cargo test run all pass.
+
+What changed. I searched src/ for the refusal text itself (both "requires an interactive session" and "needs an interactive session") rather than checking only the two verbs in the plan:
+
+| Where | Before | Now |
+|---|---|---|
+| yoyo extended (dispatch_sub.rs) | exit 0 | exit 2 |
+| yoyo goal check, refused before anything runs (#754) | exit 0 | exit 2 |
+| goal fallback refusal (can't be reached today) | exit 0 | exit 2 |
+| yoyo lint fix (commands_lint.rs) | exit 0 | exit 2 |
+| yoyo config set / config edit / unknown verbs | already 2 | unchanged |
+
+• **lint fix wasn't in the plan.** The text search found it. An existing test asserted `(None, 0)` and called that "stays a success". It now asserts the refusal code, and still checks that fix isn't treated as an unknown subcommand (code 1).
+• **One code everywhere.** All of these use the existing SETUP_NOT_INTERACTIVE_EXIT constant (2) from setup.rs, so the number isn't written out again.
+• **Messages unchanged.** The printed refusal text is byte-identical.
+• **How it's built.** The logic moved into two small functions, `goal_shell_status` and `extended_shell_status`, which return the exit code. The command arms pass it to the existing exit_if_nonzero.
+
+Tests. A new test calls those functions directly. It checks that both refusals return 2 and that the refusal writes nothing to disk. As a near-miss, it checks that bare goal, goal set and goal show still return 0. I also ran a positive control: with the goal check refusal changed to return 0, the test failed with left: 0, right: 2; after restoring it, the test passed.
+
+Probe of the built binary (empty temp dir, stdin from /dev/null):
+
+| Command | Exit |
+|---|---|
+| yoyo extended | 2 |
+| yoyo goal check | 2 |
+| yoyo lint fix | 2 |
+| yoyo goal (near-miss) | 0 |
+| yoyo config set x y | 2 |
+
+The temp dir was still empty afterwards.
+
+Docs and issue.
+• `docs/src/usage/commands.md`: the exit-codes paragraph now covers these three commands.
+• `setup.rs`: the constant's doc comment now names these refusals too.
+• #982's body is updated in place: the fixed entry is listed under the condition ("shell refusal: needs interactive session") with the commit sha, and it's removed from "Known still exit 0". The issue is still open.
+
+Still open on #982: bare run (left at exit 0 on purpose), undo --all (not confirmed), and usage errors using two different codes (1 vs 2). I also didn't test goal check now or other unknown goal subcommands; I noted that in the issue.
+
+The issue body cites 5443468c. If the commit gets rebased before it's pushed, that sha will need updating.
+  watch: no files changed this turn — skipping

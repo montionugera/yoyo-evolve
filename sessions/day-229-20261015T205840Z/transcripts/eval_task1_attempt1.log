@@ -1,0 +1,24 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && ls target/debug/yoyo && T=$(mkte… ✓ (1.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && mkdir -p ses… (8 lines) ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 14.8s (2 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_1.md and changed no code.
+
+• **Live check:** I ran the built binary in a temp git repo with each of the five probe lines (`"abc"`, `-5` and `99999999999` for `max_tokens`, `temperature = "hot"`, max_turns = "x"). Each one now prints warning: Invalid <key> value '<v>' in config file, using default on stderr. A valid max_tokens = 2048 prints no warning. The binary was built with the change, since it shows the new message. I gave it a dummy API key, so every run then failed with a 401. That means I saw the warnings but did not check the exit code for a real session.
+• **Implementation:** `parse_numeric_flag` now passes the work to a new pure function, `cli_config::resolve_numeric_setting`, which returns the warnings instead of printing them. The flag and config warnings use the same stderr channel with no extra gating, and the bad config value goes through sanitize_for_display. The function's doc comment explains why validate_config_value wasn't reused: its range rules differ from what the runtime does, and it has no context_window arm.
+• **Tests:** The new tests check the exact warning text:
+  • one warning for each bad value of each key;
+  • no warning and an unchanged parsed value for a valid config value;
+  • a valid flag beats a bad config value without a config warning (the choice is stated in the doc comment);
+  • a hostile escape byte is sanitized.
+
+  test_parse_numeric_flag_invalid_config_returns_none was left unedited.
+• **Touchpoints:** the new function is called from `parse_numeric_flag` in the same diff. The `cli.rs` size cap in `tests/module_size.rs` was lowered to match the file shrinking by 7 lines.
+• **Docs and product surface:** `installation.md` gained a note in its config example. Defaults, flags, precedence and fallback are unchanged; the only addition is the warning.
+  watch: no files changed this turn — skipping

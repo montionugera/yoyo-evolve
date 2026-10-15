@@ -1,0 +1,156 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "cli.rs" tests/module_size… ✓ (4ms)
+ ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "grace\|GRACE" tests/modul… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn validate_config_value"… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "cli_config\|const .*CAP\|… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "const [A-Z_]*: usize" tes… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1017,1022p src/cli.rs; grep… ✓ (6ms)
+  ▶ read src/cli.rs:1016..1024  ▶ read src/cli_config.rs:225..245 ✓ (0ms)
+ ✓ (2ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 54.1s (9 ✓)
+
+Now write the pure resolver in cli_config.rs (test-first: I'll add tests alongside and the wrapper change in cli.rs).
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ edit src/cli_config.rs (6 → 144 lines)
+        pub safe_mode: bool,
+  + }
+  + 
+  + /// Resolve a numeric setting: `flag_name`'s value in `args` wins, else
+  + /// `file_config[config_key]`, else `None` (the caller's default).
+  + ///
+  + /// Pure — returns the warnings instead of printing them, so tests see the
+  + /// exact text a user reads; `cli::parse_numeric_flag` prints each one.
+  + ///
+  + /// Both doors warn when their value cannot be parsed (#1028: the config door
+  + /// used to drop `max_tokens = "abc"` silently and run on the default, which is
+  + /// how a user ends up cut off under a limit they think they changed). The
+  + /// config value is consulted — and so can only warn — when no valid flag
+  + /// supersedes it: with `--max-tokens 4096` the file's value is never used,
+  + /// so "using default" would be false about this run.
+  + ///
+  + /// Why not `config::validate_config_value`: it judges *ranges* the runtime
+  + /// handles differently (it rejects temperature above 2.0 while the runtime
+  + /// clamps above 1.0 and says so; it rejects `max_tokens = 0`, which parses and
+  + /// is used) and it has no `context_window` arm. This warns exactly when the
+  ... (124 more lines)
+ ✓ (16.8s)
+        pub safe_mode: bool,
+  + }
+  + 
+  + /// Resolve a numeric setting: `flag_name`'s value in `args` wins, else
+  + /// `file_config[config_key]`, else `None` (the caller's default).
+  + ///
+  + /// Pure — returns the warnings instead of printing them, so tests see the
+  + /// exact text a user reads; `cli::parse_numeric_flag` prints each one.
+  ... (13 more lines)
+
+Expected — now the consumer in cli.rs and the HashMap fix.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's|&Has… (30 lines) ✓ (20.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (3m 55s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test > /tmp/t.log 2>&1; echo… ✓ (3m 13s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7m 37s (3 ✓)
+
+Green. Ratchet the register down as the gate asks.
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's|    ("src/cli.rs", 7692)… ✓ (2m 19s)
+
+Now the hand probe on the built binary, for each of the five bad lines (plus a valid control):
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; BIN=$PWD/target/release/yoyo; for … ✓ (8.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Every bad line warns, and the valid control is silent. Now the scope check: is there any other numeric config reader with a silent .ok()?
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "file_config\.get\|config\… ✓ (14ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Found at least one sibling: max_auto_continues drops a bad value via its own silent .ok(). Let me check #1028's actual scope and look for more members before deciding.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1028 --json state,ti… ✓ (305ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The issue's own scope is the four named keys. Let me census the rest of the class before choosing fix-vs-file.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "parse_max_auto_continues… ✓ (27ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2388,2405p src/cli.rs; grep… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn resolve_cost_threshold… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "fn resolve_cost_threshol… ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn parse_cost_threshold" … ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; BIN=$PWD/target/release/yoyo; for … ✓ (3.7s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 28.2s (6 ✓)
+
+Both confirmed silent. Filing them as their own issue so Fixes #1028 stays true (the d228 rule):
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/bod… (13 lines) ✓ (750ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1030 --json state -q… ✓ (290ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 95,140p docs/src/getting-st… ✓ (3ms)
+  ▶ edit docs/src/getting-started/installation.md (3 → 5 lines)
+    max_tokens = 8192
+    max_turns = 50
+    temperature = 0.7
+  + # An unparseable max_tokens / max_turns / temperature / context_window
+  + # (e.g. "abc", -5) prints a warning on stderr and falls back to the default.
+ ✓ (1ms)
+    max_tokens = 8192
+    max_turns = 50
+    temperature = 0.7
+  + # An unparseable max_tokens / max_turns / temperature / context_window
+  + # (e.g. "abc", -5) prints a warning on stderr and falls back to the default.
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (3m 56s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -c "cli.r… (9 lines) ✓ (59.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 5m 19s (6 ✓)
+
+The control broke exactly the three failure-path tests and left the near-miss guard green. After restoring, all 16 pass. Committing:
+  ╭─ Turn 28 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (45 lines) ✓ (23ms)
+
+I fixed #1028: a bad max_tokens, temperature, max_turns or context_window value in .yoyo.toml now prints a warning on stderr instead of being dropped silently. Build, all tests, clippy with -D warnings and the format check pass, and it's committed as 32e13379.
+
+Change
+• The parsing now lives in a new function, cli_config::resolve_numeric_setting. It returns the value plus any warning text, so the tests check the exact string a user sees. parse_numeric_flag in src/cli.rs just prints those warnings, in the same style and on the same channel as the existing flag warning.
+• Example: `warning: Invalid max_tokens value 'abc' in config file, using default`. Nothing else changes: the default is still used, the exit code is still 0, and a flag still overrides the config.
+• The config value is cleaned with sanitize_for_display before printing, since it comes from the repository.
+• **One choice to know about:** if a valid flag overrides a bad config value, the bad value gets no warning. That run never uses it, so "using default" would be false. If the flag is also invalid, both warn. A test pins this.
+• I didn't reuse validate_config_value. Its range rules differ from what runtime actually does (it rejects temperature above 2.0, while runtime clamps above 1.0), and it has no context_window rule. It's also the one the issue suggested, so the commit says why.
+
+Checks
+• I built the release binary and ran it in a temp repo once per bad line: "abc", -5 and 99999999999 for max_tokens, temperature = "hot", max_turns = "x" and context_window = "big". Each printed exactly one warning, still answered PONG and exited 0. A valid line (max_tokens = 2048) printed nothing.
+• New tests cover a bad value for each key, valid values staying silent and unchanged, the flag-override choice, and an escape character in the value. When I removed the warning temporarily, exactly the three failure tests failed by name; I put it back and everything passed. The existing test test_parse_numeric_flag_invalid_config_returns_none passes without edits.
+• `src/cli.rs` got 7 lines shorter, so I lowered its entry in the file-size check to 7685.
+• `docs/src/getting-started/installation.md` now says a bad value warns and falls back to the default.
+
+Same problem elsewhere, filed as #1030: two more settings drop a bad value silently, and the issue doesn't cover them, so the commit can still say Fixes #1028. I confirmed both on the binary:
+• `max_auto_continues` in the config is dropped without a word.
+• `cost_warn_usd, --cost-warn and YOYO_COST_WARN_USD` are worse: a mistyped spending limit turns the limit off, with no warning from any of the three.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/cli_config.rs

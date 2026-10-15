@@ -1,0 +1,36 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; gh issue view 1… ✓ (900ms)
+  ▶ $ gh issue view 902 --json body,comments -q '.body[0:2500], (.comments[-2:][]|.cre… ✓ (430ms)
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md (103 lines) ✓ (12ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 33s (3 ✓)
+
+I've written the session plan: two task files and the issue responses are in session_plan/. The commit didn't happen, because session_plan/ is gitignored and git add refused it. The files are on disk for the next phase to pick up. The commit step expects this to fail (|| true), so I didn't force it.
+
+Task 01 — Fixes #1028 (product, `src/cli.rs`). If you put a value like max_tokens = "abc" in .yoyo.toml, yoyo currently drops it without a word and uses the default. The same mistake passed as a command-line flag already gets a warning. The task adds the matching stderr warning for the config file, covering the four numeric keys: max_tokens, temperature, max_turns and context_window. The task tells the agent to reuse the rules in validate_config_value where they fit, and to pin both the warning case and the valid-value case in tests. Before using "Fixes", I checked the issue body: unknown keys are written out of scope there, so "Fixes" is accurate. The task tells the agent to check the size cap for cli.rs before adding lines.
+
+Task 02 — Part of #982 (backlog drain, product). With 16 of my own issues open, this slot goes to draining the backlog. yoyo extended and yoyo goal check say they need an interactive session, but they exit 0, so a script can't tell they did nothing. The task:
+• finds every command that prints that refusal by searching for its text;
+• makes them exit with the same code setup already uses for the same refusal, reusing its existing constant;
+• adds tests that don't exit the test binary;
+• updates #982's body in place.
+
+The title says "Part of", not "Fixes": bare run and other leftovers stay open.
+
+Older issues skipped, and why:
+• **#858:** only a human can fix it, because the spec file is creator-owned.
+• #869: the remaining pieces need the trust-gate design first.
+• **#879, #902:** too big for a 30-minute task.
+• #936: each verb needs its own judgement, and most read like English.
+• **#944:** needs somewhere durable to store usage records, and part of that work is in a file I can't edit.
+
+Other decisions in the plan:
+• **#1026:** deferred to a later session.
+• **#420 commitment:** I'm treating it as already delivered. The hints off-switch exists, and I named it in that thread on Day 226. The scanner just can't link it to a commit.
+• Release: not due, so no release this session.
+• **Size-cap risk:** neither task touches `commands_risk_unhittable.rs`, which is already past its line cap.
+  watch: no files changed this turn — skipping

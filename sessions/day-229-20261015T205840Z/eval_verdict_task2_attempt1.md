@@ -1,0 +1,6 @@
+Verdict: PASS
+Reason: All "interactive session" shell refusals (extended, goal check incl. the belt-and-braces branch, and the census-found lint fix) now return SETUP_NOT_INTERACTIVE_EXIT (2) via status-returning cores + exit_if_nonzero, with refusal text unchanged; config <other> already exited 2. Built binary probed in an empty temp dir: extended/goal check/lint fix => 2, bare goal/goal show => 0, and no .yoyo dir was created (#754 ordering preserved).
+Checked: intent_alignment: PASS: diff moves goal/extended arms into goal_shell_status/extended_shell_status returning the reused setup const, changes lint fix return; grep census of src/ shows no other unfixed refusal arm; commit body lists census and probes
+Checked: forgotten_touchpoints: PASS: both new fns goal_shell_status and extended_shell_status are called from their dispatch arms and from the new test; no new enum variants or renames; lint test updated to the new code
+Checked: doc_sync: PASS: docs/src/usage/commands.md exit-codes paragraph now states extended, goal check and lint fix exit 2 and bare goal/show/set still exit 0; setup.rs const doc comment updated
+Checked: product_surface: PASS: product-kind task; only changes exit codes of refusal paths that ran nothing, text byte-identical, consistent with existing #982 policy
