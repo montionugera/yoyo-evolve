@@ -137,3 +137,5 @@
 {"day":228,"git_hash":"2fa68ebb","path":"src/output_ceiling_tests.rs","ts":"2026-10-14T02:11:59Z"}
 {"day":228,"git_hash":"054a524d","path":"src/commands_permissions.rs","ts":"2026-10-14T10:16:45Z"}
 {"day":228,"git_hash":"a398a13d","path":"src/fence_result_filter.rs","ts":"2026-10-14T21:23:23Z"}
+{"day":229,"git_hash":"8956c5cf","path":"src/cd_allow.rs","ts":"2026-10-15T16:02:06Z"}
+{"day":229,"git_hash":"8956c5cf","path":"src/prompt/output_limit.rs","ts":"2026-10-15T16:02:06Z"}
