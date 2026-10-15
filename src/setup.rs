@@ -787,7 +787,9 @@ pub fn run_setup_wizard() -> Option<WizardResult> {
 }
 
 /// Exit code for an explicit `yoyo setup` whose stdin is not a terminal (#1024):
-/// 2, the usage code the #982 refusals use.
+/// 2, the usage code the #982 refusals use. Also the one code every shell
+/// "needs an interactive session" refusal exits with (`yoyo extended`,
+/// `yoyo goal check`, `yoyo lint fix`), so a script reads them alike.
 pub(crate) const SETUP_NOT_INTERACTIVE_EXIT: i32 = 2;
 
 /// #1024: the explicit `yoyo setup` door must be gated like the auto-offered

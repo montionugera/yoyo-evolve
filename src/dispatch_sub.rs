@@ -228,6 +228,47 @@ fn goal_args_need_session(args: &[String]) -> bool {
     input.strip_prefix("/goal").unwrap_or("").trim() == "check"
 }
 
+/// `yoyo goal ...` from the shell, returning the exit status (#982). The two
+/// "requires an interactive session" refusals did nothing, so they return
+/// [`crate::setup::SETUP_NOT_INTERACTIVE_EXIT`] — the one code a shell refusal
+/// for want of a live session uses — instead of the success the arm used to
+/// fall through to. Every verb that runs returns 0, as before.
+fn goal_shell_status(args: &[String]) -> i32 {
+    // Plain join: handle_goal's `set` arm takes its remainder
+    // verbatim (strip_prefix("set").trim(), no tokenize_quoted in
+    // commands_goal.rs), so re-quoting a multi-word goal would
+    // store literal `"` chars — same shape as #679 finding 2.
+    // #754: refuse `check` BEFORE dispatch. handle_goal's check arm
+    // runs the project-local verify command while building the prompt,
+    // so refusing afterwards printed "requires an interactive session"
+    // *after* executing the very thing the message implies never ran.
+    if goal_args_need_session(args) {
+        eprintln!("{YELLOW}  /goal check requires an interactive session.{RESET}");
+        eprintln!("{DIM}  Start yoyo and use: /goal check{RESET}\n");
+        eprintln!("{DIM}  Nothing ran: the verify command was not executed.{RESET}\n");
+        return crate::setup::SETUP_NOT_INTERACTIVE_EXIT;
+    }
+    let input = join_args_as_command(args);
+    let result = crate::commands_goal::handle_goal(&input);
+    // Belt and braces: if a future handler change starts returning
+    // SendToAgent for some other verb, report it rather than swallow it.
+    if let crate::dispatch::CommandResult::SendToAgent(_) = result {
+        eprintln!("{YELLOW}  /goal check requires an interactive session.{RESET}");
+        eprintln!("{DIM}  Start yoyo and use: /goal check{RESET}\n");
+        return crate::setup::SETUP_NOT_INTERACTIVE_EXIT;
+    }
+    0
+}
+
+/// `yoyo extended` from the shell: always a refusal, since extended mode needs
+/// a live agent session. Prints the usage hint and returns the shell-refusal
+/// status (#982) — it used to exit 0 having run nothing.
+fn extended_shell_status() -> i32 {
+    eprintln!("{YELLOW}  /extended requires an interactive session.{RESET}");
+    eprintln!("{DIM}  Start yoyo and use: /extended <task> [--turns N]{RESET}\n");
+    crate::setup::SETUP_NOT_INTERACTIVE_EXIT
+}
+
 /// `--version`/`-V` — both print and bail out before any config is built.
 /// This helper is the first slice of the parse_args refactor (#261); it
 /// exists so the "did I handle this?" decision can be unit-tested in
@@ -689,28 +730,9 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "goal" => {
-                // Plain join: handle_goal's `set` arm takes its remainder
-                // verbatim (strip_prefix("set").trim(), no tokenize_quoted in
-                // commands_goal.rs), so re-quoting a multi-word goal would
-                // store literal `"` chars — same shape as #679 finding 2.
-                // #754: refuse `check` BEFORE dispatch. handle_goal's check arm
-                // runs the project-local verify command while building the prompt,
-                // so refusing afterwards printed "requires an interactive session"
-                // *after* executing the very thing the message implies never ran.
-                if goal_args_need_session(args) {
-                    eprintln!("{YELLOW}  /goal check requires an interactive session.{RESET}");
-                    eprintln!("{DIM}  Start yoyo and use: /goal check{RESET}\n");
-                    eprintln!("{DIM}  Nothing ran: the verify command was not executed.{RESET}\n");
-                    return Some(None);
-                }
-                let input = join_args_as_command(args);
-                let result = crate::commands_goal::handle_goal(&input);
-                // Belt and braces: if a future handler change starts returning
-                // SendToAgent for some other verb, report it rather than swallow it.
-                if let crate::dispatch::CommandResult::SendToAgent(_) = result {
-                    eprintln!("{YELLOW}  /goal check requires an interactive session.{RESET}");
-                    eprintln!("{DIM}  Start yoyo and use: /goal check{RESET}\n");
-                }
+                // #982: both "requires an interactive session" refusals now
+                // exit nonzero; the parse and #754 ordering live in the helper.
+                exit_if_nonzero(goal_shell_status(args));
                 return Some(None);
             }
             "memories" => {
@@ -723,9 +745,8 @@ pub(crate) fn try_dispatch_subcommand_in(
             }
             "extended" => {
                 // Extended mode requires an active agent session — print usage and
-                // suggest starting yoyo interactively.
-                eprintln!("{YELLOW}  /extended requires an interactive session.{RESET}");
-                eprintln!("{DIM}  Start yoyo and use: /extended <task> [--turns N]{RESET}\n");
+                // suggest starting yoyo interactively. #982: exits nonzero.
+                exit_if_nonzero(extended_shell_status());
                 return Some(None);
             }
             "gasp" => {
@@ -2046,6 +2067,36 @@ mod tests {
                 "goal_args_need_session({argv:?}) should be {expected}"
             );
         }
+    }
+
+    #[test]
+    fn needs_session_refusals_exit_with_the_shell_refusal_code() {
+        // #982: `yoyo extended` and `yoyo goal check` printed "requires an
+        // interactive session", ran nothing, and exited 0. Pinned through the
+        // status-returning cores, never an in-process dispatch (the arm now
+        // calls process::exit, which would kill this test binary).
+        let code = crate::setup::SETUP_NOT_INTERACTIVE_EXIT;
+        assert_ne!(code, 0, "a refusal must not read as success");
+        assert_eq!(extended_shell_status(), code);
+        let argv =
+            |parts: &[&str]| -> Vec<String> { parts.iter().map(|s| s.to_string()).collect() };
+        let tmp = tempfile::TempDir::new().expect("create temp dir");
+        crate::commands_goal::with_goal_base_dir(tmp.path(), || {
+            assert_eq!(goal_shell_status(&argv(&["yoyo", "goal", "check"])), code);
+            // #754 still holds: the refusal ran nothing, so no goal file appeared.
+            assert!(!tmp.path().join(".yoyo").exists());
+            // Near-miss: verbs on the same arm that do run still succeed.
+            assert_eq!(goal_shell_status(&argv(&["yoyo", "goal"])), 0);
+            assert_eq!(
+                goal_shell_status(&argv(&["yoyo", "goal", "set", "ship it"])),
+                0
+            );
+            assert_eq!(
+                crate::commands_goal::load_goal().as_deref(),
+                Some("ship it")
+            );
+            assert_eq!(goal_shell_status(&argv(&["yoyo", "goal", "show"])), 0);
+        });
     }
 
     #[test]
