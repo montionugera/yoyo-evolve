@@ -259,7 +259,9 @@ pub(crate) fn handle_lint_status(input: &str) -> (Option<String>, i32) {
             "{DIM}  `lint fix` needs an interactive session — it sends lint failures to the AI to fix.{RESET}"
         );
         println!("{DIM}  Run `yoyo`, then `/lint fix` with no extra arguments.{RESET}\n");
-        return (None, 0);
+        // #982: a refusal ran nothing, so the shell door must not read success.
+        // Same code as every "needs an interactive session" refusal.
+        return (None, crate::setup::SETUP_NOT_INTERACTIVE_EXIT);
     }
 
     let strictness = match arg {
@@ -1065,8 +1067,14 @@ mod tests {
                 .contains("Unknown /lint subcommand: zz"),
             "summary unchanged: {summary:?}"
         );
-        // Near-miss: `fix` is documented, returns early, and stays a success.
-        assert_eq!(handle_lint_status("/lint fix"), (None, 0));
+        // Near-miss: `fix` is documented, so it is NOT the unknown-subcommand
+        // failure (code 1, a summary). It is a session refusal that ran nothing,
+        // so since Day 229 it carries the shell-refusal code, not success (#982).
+        assert_eq!(
+            handle_lint_status("/lint fix"),
+            (None, crate::setup::SETUP_NOT_INTERACTIVE_EXIT)
+        );
+        assert_ne!(crate::setup::SETUP_NOT_INTERACTIVE_EXIT, 1);
     }
 
     #[test]
