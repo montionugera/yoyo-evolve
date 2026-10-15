@@ -390,7 +390,11 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // Day 224 (#982 residue): 2193 -> 2203 (+10, `risk_status` + its exit call), pasted.
     // Day 224 (#982 residue, Task 2): 2203 -> 2213 (+3 the `index` arm's exit
     // call and comment; +7 drift from #1008's argv arms already in the tree), pasted.
-    ("src/dispatch_sub.rs", 2213),
+    // Day 229 (#982, bare `blame` / `config <unknown>` exit 2): 2213 -> 2328
+    // (+100 drift already at HEAD from arms landed since Day 224; +15 this
+    // task: the config arm's exit call and the in-process test moved to a
+    // source-level pin, since the arm now exits), pasted.
+    ("src/dispatch_sub.rs", 2328),
     // Day 209: 3439 -> 3455 (+16, within the drift band, pasted rather than left to absorb).
     // #937 option 1: nine lines of doc above `builtin_model_pricing` naming both ignored
     // audit commands (deliverable 4 — an alarm nobody can find is the #745/#767/#769

@@ -602,6 +602,10 @@ pub(crate) fn try_dispatch_subcommand_in(
                             "{YELLOW}  `config {other}` requires an interactive session.{RESET}"
                         );
                         eprintln!("{DIM}  Try: yoyo config show (works from the shell){RESET}");
+                        // #982: a refused or unknown subcommand did not run, so
+                        // exit 2 (usage) rather than 0. Covers `set`/`edit` too:
+                        // `yoyo config set k v && next` must not read success.
+                        exit_if_nonzero(2);
                     }
                 }
                 return Some(None);
@@ -1595,8 +1599,9 @@ mod tests {
     fn test_try_dispatch_subcommand_blame() {
         // `yoyo blame` with no file should still dispatch (shows error message).
         // #982: test the status core the arm calls (see the `diff` test).
-        // A usage error is not the not-a-repo branch, so it stays 0.
-        assert_eq!(crate::commands_git_review::handle_blame_status("/blame"), 0);
+        // A usage error now exits 2 (#982: it used to stay 0, which this test
+        // pinned); the binary-level pin is `bare_blame_is_a_usage_error_and_exits_two`.
+        assert_eq!(crate::commands_git_review::handle_blame_status("/blame"), 2);
     }
 
     #[test]
@@ -1896,13 +1901,23 @@ mod tests {
 
     #[test]
     fn test_try_dispatch_subcommand_config_unknown() {
-        // Unknown config subcommands still dispatch (print a message, don't hang)
-        let args = vec!["yoyo".into(), "config".into(), "edit".into()];
-        let result = try_dispatch_subcommand(&args);
-        assert!(
-            matches!(result, Some(None)),
-            "expected Some(None) for `config edit` (requires session message)"
-        );
+        // #982: the unknown/refused `config` arm now exits 2, which would kill
+        // this test binary, so the dispatch of `config edit` (and `config zzz`,
+        // `config set`) is pinned at binary level in tests/integration.rs
+        // (`config_set_and_edit_refusals_exit_two`,
+        // `config_unknown_subcommand_refusal_exits_two`). In-process, pin that
+        // the arm still routes the refusal through the exit helper.
+        let src =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/dispatch_sub.rs"))
+                .expect("read own source");
+        let arm = src
+            .find(concat!("\"config", "\" =>"))
+            .expect("config arm exists");
+        let end = src[arm..]
+            .find(concat!("\"permissions", "\" =>"))
+            .expect("permissions arm follows");
+        let body = &src[arm..arm + end];
+        assert!(body.contains(concat!("exit_if_nonzero(", "2)")), "{body}");
     }
 
     #[test]

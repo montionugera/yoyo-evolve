@@ -3700,3 +3700,102 @@ fn map_takes_one_spaced_argv_element_as_one_path() {
     assert_eq!(bare.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&bare.stdout).contains("main"));
 }
+
+/// Run yoyo in `dir` with `NO_COLOR=1` so the asserted bytes carry no ANSI.
+fn yoyo_plain_in(dir: &std::path::Path, args: &[&str]) -> (Option<i32>, String, String) {
+    let ceiling = dir.parent().unwrap_or(dir);
+    let out = yoyo_cmd()
+        .args(args)
+        .current_dir(dir)
+        .env("GIT_CEILING_DIRECTORIES", ceiling)
+        .env("NO_COLOR", "1")
+        .stdin(Stdio::null())
+        .output()
+        .expect("run yoyo");
+    (
+        out.status.code(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
+}
+
+#[test]
+fn bare_blame_is_a_usage_error_and_exits_two() {
+    // #982: bare `yoyo blame` printed its usage line and exited 0, so a
+    // script read success. Usage errors exit 2 (the def/outline/grep/map/
+    // index/risk precedent). The text and its channel (stdout) are unchanged.
+    let dir = blame_fixture_repo();
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["blame"]);
+    assert_eq!(code, Some(2), "stdout={stdout} stderr={stderr}");
+    assert_eq!(
+        stdout,
+        "  ✗ Usage: /blame <file> or /blame <file>:<start>-<end>\n"
+    );
+    assert_eq!(stderr, "");
+}
+
+#[test]
+fn blame_with_an_inverted_range_is_a_usage_error_and_exits_two() {
+    // Same parse-error branch as bare `blame`: a range the parser refuses is
+    // a usage error, not a success.
+    let dir = blame_fixture_repo();
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["blame", "plain.rs:5-1"]);
+    assert_eq!(code, Some(2), "stdout={stdout} stderr={stderr}");
+    assert_eq!(stdout, "  ✗ Invalid range: start (5) > end (1)\n");
+}
+
+#[test]
+fn blame_of_a_committed_file_keeps_exit_zero_under_no_color() {
+    // Near miss for the usage fix: a real blame still exits 0.
+    let dir = blame_fixture_repo();
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["blame", "plain.rs"]);
+    assert_eq!(code, Some(0), "stdout={stdout} stderr={stderr}");
+    assert!(stdout.contains("plain_marker_982"), "stdout={stdout}");
+}
+
+#[test]
+fn config_unknown_subcommand_refusal_exits_two() {
+    // #982: `yoyo config zzz` printed its refusal on stderr and exited 0.
+    // The refusal text is unchanged; only the exit status moves.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["config", "zzz"]);
+    assert_eq!(code, Some(2), "stdout={stdout} stderr={stderr}");
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "  `config zzz` requires an interactive session.\n  Try: yoyo config show (works from the shell)\n"
+    );
+}
+
+#[test]
+fn config_set_and_edit_refusals_exit_two() {
+    // `set` and `edit` share the unknown-subcommand arm: from the shell they
+    // are refused (they need agent state), so `yoyo config set ... && next`
+    // must not proceed as if the value were set. Moved here from the in-process
+    // `test_try_dispatch_subcommand_config_unknown`, which would now kill the
+    // test binary when the arm exits.
+    let dir = tempfile::tempdir().expect("tempdir");
+    for (args, verb) in [
+        (&["config", "edit"][..], "edit"),
+        (&["config", "set", "model", "x"][..], "set"),
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+        assert_eq!(
+            stderr,
+            format!(
+                "  `config {verb}` requires an interactive session.\n  Try: yoyo config show (works from the shell)\n"
+            ),
+            "{args:?}"
+        );
+    }
+}
+
+#[test]
+fn config_get_model_keeps_exit_zero() {
+    // Near miss: `config get <key>` runs from the shell and still exits 0.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["config", "get", "model"]);
+    assert_eq!(code, Some(0), "stdout={stdout} stderr={stderr}");
+    assert!(stdout.contains("model"), "stdout={stdout}");
+}

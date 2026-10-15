@@ -502,7 +502,9 @@ pub fn handle_blame_status(input: &str) -> i32 {
         Ok(a) => a,
         Err(e) => {
             println!("  {RED}✗{RESET} {e}");
-            return 0;
+            // #982: a usage error (no file, bad range) exits 2 from the shell,
+            // the def/outline/grep/map/index/risk precedent. Text unchanged.
+            return 2;
         }
     };
 
