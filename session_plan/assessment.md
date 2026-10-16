@@ -37,7 +37,7 @@ Binary probes from a clean `/tmp/probe` (no config): `-p "Reply with exactly PON
 1. **#1036** — malformed `.yoyo.toml`: warning ships, stray quote still sent, exit 0. Three consecutive journals ended on this question; the issue requires a decision (refuse / strip / keep-with-reason) pinned by test. Nobody reaches this branch on purpose (Day 229 rule).
 2. **#1030** — `cost_warn_usd` typo silently turns the budget OFF on every door (flag, env, config); `max_auto_continues` same. Cheap, same shape as #1028.
 3. **#1026** — json/stream-json print no output-limit note; exit-0 justified by the wrong population.
-4. Stale anthropic default `claude-opus-4-6` (unfiled, see Self-Test).
+4. Stale default models (anthropic `claude-opus-4-6`, openai `gpt-5`) — **#1037**, filed this session.
 5. commands_risk_unhittable.rs size tripwire (above).
 
 ## Open Issues Summary
