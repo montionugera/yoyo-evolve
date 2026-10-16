@@ -34,8 +34,18 @@ pub(crate) const UNCLOSED_HEADER: &str = "unclosed [section] header";
 /// Empty when the file has none of the shapes this module checks.
 pub(crate) fn config_syntax_problems(text: &str) -> Vec<(usize, &'static str)> {
     let mut problems = Vec::new();
+    // The closing delimiter of a multi-line string we are inside, if any. Its
+    // body lines are string content, not TOML, so a `[x` or `k = "v` there is
+    // never a problem (#1036: a false positive here refuses startup).
+    let mut open_multiline: Option<&str> = None;
     for (idx, raw) in text.lines().enumerate() {
         let line = raw.trim();
+        if let Some(delim) = open_multiline {
+            if line.contains(delim) {
+                open_multiline = None;
+            }
+            continue;
+        }
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
@@ -48,7 +58,17 @@ pub(crate) fn config_syntax_problems(text: &str) -> Vec<(usize, &'static str)> {
         let Some((_, value)) = line.split_once('=') else {
             continue;
         };
-        if value_leaves_string_open(value.trim()) {
+        let value = value.trim();
+        let opened = ["\"\"\"", "'''"]
+            .into_iter()
+            .find_map(|d| value.strip_prefix(d).map(|rest| (d, rest)));
+        if let Some((delim, rest)) = opened {
+            if !rest.contains(delim) {
+                open_multiline = Some(delim);
+            }
+            continue;
+        }
+        if value_leaves_string_open(value) {
             problems.push((idx + 1, UNTERMINATED_QUOTE));
         }
     }
@@ -129,6 +149,85 @@ pub(crate) fn config_syntax_warning(
     ))
 }
 
+/// Exit code when an agent entry point refuses a malformed config (#1036).
+/// 2, the family of yoyo's other usage/config refusals
+/// (`setup::SETUP_NOT_INTERACTIVE_EXIT`, the bare-word near-miss guard).
+pub(crate) const CONFIG_SYNTAX_REFUSAL_EXIT: i32 = 2;
+
+/// The startup refusal for the config file `shown` holding `content`, or
+/// `None` when the file has no syntax problem this module detects. That
+/// `None` is the whole regression surface: every clean file starts as before.
+///
+/// Why refuse rather than warn (#1036): nobody writes an unterminated quote
+/// on purpose, so there is no deliberate user for a quiet default to protect.
+/// Everyone on this branch made a typo they don't know about, and the
+/// lenient parser would send the value stray quote included (a 404 for
+/// `model`) with exit 0. git, cargo and Python's tomllib all refuse the same
+/// shape. `shown` is interpolated, so it goes through `cli::sanitize_for_display`.
+pub(crate) fn config_syntax_refusal(shown: &str, content: &str) -> Option<String> {
+    let problems = config_syntax_problems(content);
+    if problems.is_empty() {
+        return None;
+    }
+    let path = crate::cli::sanitize_for_display(shown);
+    let locations: Vec<String> = problems
+        .iter()
+        .map(|(line, kind)| format!("  {path}:{line}: {kind}"))
+        .collect();
+    let lines: Vec<String> = problems.iter().map(|(line, _)| line.to_string()).collect();
+    let (noun, which) = if problems.len() == 1 {
+        ("problem", "line")
+    } else {
+        ("problems", "lines")
+    };
+    Some(format!(
+        "config file is malformed ({} syntax {noun}); not starting, because the \
+         affected values would be used as written, stray quotes included:\n{}\n\
+         To fix: correct {which} {} of {path}, or move the file aside \
+         (yoyo then uses the next config file it finds, or its defaults).",
+        problems.len(),
+        locations.join("\n"),
+        lines.join(", "),
+    ))
+}
+
+/// Does this invocation reach an agent entry point (REPL, `-p`, piped
+/// single-shot) through `parse_args`, rather than a shell subcommand?
+/// `args[0]` is the binary path. Routed subcommands are dispatched before
+/// `parse_args` loads the config; the inspection verbs among them (`config
+/// get/show`, `doctor`, `model`, `permissions`) keep the warning so the user
+/// can still look at the file the refusal names, and `review`, the one routed
+/// verb that calls a provider, opts in itself.
+pub(crate) fn invocation_refuses_malformed_config(args: &[String]) -> bool {
+    !args
+        .get(1)
+        .is_some_and(|a| crate::dispatch_near_miss::ROUTED_SUBCOMMANDS.contains(&a.as_str()))
+}
+
+/// Set by an agent entry point before it loads the config: from then on a
+/// malformed loaded file is refused (exit 2) instead of warned about.
+static REFUSE_MALFORMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Opt this process into refusing a malformed config at load time (#1036).
+pub(crate) fn refuse_malformed_config_on_load() {
+    REFUSE_MALFORMED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Called by `load_config_file` for the file it picked. In refuse mode a
+/// malformed file prints the refusal and exits `CONFIG_SYNTAX_REFUSAL_EXIT`
+/// before any provider call; otherwise it is the #1034 warning, unchanged.
+pub(crate) fn check_loaded_config(shown: &str, content: &str) {
+    if REFUSE_MALFORMED.load(std::sync::atomic::Ordering::SeqCst) {
+        if let Some(msg) = config_syntax_refusal(shown, content) {
+            use crate::format::{RED, RESET};
+            eprintln!("{RED}error:{RESET} {msg}");
+            std::process::exit(CONFIG_SYNTAX_REFUSAL_EXIT);
+        }
+        return;
+    }
+    warn_config_syntax_once(shown, content);
+}
+
 /// Set once a syntax warning has been printed, so it appears once per run.
 /// `load_config_file` is called several times in one process (argument
 /// parsing, the piped path, the REPL), and each call re-reads the same file.
@@ -193,7 +292,6 @@ mod tests {
             "env = { KEY = \"v\" }",
             "max_tokens = 4096",
             "notify_command = echo it's done",
-            "prompt = \"\"\"",
             "allow = [",
             "  \"git *\",",
             "]",
@@ -202,9 +300,143 @@ mod tests {
             "# model = \"unterminated in a comment",
             "",
             "key = \"✓ multi-byte ✓\"",
+            // Last on purpose: an unclosed `\"\"\"` makes every later line string
+            // body (#1036), so earlier lines would go unscanned.
+            "prompt = \"\"\"",
         ]
         .join("\n");
         assert_eq!(config_syntax_problems(&clean), Vec::new());
+    }
+
+    /// Step 1 of #1036: before a malformed file blocks startup, every valid
+    /// TOML shape below must report NOTHING. A false positive here is a dead
+    /// CLI (including this repo's own evolve loop), not a stray warning.
+    #[test]
+    fn valid_toml_shapes_never_fire() {
+        let shapes: &[(&str, &str)] = &[
+            (
+                "multi-line basic string with a quote inside",
+                "prompt = \"\"\"\nsay \"hi\" now\n\"\"\"\n",
+            ),
+            ("multi-line literal string", "prompt = '''\nit's \"x\n'''\n"),
+            (
+                "literal string holding a double quote",
+                "x = 'a \"quoted\" word'\n",
+            ),
+            ("literal strings side by side", "x = ['it', 's']\n"),
+            ("escaped quotes", "x = \"a \\\"b\\\" c\"\n"),
+            (
+                "comment holding a lone quote",
+                "# say \"hi\nmodel = \"m\"\n",
+            ),
+            (
+                "trailing comment with a quote",
+                "model = \"m\" # a \" here\n",
+            ),
+            ("array of tables", "[[array.of.tables]]\nname = \"a\"\n"),
+            ("inline table", "env = { a = \"b\" }\n"),
+            (
+                "array of strings spanning lines",
+                "allow = [\n  \"git *\",\n  \"cargo *\",\n]\n",
+            ),
+            ("bracket inside a string value", "x = \"[not a header\"\n"),
+            ("indented section header", "  [permissions]\n"),
+            (
+                "multi-line string whose body looks like a header and an open quote",
+                "prompt = \"\"\"\n[not a header\nkey = \"half\n\"\"\"\nmodel = \"m\"\n",
+            ),
+            (
+                "multi-line literal string whose body looks malformed",
+                "prompt = '''\n[x\na = 'b\n'''\n",
+            ),
+            (
+                "one-line triple-quoted string",
+                "x = \"\"\"one line\"\"\"\n[s]\n",
+            ),
+        ];
+        for (name, text) in shapes {
+            assert_eq!(config_syntax_problems(text), Vec::new(), "{name}: {text:?}");
+            assert_eq!(config_syntax_refusal(".yoyo.toml", text), None, "{name}");
+        }
+        // This repo's own config, read from disk: the evolve loop loads it on every run.
+        let own = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/.yoyo.toml"))
+            .expect("repo .yoyo.toml must exist");
+        assert!(own.contains("model"), "anti-vacuous: read the real file");
+        assert_eq!(config_syntax_problems(&own), Vec::new());
+        assert_eq!(config_syntax_refusal(".yoyo.toml", &own), None);
+    }
+
+    #[test]
+    fn refusal_names_file_line_problem_and_remedy() {
+        assert_eq!(
+            config_syntax_refusal(
+                ".yoyo.toml",
+                "provider = \"anthropic\"\nmodel = \"claude-haiku-5-5\n"
+            )
+            .as_deref(),
+            Some(
+                "config file is malformed (1 syntax problem); not starting, because the \
+                 affected values would be used as written, stray quotes included:\n  \
+                 .yoyo.toml:2: unterminated quote\n\
+                 To fix: correct line 2 of .yoyo.toml, or move the file aside \
+                 (yoyo then uses the next config file it finds, or its defaults)."
+            )
+        );
+        assert_eq!(
+            config_syntax_refusal("a.toml", "model = \"x\n\n[mcp_servers.fs\n").as_deref(),
+            Some(
+                "config file is malformed (2 syntax problems); not starting, because the \
+                 affected values would be used as written, stray quotes included:\n  \
+                 a.toml:1: unterminated quote\n  a.toml:3: unclosed [section] header\n\
+                 To fix: correct lines 1, 3 of a.toml, or move the file aside \
+                 (yoyo then uses the next config file it finds, or its defaults)."
+            )
+        );
+    }
+
+    #[test]
+    fn refusal_is_none_for_clean_and_empty_files() {
+        for clean in [
+            "",
+            "model = \"claude-haiku-5-5\"\n",
+            "[permissions]\nallow = [\"a\"]\n",
+        ] {
+            assert_eq!(
+                config_syntax_refusal(".yoyo.toml", clean),
+                None,
+                "{clean:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn refusal_escapes_control_bytes_in_path() {
+        let path = "evil\x1b[31m.toml";
+        assert!(path.as_bytes().contains(&0x1b), "fixture must be hostile");
+        let out = config_syntax_refusal(path, "[x\n").unwrap();
+        assert!(!out.as_bytes().contains(&0x1b), "got {out:?}");
+    }
+
+    #[test]
+    fn only_non_subcommand_invocations_refuse() {
+        let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let cases: &[(&[&str], bool)] = &[
+            (&["yoyo"], true),
+            (&["yoyo", "-p", "hi"], true),
+            (&["yoyo", "--model", "m"], true),
+            (&["yoyo", "explain this"], true),
+            (&["yoyo", "config", "get", "model"], false),
+            (&["yoyo", "doctor"], false),
+            (&["yoyo", "setup"], false),
+            (&["yoyo", "review"], false),
+        ];
+        for (args, want) in cases {
+            assert_eq!(
+                invocation_refuses_malformed_config(&a(args)),
+                *want,
+                "{args:?}"
+            );
+        }
     }
 
     #[test]

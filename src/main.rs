@@ -1218,6 +1218,12 @@ async fn main() {
         std::process::exit(2);
     }
 
+    // #1036: an agent entry point refuses a malformed config file (exit 2,
+    // before any provider call) instead of sending a value with a stray quote.
+    if config_syntax::invocation_refuses_malformed_config(&args) {
+        config_syntax::refuse_malformed_config_on_load();
+    }
+
     let Some(config) = parse_args(&args) else {
         return; // --help or --version was handled
     };

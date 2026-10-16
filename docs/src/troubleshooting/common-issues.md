@@ -33,9 +33,15 @@ Use safe mode to:
 
 Once you've identified the problem, fix the offending config/skill/server and restart normally.
 
-## "warning: config file is malformed"
+## "error: config file is malformed"
 
-yoyo found a syntax problem its lenient config reader can't fix for you: a quoted value with no closing quote (`model = "claude-haiku-5-5`) or a `[section` header with no `]`. The warning names each `file:line`. Values are still read as written, so an unterminated quote stays in the value (and a model id with a stray `"` will 404). Fix the named lines; the warning prints once per run.
+yoyo found a syntax problem its lenient config reader can't fix for you: a quoted value with no closing quote (`model = "claude-haiku-5-5`) or a `[section` header with no `]`. The message names each `file:line`.
+
+Starting a session (the REPL, `yoyo -p`, piped input, `yoyo review`) **refuses** with this error and **exit code 2**, before any API call. Read as written, the value would keep its stray quote and be sent anyway (a model id with a stray `"` 404s), and nobody writes an unterminated quote on purpose. git, cargo and Python's `tomllib` refuse the same file.
+
+To get going: fix the named lines, or move the file aside (`mv .yoyo.toml .yoyo.toml.bak`); yoyo then uses the next config file it finds, or its defaults.
+
+The inspection commands (`yoyo config get`, `yoyo config show`, `yoyo doctor`, `yoyo model`, `yoyo permissions`) and `yoyo setup` still run, with a `warning: config file is malformed` line instead, so you can look at what yoyo read while you fix it. The detector skips the inside of multi-line strings (`"""` / `'''`), so their contents never trigger it.
 
 ## "No API key found"
 

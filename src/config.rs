@@ -2122,9 +2122,9 @@ pub fn load_config_file() -> (HashMap<String, String>, String) {
     (HashMap::new(), String::new())
 }
 
-/// The shared tail of every `load_config_file` hit: announce, warn about
-/// syntax `parse_config_file` cannot report (#1034, once per run), record
-/// provenance, parse.
+/// The shared tail of every `load_config_file` hit: announce, check syntax
+/// `parse_config_file` cannot report (#1034 warning; #1036 refusal at agent
+/// entry points), record provenance, parse.
 fn accept_loaded_config(
     shown: &str,
     path: std::path::PathBuf,
@@ -2133,7 +2133,7 @@ fn accept_loaded_config(
     if !is_quiet() {
         eprintln!("{DIM}  config: {shown}{RESET}");
     }
-    crate::config_syntax::warn_config_syntax_once(shown, &content);
+    crate::config_syntax::check_loaded_config(shown, &content);
     record_loaded_config_path(path);
     let map = parse_config_file(&content);
     record_sub_agent_model(&map);

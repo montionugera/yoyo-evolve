@@ -942,6 +942,7 @@ fn resolve_api_key(args: &[String], provider: &str) -> Option<String> {
 /// Run the `yoyo review` subcommand — resolve config, build an agent,
 /// run the review, and print the result. Returns an exit code (0 or 1).
 fn run_review_subcommand(args: &[String], review_arg: &str) -> i32 {
+    crate::config_syntax::refuse_malformed_config_on_load(); // #1036: calls a provider
     let (file_config, _) = load_config_file();
 
     let provider = flag_value(args, &["--provider"])
