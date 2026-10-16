@@ -19,6 +19,9 @@ pub struct MarkdownRenderer {
     /// early for streaming, this tracks the prefix so we don't re-render on newline.
     /// Once set, subsequent tokens stream as inline text until the newline arrives.
     block_prefix_rendered: bool,
+    /// A streamed blockquote prefix opened an ITALIC run that the line's end
+    /// must close, as the whole-line path's trailing RESET does (#1029).
+    quote_italic_open: bool,
     /// Withheld tail of a delta ending in an unmatched opening inline marker
     /// (`**`, `*`, `` ` ``) — prepended to the next delta so a pair split
     /// across streaming chunks ("**bo" + "ld**") still formats (#661).
@@ -45,6 +48,7 @@ impl MarkdownRenderer {
             line_buffer: String::new(),
             line_start: true,
             block_prefix_rendered: false,
+            quote_italic_open: false,
             inline_carry: String::new(),
             code_highlight_state: HighlightState::default(),
         }
@@ -135,6 +139,7 @@ impl MarkdownRenderer {
                 if !mid_line_part.is_empty() {
                     output.push_str(&self.render_inline(mid_line_part));
                 }
+                output.push_str(&self.close_quote_italic());
                 output.push('\n');
                 self.line_start = true;
                 self.block_prefix_rendered = false;
@@ -262,6 +267,7 @@ impl MarkdownRenderer {
                 // The prefix (bullet, quote marker, etc.) was already rendered.
                 // Just render remaining content as inline text.
                 output.push_str(&self.render_inline(&line));
+                output.push_str(&self.close_quote_italic());
             } else {
                 output.push_str(&self.render_line(&line));
             }
@@ -424,32 +430,28 @@ impl MarkdownRenderer {
         let first = trimmed.as_bytes()[0];
 
         // Blockquote: ">" or "> " confirmed — render prefix, stream rest
-        if first == b'>' {
+        // #1029: wait for the char after `>` so the optional space is stripped
+        // as the whole-line path strips it; the content goes through the #661
+        // carry so an opener arriving with the prefix still formats.
+        if first == b'>' && trimmed.len() >= 2 {
             let rest = trimmed.strip_prefix('>').unwrap_or("");
-            let rest = rest.strip_prefix(' ').unwrap_or(rest);
-            let prefix_output = format!("{DIM}│{RESET} {ITALIC}");
-            let rest_output = if !rest.is_empty() {
-                self.render_inline(rest)
-            } else {
-                String::new()
-            };
+            let rest = rest.strip_prefix(' ').unwrap_or(rest).to_string();
             self.line_buffer.clear();
+            let rest_output = self.render_inline_carrying(&rest);
             self.line_start = false;
             self.block_prefix_rendered = true;
-            return format!("{prefix_output}{rest_output}");
+            self.quote_italic_open = true;
+            return format!("{DIM}│{RESET} {ITALIC}{rest_output}");
         }
 
         // Unordered list: confirmed when we see "- X", "* X", "+ X"
         // where X is NOT a continuation of a horizontal rule
         if let Some(content) = self.try_confirm_unordered_list(trimmed) {
-            let indent = Self::leading_whitespace(&self.line_buffer);
-            let content_output = if !content.is_empty() {
-                self.render_inline(content)
-            } else {
-                String::new()
-            };
-            let prefix_output = format!("{indent}{CYAN}•{RESET} {content_output}");
+            let content = content.to_string();
+            let indent = Self::leading_whitespace(&self.line_buffer).to_string();
             self.line_buffer.clear();
+            let content_output = self.render_inline_carrying(&content);
+            let prefix_output = format!("{indent}{CYAN}•{RESET} {content_output}");
             self.line_start = false;
             self.block_prefix_rendered = true;
             return prefix_output;
@@ -457,14 +459,11 @@ impl MarkdownRenderer {
 
         // Ordered list: confirmed when we see "N. " with content
         if let Some((num, content)) = self.try_confirm_ordered_list(trimmed) {
-            let indent = Self::leading_whitespace(&self.line_buffer);
-            let content_output = if !content.is_empty() {
-                self.render_inline(content)
-            } else {
-                String::new()
-            };
-            let prefix_output = format!("{indent}{CYAN}{num}.{RESET} {content_output}");
+            let (num, content) = (num.to_string(), content.to_string());
+            let indent = Self::leading_whitespace(&self.line_buffer).to_string();
             self.line_buffer.clear();
+            let content_output = self.render_inline_carrying(&content);
+            let prefix_output = format!("{indent}{CYAN}{num}.{RESET} {content_output}");
             self.line_start = false;
             self.block_prefix_rendered = true;
             return prefix_output;
@@ -572,10 +571,20 @@ impl MarkdownRenderer {
         output
     }
 
+    /// RESET for an ITALIC run opened by a streamed blockquote prefix, or "".
+    fn close_quote_italic(&mut self) -> String {
+        if std::mem::take(&mut self.quote_italic_open) {
+            RESET.to_string()
+        } else {
+            String::new()
+        }
+    }
+
     /// Flush any remaining buffered content (call after stream ends).
     pub fn flush(&mut self) -> String {
-        // #661: the stream has ended — emit any withheld inline-marker tail
-        // literally so carried text is never lost.
+        self.quote_italic_open = false; // the RESETs below close it
+                                        // #661: the stream has ended — emit any withheld inline-marker tail
+                                        // literally so carried text is never lost.
         let carried = std::mem::take(&mut self.inline_carry);
         let output = if self.line_buffer.is_empty() {
             if self.block_prefix_rendered {
@@ -656,9 +665,9 @@ impl MarkdownRenderer {
             };
         }
 
-        // Header: # at line start → BOLD+CYAN
+        // Header: # at line start → BOLD+CYAN, marker dropped (#1029)
         if trimmed.starts_with('#') {
-            return format!("{BOLD}{CYAN}{line}{RESET}");
+            return self.render_heading(line, super::color_enabled());
         }
 
         // Horizontal rule: ---, ***, ___ (3+ of the same char, possibly with spaces)
@@ -690,6 +699,36 @@ impl MarkdownRenderer {
 
         // Apply inline formatting for normal text
         self.render_inline(line)
+    }
+
+    /// Render a `#` line (#1029). An ATX heading (`#{1,6}` then a space or end)
+    /// loses its marker and optional closing `#`s; its text gets inline
+    /// rendering, with the heading style re-applied after each span's RESET.
+    /// With `color` off every style is empty, so the marker is the only heading
+    /// signal left and is kept. Non-ATX lines (`#tag`) keep the old rendering.
+    fn render_heading(&self, line: &str, color: bool) -> String {
+        let trimmed = line.trim();
+        let level = trimmed.bytes().take_while(|&b| b == b'#').count();
+        let after = &trimmed[level..]; // `#` is ASCII: a char boundary
+        if !(1..=6).contains(&level) || !(after.is_empty() || after.starts_with(' ')) {
+            return format!("{BOLD}{CYAN}{line}{RESET}");
+        }
+        if !color {
+            return self.render_inline(line);
+        }
+        let mut text = after.trim();
+        let unclosed = text.trim_end_matches('#');
+        if unclosed.is_empty() || unclosed.ends_with(' ') {
+            text = unclosed.trim_end();
+        }
+        let (style, reset) = (format!("{BOLD}{CYAN}"), RESET.to_string());
+        let inline = self.render_inline(text);
+        let inline = if reset.is_empty() {
+            inline
+        } else {
+            inline.replace(&reset, &format!("{reset}{style}"))
+        };
+        format!("{style}{inline}{RESET}")
     }
 
     /// Check if a trimmed line is a horizontal rule (---, ***, ___, 3+ chars).
@@ -870,76 +909,6 @@ mod tests {
         let mut out = r.render_delta(input);
         out.push_str(&r.flush());
         out
-    }
-
-    #[test]
-    fn test_md_code_block_detection() {
-        let input = "before\n```\ncode line\n```\nafter\n";
-        let out = render_full(input);
-        // "code line" should be wrapped in DIM
-        assert!(out.contains(&format!("{DIM}code line{RESET}")));
-        // "before" and "after" should NOT be dim
-        assert!(out.contains("before"));
-        assert!(out.contains("after"));
-    }
-
-    #[test]
-    fn test_md_code_block_with_language() {
-        let input = "```rust\nlet x = 1;\n```\n";
-        let mut r = MarkdownRenderer::new();
-        let out = r.render_delta(input);
-        let flushed = r.flush();
-        let full = format!("{out}{flushed}");
-        // Language should be captured and fence dimmed
-        assert!(full.contains(&format!("{DIM}```rust{RESET}")));
-        // "let" should be keyword-highlighted, not just DIM
-        assert!(full.contains(&format!("{BOLD_CYAN}let{RESET}")));
-        // Number should be yellow
-        assert!(full.contains(&format!("{YELLOW}1{RESET}")));
-    }
-
-    #[test]
-    fn test_md_inline_code() {
-        let out = render_full("use `Option<T>` here\n");
-        assert!(out.contains(&format!("{CYAN}Option<T>{RESET}")));
-    }
-
-    #[test]
-    fn test_md_bold_text() {
-        let out = render_full("this is **important** stuff\n");
-        assert!(out.contains(&format!("{BOLD}important{RESET}")));
-    }
-
-    #[test]
-    fn test_md_header_rendering() {
-        let out = render_full("# Hello World\n");
-        assert!(out.contains(&format!("{BOLD}{CYAN}# Hello World{RESET}")));
-    }
-
-    #[test]
-    fn test_md_header_h2() {
-        let out = render_full("## Section Two\n");
-        assert!(out.contains(&format!("{BOLD}{CYAN}## Section Two{RESET}")));
-    }
-
-    #[test]
-    fn test_md_partial_delta_fence() {
-        // Fence marker split across multiple deltas
-        let mut r = MarkdownRenderer::new();
-        let out1 = r.render_delta("``");
-        // Nothing emitted yet — still buffered (no newline)
-        assert_eq!(out1, "");
-        let out2 = r.render_delta("`\n");
-        // Now the fence line is complete
-        assert!(out2.contains(&format!("{DIM}```{RESET}")));
-        let out3 = r.render_delta("code here\n");
-        assert!(out3.contains(&format!("{DIM}code here{RESET}")));
-        let out4 = r.render_delta("```\n");
-        assert!(out4.contains(&format!("{DIM}```{RESET}")));
-        // After closing, normal text again
-        let out5 = r.render_delta("normal\n");
-        assert!(out5.contains("normal"));
-        assert!(!out5.contains(&format!("{DIM}")));
     }
 
     /// Helper: render a sequence of streaming chunks, then flush (#661 tests).
@@ -1210,7 +1179,8 @@ mod tests {
         let mut r = MarkdownRenderer::new();
         // Header at line start
         let out = r.render_delta("# My Header\n");
-        assert!(out.contains(&format!("{BOLD}{CYAN}# My Header{RESET}")));
+        // expected value changed by #1029: this pinned the marker leak
+        assert!(out.contains(&format!("{BOLD}{CYAN}My Header{RESET}")));
     }
 
     #[test]
@@ -1283,7 +1253,8 @@ mod tests {
 
         // Now add more to reveal it's a header
         let out2 = r.render_delta(" Title\n");
-        assert!(out2.contains(&format!("{BOLD}{CYAN}# Title{RESET}")));
+        // expected value changed by #1029: this pinned the marker leak
+        assert!(out2.contains(&format!("{BOLD}{CYAN}Title{RESET}")));
     }
 
     #[test]
@@ -3175,3 +3146,7 @@ mod tests {
         assert!(!out2.contains("─"), "Spaces-only should not be a rule");
     }
 }
+
+#[cfg(test)]
+#[path = "markdown_parity_tests.rs"]
+mod markdown_parity_tests;

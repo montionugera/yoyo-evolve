@@ -452,7 +452,9 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // deltas (split `**bo` + `ld**` pairs now render bold) plus the
     // chunking-independence and carry-safety regression tests.
     // Day 174: +17 absorbed since Day 166.
-    ("src/format/markdown.rs", 3177),
+    // Day 230 (#1029): 3177 -> 3152. The heading/carry fix added ~47 lines and
+    // ~72 lines of existing tests moved verbatim to markdown_parity_tests.rs.
+    ("src/format/markdown.rs", 3152),
     // Day 174: +1 absorbed since Day 166.
     // Day 177: 2456 → 2568 (+112, past the 100-line grace band, so the gate
     // demanded this line rather than absorbing it). The growth is the #780-class
