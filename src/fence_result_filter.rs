@@ -15,19 +15,28 @@
 //! line says how many, so the model learns results were removed rather than
 //! concluding they never existed.
 //!
-//! **Fail closed on lines it cannot attribute (#1023).** `search` is yoagent's
-//! tool, which spawns `rg` itself, so yoyo does not build its argv and cannot
-//! add `--no-config`; `rg` reads whatever `RIPGREP_CONFIG_PATH` names. A config
-//! can change the OUTPUT SHAPE this filter reads a path from — measured on
-//! ripgrep 14.1.0: `--no-filename` printed the denied file's line as a bare
-//! `1:TOKEN`, `--null` put a NUL where the `:` was, `--json` printed JSON
-//! objects, `--path-separator=X` printed `XtmpX…` — and every one of those lines
-//! used to pass as "not a result line". So while a fence is active and the root
-//! is a directory, a line before yoagent's own footer is kept only if its first
-//! `path:N:` candidate names a path under the searched root (and holds no NUL).
-//! Anything else is dropped and counted in its own note. The property is
-//! "a user's ripgrep config never shapes what a fenced search returns", decided
-//! by where a line's path came from — no list of rg flags is consulted.
+//! **Fail closed on lines it cannot attribute (#1023).** While a fence is active
+//! and the root is a directory, a line before yoagent's own footer is kept only
+//! if its first `path:N:` candidate names a path under the searched root (and
+//! holds no NUL). Anything else is dropped and counted in its own note. The
+//! property is "no line reaches the model unless the fence could name the file
+//! it came from", decided by where a line's path came from — no list of rg
+//! flags or output formats is consulted.
+//!
+//! A user's search config is no longer one of the reasons: yoagent's `search`
+//! passes `--no-config` to `rg` and removes `RIPGREP_CONFIG_PATH` and
+//! `GREP_OPTIONS` from the child's environment, for `rg` and the grep fallback
+//! alike <!-- yoagent-version-claim: 0.25.5 -->. The shapes that can still reach
+//! the drop path, stated rather than implied: a file NAME containing a newline
+//! (measured, GNU grep 3.11: `d/a\nb.txt` printed as `d/a` and `b.txt:1:tok`,
+//! neither naming a file under `d`); a grep that prints its binary-match notice
+//! on stdout (GNU grep did before 3.5, per its NEWS: `Binary file FOO matches`);
+//! an `rg` or `grep` on `PATH` that is a wrapper adding its own flags; and any
+//! future output form this parser does not know. Before yoagent 0.25.5 the
+//! main reason was a ripgrep config (measured on ripgrep 14.1.0, Day 229:
+//! `--no-filename`, `--null`, `--json` and `--path-separator=X` each passed a
+//! denied file's line as "not a result line"); those fixtures stay in the tests
+//! below because a wrapper on `PATH` can still produce them.
 //!
 //! Limits, stated rather than implied: the tool's own `(N matches)` /
 //! `(N files)` footer and its `details` JSON are not rewritten (the withheld
@@ -106,7 +115,7 @@ fn withheld_note(count: usize) -> String {
 fn unattributed_note(count: usize) -> String {
     let noun = if count == 1 { "line" } else { "lines" };
     format!(
-        "[{count} {noun} withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form (a ripgrep config via RIPGREP_CONFIG_PATH can reshape output), so it was dropped rather than risk a leak]"
+        "[{count} {noun} withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
     )
 }
 
@@ -326,7 +335,8 @@ mod tests {
     /// `RIPGREP_CONFIG_PATH` naming a one-flag config (ripgrep 14.1.0, Day 229
     /// probe, `{R}` = the searched root, `secrets/` denied). Every row named
     /// the denied file or carried its line, and every row passed the
-    /// pre-#1023 filter untouched.
+    /// pre-#1023 filter untouched. Since yoagent 0.25.5 a config can no longer
+    /// produce these, but a wrapper `rg` on `PATH` still can, so they stay.
     fn reshaped_bodies(root: &str) -> Vec<(&'static str, String)> {
         vec![
             ("--no-filename", format!("1:token={CANARY}\n1:ok {CANARY}\n(2 matches)")),
@@ -501,5 +511,39 @@ mod tests {
         assert!(!get(&fenced).contains(CANARY));
         let untouched = fence_tool_result("bash", mk(), &refused, true, &root);
         assert_eq!(get(&untouched), text);
+    }
+
+    /// The note the MODEL receives for an unattributable line, pinned at the
+    /// emission point (`fence_tool_result`'s text block). The fixture is the
+    /// shape measured on GNU grep 3.11 for a file named `a\nb.txt` (Day 230):
+    /// the name's newline splits the result into two lines, neither naming a
+    /// file under the root. It must not blame a ripgrep config: yoagent 0.25.5
+    /// passes `--no-config` and clears `RIPGREP_CONFIG_PATH`, so the old
+    /// parenthetical told the model a cause that can no longer happen.
+    #[test]
+    fn unattributed_note_names_no_cause_the_code_cannot_know() {
+        let (_dir, root, r) = fixture();
+        let refused = |p: &str| r.check_path(p).is_err();
+        let body = format!("{root}/src/a.txt:1:ok {CANARY}\n{root}/src/x\ny.txt:1:ok\n(2 matches)");
+        // Anti-vacuous: the split line really is unattributable on its own.
+        assert!(!attributable_to_root("y.txt:1:ok", &root));
+        let res = yoagent::types::ToolResult {
+            content: vec![yoagent::types::Content::Text { text: body }],
+            details: serde_json::json!({}),
+        };
+        let out = text_of(&fence_tool_result("search", res, &refused, true, &root));
+        assert_eq!(
+            out,
+            format!(
+                "{root}/src/a.txt:1:ok {CANARY}\n(2 matches)\n[2 lines withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
+            )
+        );
+        for stale in ["RIPGREP_CONFIG_PATH", "ripgrep config"] {
+            assert!(!out.contains(stale), "note names a dead cause: {out}");
+        }
+        assert_eq!(
+            unattributed_note(1),
+            "[1 line withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
+        );
     }
 }
