@@ -414,9 +414,44 @@ pub(crate) fn path_guard_refusal(
     path_guard_refusal_with(&CD_DENIED_DIRS, startup, path)
 }
 
+/// Is `<target>/.yoyo.toml` the very file this session loaded at startup (#1032)?
+/// Both paths are canonicalized, so a symlink or a `..` spelling still matches.
+/// `false` when nothing was loaded or either path cannot be canonicalized, so
+/// a failure falls back to today's note, never to silence.
+pub(crate) fn is_loaded_config(target: &Path, loaded: Option<&Path>) -> bool {
+    let Some(loaded) = loaded else {
+        return false;
+    };
+    match (
+        std::fs::canonicalize(target.join(".yoyo.toml")),
+        std::fs::canonicalize(loaded),
+    ) {
+        (Ok(here), Ok(loaded)) => here == loaded,
+        _ => false,
+    }
+}
+
+/// `reading` as `/cd` should report it: when the file IS the loaded config
+/// (back in the launch directory), its sections are applied, so the
+/// NOT-applied list is dropped (#1032). Deny entries and unreadable files are
+/// untouched; any other directory gets `reading` back unchanged.
+pub(crate) fn reading_for_note(reading: &CdConfigReading, is_loaded: bool) -> CdConfigReading {
+    match reading {
+        CdConfigReading::Sets(_, deny, dir_deny, dir_allow) if is_loaded => CdConfigReading::Sets(
+            Vec::new(),
+            deny.clone(),
+            dir_deny.clone(),
+            dir_allow.clone(),
+        ),
+        other => other.clone(),
+    }
+}
+
 /// Print the note for an already-read `reading` to stderr.
 pub(crate) fn print_cd_config_note(target: &Path, reading: &CdConfigReading) {
     let plain = crate::format::is_plain_output();
+    let is_loaded = is_loaded_config(target, crate::config::loaded_config_resolved_path());
+    let reading = &reading_for_note(reading, is_loaded);
     let note = cd_config_note(&target.display().to_string(), reading, plain);
     // Deliberately NOT gated on quiet mode, for either volume. A warning is not
     // chrome: `--quiet` is auto-on whenever stdin and stdout are both piped, so a
@@ -729,6 +764,97 @@ mod tests {
 
     fn p(base: &Path, rel: &str) -> String {
         base.join(rel).to_string_lossy().into_owned()
+    }
+
+    const HOOK_TOML: &str = "hooks.pre.bash = \"echo hi\"\n";
+
+    /// The note `/cd` prints for `target`, given which file the session loaded.
+    fn note_at(target: &Path, loaded: Option<&Path>) -> Option<String> {
+        let reading = read_cd_config(target);
+        let reading = reading_for_note(&reading, is_loaded_config(target, loaded));
+        cd_config_note(&target.display().to_string(), &reading, true)
+    }
+
+    #[test]
+    fn cd_back_into_launch_dir_does_not_call_loaded_config_unapplied() {
+        // #1032: launch dir A sets a hook; /cd back into A must not say it is NOT applied.
+        let (_d, base) = tmp();
+        let a = base.join("A");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::write(a.join(".yoyo.toml"), HOOK_TOML).unwrap();
+        // Anti-vacuous: the file really does set an unapplied section.
+        assert_eq!(read_cd_config(&a), sets(HOOK_TOML));
+        assert!(
+            matches!(read_cd_config(&a), CdConfigReading::Sets(ref s, ..) if s == &vec!["hooks"])
+        );
+
+        // Loaded path spelled with `..`.
+        let dotted = base.join("A").join("..").join("A").join(".yoyo.toml");
+        assert_eq!(note_at(&a, Some(&dotted)), None);
+
+        // Reached through a symlinked directory.
+        #[cfg(unix)]
+        {
+            let link = base.join("link-to-A");
+            std::os::unix::fs::symlink(&a, &link).unwrap();
+            assert_eq!(note_at(&link, Some(&a.join(".yoyo.toml"))), None);
+            assert_eq!(note_at(&a, Some(&link.join(".yoyo.toml"))), None);
+        }
+    }
+
+    #[test]
+    fn different_dir_with_same_sections_keeps_the_exact_warning() {
+        // Near-miss guard for #1032: B sets the same hook, A's file was loaded.
+        let (_d, base) = tmp();
+        let (a, b) = (base.join("A"), base.join("B"));
+        for d in [&a, &b] {
+            std::fs::create_dir_all(d).unwrap();
+            std::fs::write(d.join(".yoyo.toml"), HOOK_TOML).unwrap();
+        }
+        let expected = format!(
+            "  {}/.yoyo.toml sets hooks and they are NOT applied in this session: the launch \
+             directory's settings stay in force, except that its own [permissions] allow and \
+             hooks pause outside its tree. Restart yoyo here to use them (#869).",
+            b.display()
+        );
+        assert_eq!(
+            note_at(&b, Some(&a.join(".yoyo.toml"))),
+            Some(expected.clone())
+        );
+        // No loaded config at all: unchanged.
+        assert_eq!(note_at(&b, None), Some(expected));
+        assert!(!is_loaded_config(&b, None));
+    }
+
+    #[test]
+    fn missing_loaded_file_falls_back_to_the_warning_not_silence() {
+        let (_d, base) = tmp();
+        let a = base.join("A");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::write(a.join(".yoyo.toml"), HOOK_TOML).unwrap();
+        let gone = base.join("gone").join(".yoyo.toml");
+        assert!(!is_loaded_config(&a, Some(&gone)));
+        assert!(note_at(&a, Some(&gone)).unwrap().contains("NOT applied"));
+    }
+
+    #[test]
+    fn loaded_config_keeps_its_applied_deny_entries() {
+        // Only the NOT-applied list is dropped; deny entries still report as applied.
+        let reading = sets(PERMS_TOML);
+        assert_eq!(reading_for_note(&reading, true), reading);
+        let both = sets("[permissions]\nallow = [\"git *\"]\ndeny = [\"rm *\"]\n");
+        match reading_for_note(&both, true) {
+            CdConfigReading::Sets(s, d, _, _) => {
+                assert!(s.is_empty());
+                assert_eq!(d, vec!["rm *".to_string()]);
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(reading_for_note(&both, false), both);
+        assert_eq!(
+            reading_for_note(&CdConfigReading::Unreadable, true),
+            CdConfigReading::Unreadable
+        );
     }
 
     #[test]

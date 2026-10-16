@@ -2166,7 +2166,27 @@ static LOADED_CONFIG_PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::
 
 /// Record which config file won the search. First writer wins.
 fn record_loaded_config_path(path: std::path::PathBuf) {
+    // Resolve NOW, while the cwd is still the launch directory: the recorded
+    // path may be relative (`.yoyo.toml`), and after a `/cd` it would resolve
+    // against the wrong directory (#1032). Falls back to the cwd join when the
+    // file cannot be canonicalized; first writer wins, like the raw path.
+    let resolved = std::fs::canonicalize(&path).unwrap_or_else(|_| {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(&path))
+            .unwrap_or_else(|_| path.clone())
+    });
+    let _ = LOADED_CONFIG_RESOLVED.set(resolved);
     let _ = LOADED_CONFIG_PATH.set(path);
+}
+
+/// `LOADED_CONFIG_PATH` resolved against the launch cwd at load time (#1032).
+static LOADED_CONFIG_RESOLVED: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// The config file this session loaded, as an absolute (canonical when
+/// possible) path, or `None` when no config file was loaded. Read by `/cd`'s
+/// disclosure so it never calls the loaded file "NOT applied" (#1032).
+pub(crate) fn loaded_config_resolved_path() -> Option<&'static std::path::Path> {
+    LOADED_CONFIG_RESOLVED.get().map(|p| p.as_path())
 }
 
 /// Is `path` — the config file that won the search — the *project-local* one,
