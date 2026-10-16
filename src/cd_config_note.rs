@@ -999,6 +999,58 @@ mod tests {
         assert!(crate::cd_deny::effective_user_deny_refusal(&st.deny, &bash, "rm foo").is_some());
     }
 
+    /// The exact launch-dir fixture measured on #869 (2026-10-16T09:23Z): a
+    /// deny pattern AND a hook. Silent on the way home since 528dea35; this pins
+    /// it at the rendered bytes, through the same composition `/cd` runs.
+    const HOME_DENY_HOOK_TOML: &str =
+        "hooks.post.bash = \"echo hi\"\n\n[permissions]\ndeny = [\"rm *\"]\n";
+
+    /// The stderr bytes `/cd` would write (plain), or `None` for silence.
+    fn rendered_cd(target: &Path, is_loaded: bool, st: &StartupFences) -> Option<String> {
+        let reading = without_startup_enforced(&read_cd_config(target), is_loaded, Some(st));
+        let reading = reading_for_note(&reading, is_loaded);
+        cd_config_note(&target.display().to_string(), &reading, true)
+            .map(|n| render_cd_config_note(&n, note_volume(&reading), true))
+    }
+
+    #[test]
+    fn cd_home_with_deny_and_hook_renders_nothing() {
+        let (_d, base) = tmp();
+        let a = base.join("A");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::write(a.join(".yoyo.toml"), HOME_DENY_HOOK_TOML).unwrap();
+        // Anti-vacuous: the raw reading carries both the deny and the hook.
+        let raw = read_cd_config(&a);
+        assert_eq!(deny_entries(&raw), ["rm *".to_string()]);
+        assert_eq!(
+            raw,
+            CdConfigReading::Sets(vec![HOOKS], vec!["rm *".into()], vec![], vec![])
+        );
+        assert_eq!(note_volume(&raw), NoteVolume::Warning);
+        let st = fences(&["rm *"], &[], &[]);
+        assert_eq!(rendered_cd(&a, true, &st), None);
+    }
+
+    #[test]
+    fn foreign_dir_with_deny_and_hook_still_warns_byte_identically() {
+        // Near-miss: the same bytes in a directory that is NOT the loaded file
+        // keep the full warning, captured before this test was added.
+        let (_d, base) = tmp();
+        let b = base.join("B");
+        std::fs::create_dir_all(&b).unwrap();
+        std::fs::write(b.join(".yoyo.toml"), HOME_DENY_HOOK_TOML).unwrap();
+        let st = fences(&["rm *"], &[], &[]);
+        let want = format!(
+            "warning: {}/.yoyo.toml: its 1 [permissions] deny pattern is now enforced on bash \
+             commands for the rest of this session (another /cd does not remove it; file tools \
+             never read this list). It also sets hooks and they are NOT applied: the launch \
+             directory's settings stay in force, except that its own [permissions] allow and \
+             hooks pause outside its tree. Restart yoyo here to use them (#869).",
+            b.display()
+        );
+        assert_eq!(rendered_cd(&b, false, &st), Some(want));
+    }
+
     #[test]
     fn foreign_dir_with_the_same_deny_keeps_its_exact_note_and_append() {
         // Near-miss guard: B is not the loaded file, so nothing is dropped.
