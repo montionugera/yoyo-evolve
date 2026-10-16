@@ -26,7 +26,7 @@
 //! A user's search config is no longer one of the reasons: yoagent's `search`
 //! passes `--no-config` to `rg` and removes `RIPGREP_CONFIG_PATH` and
 //! `GREP_OPTIONS` from the child's environment, for `rg` and the grep fallback
-//! alike <!-- yoagent-version-claim: 0.25.5 -->. The shapes that can still reach
+//! alike <!-- yoagent-version-claim: 0.25 -->. The shapes that can still reach
 //! the drop path, stated rather than implied: a file NAME containing a newline
 //! (measured, GNU grep 3.11: `d/a\nb.txt` printed as `d/a` and `b.txt:1:tok`,
 //! neither naming a file under `d`); a grep that prints its binary-match notice

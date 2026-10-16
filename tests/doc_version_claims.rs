@@ -14,9 +14,29 @@
 //! The convention that came out of it: any prose claim asserting what an
 //! external dependency *cannot* do carries a marker naming the yoagent
 //! version it was checked against, and this test pins every such marker to
-//! whatever `Cargo.lock` actually resolves. When the pin moves, this fails and
+//! whatever `Cargo.lock` actually resolves (at `MAJOR.MINOR` granularity — see
+//! below). When the pin moves, this fails and
 //! names the file, the line and the remedy — instead of the sentence quietly
 //! becoming false again.
+//!
+//! **Markers name `MAJOR.MINOR` (e.g. `0.25`), compared against the first two
+//! components of the locked version** — the whole policy is the pure
+//! `check_marker`, table-tested below. **Superseded rule, recorded rather than
+//! erased (Day 230, #1039):** until Day 230 every marker had to equal the
+//! EXACT locked version, patch included. That made every yoagent patch release
+//! a gate: `scripts/evolve.sh` Step 1a runs `cargo update` on direct deps and
+//! keeps the new lock only if build+test pass, and this one test was the only
+//! thing that rolled yoagent 0.25.6 back in BOTH Day-230 sessions (14:31,
+//! 19:18), each time discarding a full ~10-minute build+test. The reason for
+//! the change: `Cargo.toml` pins `yoagent = "0.25"`, so patches are already
+//! trusted by the dependency spec; the gate now guards what the pin does not,
+//! a minor (or major) bump. A three-component marker is rejected as a wrong
+//! FORM ("drop the patch number"), so there is one marker form, never two.
+//! **Accepted risk, stated rather than implied:** a patch release CAN falsify a
+//! claim — 0.25.5 changed `search` (it now passes `--no-config`) and a claim
+//! about that went stale without a marker even existing. Such a claim is a
+//! bug to fix when found (re-read the upstream diff when the lock moves); it is
+//! no longer something every patch has to clear before it may land.
 //!
 //! This lives in `tests/` rather than inside the modules it scans on purpose:
 //! `src/gasp.rs` is behind the default-off `gasp` cargo feature, so a
@@ -115,6 +135,68 @@ fn markers_in(source: &str) -> Vec<(usize, String)> {
         .collect()
 }
 
+/// `MAJOR.MINOR` of a version string, if its first two dot-separated
+/// components are both non-empty and all ASCII digits. Extra components (a
+/// patch number, a pre-release suffix) are ignored — this is for reading the
+/// LOCKED version, which always carries a patch.
+fn major_minor(version: &str) -> Option<(&str, &str)> {
+    let mut parts = version.split('.');
+    let major = parts.next()?;
+    let minor = parts.next()?;
+    let numeric = |p: &str| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit());
+    (numeric(major) && numeric(minor)).then_some((major, minor))
+}
+
+/// The whole marker policy, as one pure decision: does a marker claiming
+/// `marker` agree with a lock resolving yoagent `locked`?
+///
+/// * The marker must be exactly `MAJOR.MINOR` — two numeric components. A
+///   three-component marker (`0.25.5`) is the **superseded** exact-patch form
+///   and fails as a wrong FORM, never as stale: one marker form, never two.
+/// * `MAJOR.MINOR` must equal the locked version's first two components, so a
+///   patch release (`0.25.5` → `0.25.6`) passes and a minor bump
+///   (`0.25.x` → `0.26.0`) fails with the re-read guidance.
+///
+/// `Err` carries the indented body of the failure message; the caller
+/// prefixes `file:line`.
+fn check_marker(marker: &str, locked: &str) -> Result<(), String> {
+    let parts: Vec<&str> = marker.split('.').collect();
+    let all_numeric = parts
+        .iter()
+        .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
+    if parts.len() == 3 && all_numeric {
+        let fixed = format!("{}.{}", parts[0], parts[1]);
+        return Err(format!(
+            "    claimed:  yoagent {marker} (wrong form)\n    \
+             drop the patch number: markers name MAJOR.MINOR. Write `{fixed}`, after \
+             checking that MAJOR.MINOR still matches Cargo.lock."
+        ));
+    }
+    if parts.len() != 2 || !all_numeric {
+        return Err(format!(
+            "    claimed:  yoagent {marker:?} (wrong form)\n    \
+             a marker must be MAJOR.MINOR — two numeric components, e.g. `0.25`."
+        ));
+    }
+    let Some((lock_major, lock_minor)) = major_minor(locked) else {
+        return Err(format!(
+            "    Cargo.lock resolves yoagent {locked:?}, which has no numeric MAJOR.MINOR — \
+             has the lockfile format changed?"
+        ));
+    };
+    if parts[0] == lock_major && parts[1] == lock_minor {
+        return Ok(());
+    }
+    let locked_mm = format!("{lock_major}.{lock_minor}");
+    Err(format!(
+        "    claimed:  yoagent {marker}\n    \
+         Cargo.lock resolves: yoagent {locked} (MAJOR.MINOR {locked_mm}) — the minor moved.\n    \
+         re-read the paragraph above this marker — it may have gone stale.\n    \
+         Then either re-verify the claim against yoagent {locked} and update the \
+         marker to {locked_mm}, or correct the prose."
+    ))
+}
+
 /// Every `*.rs` under `src/`, recursively, plus `CLAUDE.md` and
 /// `ARCHITECTURE.md` — the places dependency claims are written. Paths are
 /// returned relative to the repo root so failure messages are copy-pasteable.
@@ -171,14 +253,8 @@ fn every_dependency_version_claim_names_the_pinned_yoagent_version() {
         let text = read(&root.join(rel));
         for (lineno, claimed) in markers_in(&text) {
             found += 1;
-            if claimed != locked {
-                stale.push(format!(
-                    "  {rel}:{lineno}\n    claimed:  yoagent {claimed}\n    \
-                     Cargo.lock resolves: yoagent {locked}\n    \
-                     re-read the paragraph above this marker — it may have gone stale.\n    \
-                     Then either re-verify the claim against yoagent {locked} and update the \
-                     marker to {locked}, or correct the prose."
-                ));
+            if let Err(why) = check_marker(&claimed, &locked) {
+                stale.push(format!("  {rel}:{lineno}\n{why}"));
             }
         }
     }
@@ -196,8 +272,8 @@ fn every_dependency_version_claim_names_the_pinned_yoagent_version() {
 
     assert!(
         stale.is_empty(),
-        "\n{} stale dependency-version claim(s) — the prose was checked against an older \
-         yoagent than the one Cargo.lock now pins:\n\n{}\n",
+        "\n{} stale or malformed dependency-version claim(s) — each marker must name the \
+         MAJOR.MINOR of the yoagent Cargo.lock now pins:\n\n{}\n",
         stale.len(),
         stale.join("\n\n")
     );
@@ -221,6 +297,46 @@ version = "0.16.5"
         locked_yoagent_version("name = \"other\"\nversion = \"1.0\""),
         None
     );
+}
+
+#[test]
+fn check_marker_pins_major_minor_and_rejects_the_patch_form() {
+    // Pass: a patch release under the same minor is trusted (#1039) — this is
+    // the row that let yoagent 0.25.6 be rolled back twice on Day 230.
+    assert_eq!(check_marker("0.25", "0.25.6"), Ok(()));
+    assert_eq!(check_marker("0.25", "0.25.5"), Ok(()));
+    assert_eq!(check_marker("1.0", "1.0.3"), Ok(()));
+
+    // Fail: the minor moved. Names both versions and keeps the re-read remedy.
+    let moved = check_marker("0.25", "0.26.0").unwrap_err();
+    assert!(moved.contains("yoagent 0.25"), "{moved}");
+    assert!(moved.contains("yoagent 0.26.0"), "{moved}");
+    assert!(moved.contains("the minor moved"), "{moved}");
+    assert!(
+        moved.contains("re-read the paragraph above this marker"),
+        "{moved}"
+    );
+    assert!(moved.contains("update the marker to 0.26"), "{moved}");
+    // A major bump is a moved minor too, never a pass.
+    assert!(check_marker("0.25", "1.25.0").is_err());
+
+    // Fail as WRONG FORM, even when the patch matches the lock exactly: the
+    // superseded exact-patch marker must not survive as a second accepted form.
+    for locked in ["0.25.5", "0.25.6"] {
+        let form = check_marker("0.25.5", locked).unwrap_err();
+        assert!(
+            form.contains("drop the patch number: markers name MAJOR.MINOR"),
+            "{form}"
+        );
+        assert!(form.contains("`0.25`"), "{form}");
+        assert!(!form.contains("the minor moved"), "{form}");
+    }
+
+    // Other malformed markers are wrong form too, not silently compared.
+    for bad in ["0", "", "0.x", "v0.25", "0.25.", "0.25.5.1"] {
+        let e = check_marker(bad, "0.25.6").unwrap_err();
+        assert!(e.contains("wrong form"), "{bad:?}: {e}");
+    }
 }
 
 #[test]
