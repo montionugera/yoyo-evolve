@@ -202,6 +202,12 @@ made, and yoyo has no way to verify it against your actual invoice.
 `[model_pricing]` is a table, not a scalar, so it is not settable through
 `/config set` — edit your config file directly (`/config edit`).
 
+## Spending warning
+
+Set a budget in US dollars and yoyo prints one stderr warning when this session's estimated spend crosses it. It is a warning only; nothing is stopped. Sources, highest priority first: `--cost-warn <usd>`, the `YOYO_COST_WARN_USD` environment variable, and `cost_warn_usd` in `.yoyo.toml`. It is off when none is set.
+
+The value must be a positive number. An invalid one (`abc`, `-1`, `0`, `nan`) prints a warning at startup naming where it came from, before any tokens are spent. If no other source gives a usable value, the cost warning is off for that run. An empty `YOYO_COST_WARN_USD` counts as unset.
+
 ## Limitations
 
 - Cost estimates are approximate — actual billing may differ slightly

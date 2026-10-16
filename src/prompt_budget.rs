@@ -471,6 +471,85 @@ pub(crate) fn resolve_cost_threshold(
         .or_else(|| parse_cost_threshold(config))
 }
 
+/// Byte budget for the user's raw value inside [`cost_threshold_warning`],
+/// cut on a char boundary (never a raw byte index, #250).
+const COST_WARN_VALUE_MAX_BYTES: usize = 64;
+
+/// The startup warning for one cost-budget source whose value
+/// [`parse_cost_threshold`] refuses (#1030). `None` when the value is usable.
+///
+/// **Who reaches the `Some` branch, and did they choose it?** Everyone who
+/// gets here wrote a cost alarm down — a flag, an env var or a config key —
+/// and nobody writes `abc`, `-1` or `nan` on purpose, so before this the
+/// alarm they asked for was silently off and they were never told. `0` is
+/// treated the same way: neither `--help` nor the docs document `0` as
+/// "off" (off is the *default*, reached by setting nothing), so a `0` is a
+/// value that cannot fire, not a chosen switch.
+///
+/// **Why a warning and not a refusal (exit 2):** the cost budget only ever
+/// produces a warning and never stops a run, so refusing to start would be
+/// louder than the feature it guards; and this line is printed before any
+/// token is spent, so a user who needs the alarm can stop at zero cost.
+///
+/// `effective` is what the session actually resolved to. A bad value on one
+/// rung falls through to the next (see [`resolve_cost_threshold`]), so the
+/// message only says the warning is **off** when it really is, and otherwise
+/// names the budget that is in force instead.
+///
+/// The raw value is passed through `cli::sanitize_for_display` (a
+/// `.yoyo.toml` is repository-authored) and capped on a char boundary.
+pub(crate) fn cost_threshold_warning(
+    source: &str,
+    raw: &str,
+    effective: Option<f64>,
+) -> Option<String> {
+    if parse_cost_threshold(Some(raw)).is_some() {
+        return None;
+    }
+    let shown = crate::cli::sanitize_for_display(raw);
+    let capped = safe_truncate(&shown, COST_WARN_VALUE_MAX_BYTES);
+    let ellipsis = if capped.len() < shown.len() {
+        "..."
+    } else {
+        ""
+    };
+    let outcome = match effective {
+        None => "the cost warning is OFF for this run".to_string(),
+        Some(t) => format!("ignored; the ${t:.2} budget from a lower-priority source applies"),
+    };
+    Some(format!(
+        "invalid {source} value '{capped}{ellipsis}' (use a positive number of US dollars, e.g. 5.0); {outcome}"
+    ))
+}
+
+/// Every [`cost_threshold_warning`] for this session's three sources, in
+/// resolution order (flag, env, config), together with the threshold they
+/// resolve to. Pure; the caller installs the threshold and prints the lines.
+///
+/// An **empty or whitespace-only env var is treated as unset**, not as a
+/// typo: `YOYO_COST_WARN_USD= yoyo ...` is the ordinary shell way to clear an
+/// inherited variable for one command, i.e. a chosen "off". An empty flag
+/// value or config value is still warned about — nobody types
+/// `--cost-warn ""` or `cost_warn_usd = ""` meaning anything but a number.
+pub(crate) fn resolve_cost_threshold_with_warnings(
+    flag: Option<&str>,
+    env: Option<&str>,
+    config: Option<&str>,
+) -> (Option<f64>, Vec<String>) {
+    let env = env.filter(|v| !v.trim().is_empty());
+    let effective = resolve_cost_threshold(flag, env, config);
+    let sources = [
+        ("--cost-warn", flag),
+        (COST_WARN_ENV, env),
+        ("cost_warn_usd", config),
+    ];
+    let warnings = sources
+        .iter()
+        .filter_map(|(name, raw)| cost_threshold_warning(name, (*raw)?, effective))
+        .collect();
+    (effective, warnings)
+}
+
 /// This session's cost budget, in dollars, as raw `f64` bits. `0.0` means
 /// **off**, which is unambiguous because [`parse_cost_threshold`] rejects
 /// every value that is not finite and `> 0.0`.
@@ -727,6 +806,98 @@ mod cost_budget_tests {
             resolve_cost_threshold(Some("5"), Some("7.5"), Some("9.25")),
             Some(5.0)
         );
+    }
+
+    /// #1030: every value `parse_cost_threshold` refuses gets one warning that
+    /// names its source and says the alarm is OFF; usable values get `None`.
+    #[test]
+    fn cost_threshold_warning_names_source_and_says_off_for_every_bad_value() {
+        for source in ["--cost-warn", "YOYO_COST_WARN_USD", "cost_warn_usd"] {
+            // `0` is not documented as "off" anywhere (off is the default,
+            // reached by setting nothing), so it warns like any non-positive.
+            for raw in ["abc", "-1", "nan", "inf", "", "0", "0.0"] {
+                let msg = cost_threshold_warning(source, raw, None)
+                    .unwrap_or_else(|| panic!("expected a warning for {source} = {raw:?}"));
+                assert_eq!(
+                    msg,
+                    format!(
+                        "invalid {source} value '{raw}' (use a positive number of US dollars, e.g. 5.0); the cost warning is OFF for this run"
+                    )
+                );
+            }
+            // Near-miss guard: usable values stay silent, byte-for-byte None.
+            for raw in ["2.5", "10", " 5 "] {
+                assert_eq!(cost_threshold_warning(source, raw, None), None, "{raw}");
+            }
+        }
+    }
+
+    /// A bad flag over a good env must not claim the alarm is off: the
+    /// fall-through means a budget is still in force, and the message says so.
+    #[test]
+    fn cost_threshold_warnings_report_the_budget_that_actually_applies() {
+        let (t, w) = resolve_cost_threshold_with_warnings(Some("abc"), Some("5"), None);
+        assert_eq!(t, Some(5.0));
+        assert_eq!(
+            w,
+            vec!["invalid --cost-warn value 'abc' (use a positive number of US dollars, e.g. 5.0); ignored; the $5.00 budget from a lower-priority source applies".to_string()]
+        );
+
+        let (t, w) = resolve_cost_threshold_with_warnings(None, None, Some("abc"));
+        assert_eq!(t, None);
+        assert_eq!(w.len(), 1);
+        assert!(
+            w[0].starts_with("invalid cost_warn_usd value 'abc'"),
+            "{}",
+            w[0]
+        );
+        assert!(
+            w[0].ends_with("the cost warning is OFF for this run"),
+            "{}",
+            w[0]
+        );
+
+        // Two bad rungs: two lines, in resolution order.
+        let (t, w) = resolve_cost_threshold_with_warnings(Some("x"), Some("-1"), None);
+        assert_eq!(t, None);
+        assert_eq!(w.len(), 2);
+        assert!(w[0].contains("--cost-warn value 'x'"));
+        assert!(w[1].contains("YOYO_COST_WARN_USD value '-1'"));
+
+        // Nothing set, or all good: no lines at all.
+        assert_eq!(
+            resolve_cost_threshold_with_warnings(None, None, None),
+            (None, vec![])
+        );
+        assert_eq!(
+            resolve_cost_threshold_with_warnings(Some("3"), None, Some("7")),
+            (Some(3.0), vec![])
+        );
+        // An empty env var is the shell's way to clear it: unset, not a typo.
+        assert_eq!(
+            resolve_cost_threshold_with_warnings(None, Some(""), None),
+            (None, vec![])
+        );
+        assert_eq!(
+            resolve_cost_threshold_with_warnings(None, Some("  "), Some("4")),
+            (Some(4.0), vec![])
+        );
+    }
+
+    /// A repo-authored `.yoyo.toml` value cannot drive the terminal, and a
+    /// long one is cut on a char boundary with the cut marked.
+    #[test]
+    fn cost_threshold_warning_escapes_and_caps_the_raw_value() {
+        let hostile = "5\u{1b}[2J";
+        assert!(hostile.as_bytes().contains(&0x1b), "fixture must carry ESC");
+        let out = cost_threshold_warning("cost_warn_usd", hostile, None).unwrap();
+        assert!(!out.as_bytes().contains(&0x1b), "{out}");
+        assert!(out.contains("\\x1b"), "{out}");
+
+        let long = "🐙".repeat(40); // 160 bytes, 4-byte chars
+        let out = cost_threshold_warning("cost_warn_usd", &long, None).unwrap();
+        assert!(out.contains("..."), "{out}");
+        assert!(!out.contains(&long), "{out}");
     }
 
     /// Every unusable shape is OFF on **all three** sources, through the one

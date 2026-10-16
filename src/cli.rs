@@ -2387,14 +2387,25 @@ pub(crate) fn parse_args_with_config(
     // `gate_project_notify_command` / `gate_project_skills` — same reasoning as
     // `continue_on_silence`, which a project config has been able to set since
     // Day 172 for exactly the same reason.
-    crate::prompt_budget::set_cost_threshold(crate::prompt_budget::resolve_cost_threshold(
-        args.iter()
-            .position(|a| a == "--cost-warn")
-            .and_then(|i| args.get(i + 1))
-            .map(|s| s.as_str()),
-        std::env::var("YOYO_COST_WARN_USD").ok().as_deref(),
-        crate::config::parse_cost_warn_from_config(&file_config).as_deref(),
-    ));
+    //
+    // #1030: a value on any rung that cannot be a budget (`abc`, `-1`, `0`,
+    // `nan`) used to switch the alarm off without a word. Each one now prints
+    // one stderr line naming its source and whether the warning is OFF; not
+    // quiet-gated, like the #1028 numeric warnings, because the user asked for
+    // an alarm and is not getting it. Reasoning in `cost_threshold_warning`.
+    let (cost_threshold, cost_warnings) =
+        crate::prompt_budget::resolve_cost_threshold_with_warnings(
+            args.iter()
+                .position(|a| a == "--cost-warn")
+                .and_then(|i| args.get(i + 1))
+                .map(|s| s.as_str()),
+            std::env::var("YOYO_COST_WARN_USD").ok().as_deref(),
+            crate::config::parse_cost_warn_from_config(&file_config).as_deref(),
+        );
+    for w in cost_warnings {
+        eprintln!("{YELLOW}warning:{RESET} {w}");
+    }
+    crate::prompt_budget::set_cost_threshold(cost_threshold);
 
     // [model_pricing."<id>"]: user-supplied per-model rates (issue #833).
     // A wrong cost is worse than no cost, because it is actionable-looking —
