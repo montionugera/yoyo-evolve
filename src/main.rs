@@ -110,6 +110,7 @@ mod commands_update;
 mod commands_web;
 mod config;
 mod config_paths;
+mod config_syntax;
 mod context;
 #[cfg(test)]
 mod context_fence_tests;

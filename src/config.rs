@@ -2105,43 +2105,39 @@ fn resolve_sub_agent_model(
 /// Prints the loaded path to stderr (unless quiet mode).
 /// Returns `(HashMap, raw_content)` or `(empty HashMap, empty string)` if no config found.
 pub fn load_config_file() -> (HashMap<String, String>, String) {
-    // Check project-level config first
+    // Check project-level config first, then ~/.yoyo.toml, then XDG.
     for name in CONFIG_FILE_NAMES {
         if let Ok(content) = std::fs::read_to_string(name) {
-            if !is_quiet() {
-                eprintln!("{DIM}  config: {name}{RESET}");
-            }
-            record_loaded_config_path(std::path::PathBuf::from(name));
-            let map = parse_config_file(&content);
-            record_sub_agent_model(&map);
-            return (map, content);
+            return accept_loaded_config(name, std::path::PathBuf::from(name), content);
         }
     }
-    // Check ~/.yoyo.toml (home directory shorthand)
-    if let Some(path) = home_config_path() {
+    for path in [home_config_path(), user_config_path()]
+        .into_iter()
+        .flatten()
+    {
         if let Ok(content) = std::fs::read_to_string(&path) {
-            if !is_quiet() {
-                eprintln!("{DIM}  config: {}{RESET}", path.display());
-            }
-            record_loaded_config_path(path);
-            let map = parse_config_file(&content);
-            record_sub_agent_model(&map);
-            return (map, content);
-        }
-    }
-    // Check user-level config (XDG)
-    if let Some(path) = user_config_path() {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if !is_quiet() {
-                eprintln!("{DIM}  config: {}{RESET}", path.display());
-            }
-            record_loaded_config_path(path);
-            let map = parse_config_file(&content);
-            record_sub_agent_model(&map);
-            return (map, content);
+            return accept_loaded_config(&path.display().to_string(), path, content);
         }
     }
     (HashMap::new(), String::new())
+}
+
+/// The shared tail of every `load_config_file` hit: announce, warn about
+/// syntax `parse_config_file` cannot report (#1034, once per run), record
+/// provenance, parse.
+fn accept_loaded_config(
+    shown: &str,
+    path: std::path::PathBuf,
+    content: String,
+) -> (HashMap<String, String>, String) {
+    if !is_quiet() {
+        eprintln!("{DIM}  config: {shown}{RESET}");
+    }
+    crate::config_syntax::warn_config_syntax_once(shown, &content);
+    record_loaded_config_path(path);
+    let map = parse_config_file(&content);
+    record_sub_agent_model(&map);
+    (map, content)
 }
 
 // ---------------------------------------------------------------------------

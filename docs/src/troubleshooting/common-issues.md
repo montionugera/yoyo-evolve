@@ -33,6 +33,10 @@ Use safe mode to:
 
 Once you've identified the problem, fix the offending config/skill/server and restart normally.
 
+## "warning: config file is malformed"
+
+yoyo found a syntax problem its lenient config reader can't fix for you: a quoted value with no closing quote (`model = "claude-haiku-5-5`) or a `[section` header with no `]`. The warning names each `file:line`. Values are still read as written, so an unterminated quote stays in the value (and a model id with a stray `"` will 404). Fix the named lines; the warning prints once per run.
+
 ## "No API key found"
 
 ```
