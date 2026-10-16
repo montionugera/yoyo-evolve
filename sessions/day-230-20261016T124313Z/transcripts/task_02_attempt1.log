@@ -1,0 +1,179 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --short | head;… ✓ (15ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; sed -n 30,110p src/cd_config_note… ✓ (31ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; sed -n 1440,1480p src/dispatch.rs…  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; sed -n 120,232p src/cd_config_not… ✓ (4ms)
+ ✓ (9ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; awk 'NR>=1445 && NR<=1475' src/di… ✓ (10ms)
+  ▶ read src/dispatch.rs:1440..1480  ▶ read src/cd_config_note.rs:415..460 ✓ (1ms)
+ ✓ (1ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "fn gate_project_permissi… ✓ (4ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "gate_project_permissions… ✓ (5ms)
+  ▶ read src/cli.rs:1715..1775 ✓ (2ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; sed -n 1,80p src/cd_allow.rs; gre… ✓ (6ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "fn parse_permissions_and… ✓ (6ms)
+  ▶ read src/cli.rs:2795..2820  ▶ read src/cli.rs:2895..2925 ✓ (1ms)
+ ✓ (3ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -rn "dir_restrictions\.\(all… ✓ (20ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "pub fn check_path" -A45 … ✓ (4ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "reading_for_note\|print_… ✓ (21ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "reading_for_note\|print_… ✓ (5ms)
+  ▶ read src/cd_config_note.rs:730..865 ✓ (1ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -rn "fn resolve_path\b\|fn r… ✓ (4ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; cargo build 2>&1 | tail -2; R=$(p… ✓ (164ms)
+  ▶ $ cd /tmp/p869/A; R=~/work/yoyo-evolve/yoyo-evolve; [ -d $R ] || R=$(cd - >/dev/nu… ✓ (9.0s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; cp /tmp/p869/before.out /tmp/p869… ✓ (10ms)
+  ▶ edit src/cd_config_note.rs (5 → 95 lines)
+  + /// The fences this session actually enforces from startup, as raw entries:
+  + /// the bash deny list the executors were built with and the final
+  + /// `[directories]` lists (after `--deny`/`--deny-dir` overrides and
+  + /// `--restricted`'s extra allow entry). Recorded once, in `cli.rs`.
+  + #[derive(Debug, Clone, Default, PartialEq, Eq)]
+  + pub(crate) struct StartupFences {
+  +     pub deny: Vec<String>,
+  +     pub dir_deny: Vec<String>,
+  +     pub dir_allow: Vec<String>,
+  + }
+  + 
+  + static STARTUP_FENCES: std::sync::OnceLock<StartupFences> = std::sync::OnceLock::new();
+  + 
+  + /// Record the startup fences. First writer wins.
+  + pub(crate) fn record_startup_fences(
+  +     deny: &[String],
+  +     dirs: &crate::config::DirectoryRestrictions,
+  + ) {
+  +     let _ = STARTUP_FENCES.set(StartupFences {
+  +         deny: deny.to_vec(),
+  ... (73 more lines)
+  ▶ edit src/dispatch.rs (1 → 6 lines)
+  -                             let reading = crate::cd_config_note::read_cd_config(&target);
+  +                             // Day 230: minus what startup already enforces, when this is
+  +                             // the loaded file (back home): nothing re-appended or re-announced.
+  +                             let reading = crate::cd_config_note::reading_for_cd(
+  +                                 &target,
+  +                                 &crate::cd_config_note::read_cd_config(&target),
+  +                             );
+  ▶ edit src/cli.rs (5 → 7 lines)
+                eprintln!("{YELLOW}{msg}{RESET}");
+            }
+        }
+  +     // #869 (Day 230): what /cd back into the launch dir must not re-append.
+  +     crate::cd_config_note::record_startup_fences(&permissions.deny, &dir_restrictions);
+    
+        // --context-strategy
+ ✓ (4m 31s)
+  + /// The fences this session actually enforces from startup, as raw entries:
+  + /// the bash deny list the executors were built with and the final
+  + /// `[directories]` lists (after `--deny`/`--deny-dir` overrides and
+  + /// `--restricted`'s extra allow entry). Recorded once, in `cli.rs`.
+  + #[derive(Debug, Clone, Default, PartialEq, Eq)]
+  + pub(crate) struct StartupFences {
+  +     pub deny: Vec<String>,
+  +     pub dir_deny: Vec<String>,
+  ... (13 more lines)
+ ✓ (8m 18s)
+  -                             let reading = crate::cd_config_note::read_cd_config(&target);
+  +                             // Day 230: minus what startup already enforces, when this is
+  +                             // the loaded file (back home): nothing re-appended or re-announced.
+  +                             let reading = crate::cd_config_note::reading_for_cd(
+  +                                 &target,
+  +                                 &crate::cd_config_note::read_cd_config(&target),
+  +                             );
+ ✓ (12m 6s)
+                eprintln!("{YELLOW}{msg}{RESET}");
+            }
+        }
+  +     // #869 (Day 230): what /cd back into the launch dir must not re-append.
+  +     crate::cd_config_note::record_startup_fences(&permissions.deny, &dir_restrictions);
+    
+        // --context-strategy
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -rn "permissions.deny" src/t… ✓ (150ms)
+  ▶ edit src/cd_config_note.rs (5 → 117 lines)
+            assert_eq!(
+                reading_for_note(&CdConfigReading::Unreadable, true),
+                CdConfigReading::Unreadable
+  +         );
+  +     }
+  + 
+  +     // --- Day 230 (#869): /cd home re-appends and re-announces nothing ---
+  + 
+  +     const HOME_DENY_TOML: &str = "[permissions]\ndeny = [\"rm *\"]\n";
+  + 
+  +     fn fences(deny: &[&str], dir_deny: &[&str], dir_allow: &[&str]) -> StartupFences {
+  +         let v = |s: &[&str]| s.iter().map(|x| x.to_string()).collect();
+  +         StartupFences {
+  +             deny: v(deny),
+  +             dir_deny: v(dir_deny),
+  +             dir_allow: v(dir_allow),
+  +         }
+  +     }
+  + 
+  +     /// What `/cd` does with `target`, end to end over local lists: the bash
+  ... (97 more lines)
+  ▶ read src/cd_deny.rs:99..129 ✓ (0ms)
+ ✓ (4m 25s)
+            assert_eq!(
+                reading_for_note(&CdConfigReading::Unreadable, true),
+                CdConfigReading::Unreadable
+  +         );
+  +     }
+  + 
+  +     // --- Day 230 (#869): /cd home re-appends and re-announces nothing ---
+  + 
+  ... (13 more lines)
+  ▶ edit src/cd_deny.rs (2 → 11 lines)
+            assert_eq!(*list.lock().unwrap(), s(&["rm *", "curl *"]));
+  +     }
+  + 
+  +     #[test]
+  +     fn appending_the_same_entries_again_is_idempotent() {
+  +         // B -> A -> B -> A into a foreign deny-bearing dir: one copy, not two.
+  +         let list = local();
+  +         assert_eq!(append_deny_with(&list, &s(&["rm *"])), 1);
+  +         assert_eq!(append_deny_with(&list, &s(&["rm *"])), 0);
+  +         assert_eq!(*list.lock().unwrap(), s(&["rm *"]));
+        }
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; cargo fmt && cargo test --bin yoy… ✓ (4m 47s)
+            assert_eq!(*list.lock().unwrap(), s(&["rm *", "curl *"]));
+  +     }
+  + 
+  +     #[test]
+  +     fn appending_the_same_entries_again_is_idempotent() {
+  +         // B -> A -> B -> A into a foreign deny-bearing dir: one copy, not two.
+  +         let list = local();
+  +         assert_eq!(append_deny_with(&list, &s(&["rm *"])), 1);
+  ... (3 more lines)
+ ✓ (4m 47s)
+
+────────────────────────────────────────────────────────────────────────────────
+  31 tools completed in 24m 29s (31 ✓)
+
+Green. Positive control — atomic, serial: neuter the is_loaded drop and confirm the home test fails by name, then restore.
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; cp src/cd_config_note.rs /tmp/cdn… ✓ (1m 10s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The control reddened exactly the two home tests and left the near-miss guards green. After restoring it, all 91 pass. Next I re-ran the probe with the fixed binary:
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; R=$(pwd); car… (3 lines) ✓ (29.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The fix works, and the foreign directory still behaves as before. Next, the docs:
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; grep -n "^- \`cd_config_note.rs\`… ✓ (7ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; python3 - <<'… (12 lines) ✓ (24ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; awk 'NR>=1380 && NR<=1384' ARCHIT… ✓ (5ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; awk 'NR==1384' ARCHITECTURE.md | … ✓ (8ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null; python3 - <<'… (19 lines)
+  (interrupted)
+

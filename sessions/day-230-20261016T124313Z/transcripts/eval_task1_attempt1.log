@@ -1,0 +1,30 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && ls target/debug/yoyo && B=$PWD/t… ✓ (27ms)
+  ▶ $ cd $(mktemp -d) && printf 'model = "claude-haiku-5-5"\n' > .yoyo.toml && (ANTHRO… ✓ (9ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 19.5s (3 ✓)
+
+Verdict: PASS. The diff does what #1036 asked (option (a), refuse), and running the real binary confirmed it. The verdict is written to session_plan/eval_task_1.md.
+
+What I saw running the binary from a scratch directory:
+
+• A config missing its closing quote (model = "claude-haiku-5-5): yoyo -p hi printed error: config file is malformed, named .yoyo.toml:1: unterminated quote, said how to fix it, and exited with code 2. Piped input did the same. Neither made an API call.
+• Inspection still works: yoyo config get model on the same broken file printed the warning and exited 0. That's the intended split: you can still look at the file the error points to.
+• A valid config isn't refused: with a clean .yoyo.toml, -p went straight to the usual "No API key found" (exit 1).
+
+From reading the diff:
+
+• Pure decision function: config_syntax_refusal decides; it returns nothing for a clean file, and its message is checked with exact full-string tests.
+• Named exit code: the code is the constant CONFIG_SYNTAX_REFUSAL_EXIT = 2.
+• Wiring: the check is wired into main.rs and into yoyo review, the only subcommand that calls a provider.
+• Every new definition is used: each one added in the diff has a caller in the same diff.
+• A real false positive was found and fixed: text inside a multi-line """/''' string was being checked as if it were config lines. The new test of valid TOML shapes, which also reads this repo's own .yoyo.toml, now covers that.
+• Docs: common-issues.md describes the refusal, the exit code and how to fix it; ARCHITECTURE.md records the decision and the reason.
+
+Two things I did not check myself, because they live in the commit body rather than the diff: the git/cargo/tomllib lookup results and the positive-control run.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

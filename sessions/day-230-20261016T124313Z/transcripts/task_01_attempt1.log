@@ -1,0 +1,110 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cat src/config_syntax.rs | head -150; grep -n "config_syntax" src/*.rs | grep -v… ✓ (13ms)
+  ▶ $ sed -n 1,30p src/config_syntax.rs; sed -n 150,260p src/config_syntax.rs; sed -n …  ▶ $ grep -n "fn main\|load_config_file\|parse_args\|try_dispatch_subcommand\|SETUP_N… ✓ (15ms)
+ ✓ (18ms)
+  ▶ $ sed -n 1178,1330p src/main.rs ✓ (4ms)
+  ▶ $ grep -n "load_config_file\|try_dispatch_subcommand\|is_safe_mode\|fn parse_args"… ✓ (13ms)
+  ▶ $ sed -n 2225,2300p src/cli.rs; grep -n "safe_mode\|SAFE" src/cli_config.rs | head ✓ (6ms)
+  ▶ $ grep -rn "load_config_file()" src/ | grep -v "^src/config.rs:21[0-9][0-9]:pub fn… ✓ (14ms)
+  ▶ $ sed -n 820,850p src/cli.rs; grep -n "pub(crate) fn try_dispatch_subcommand\|pub … ✓ (9ms)
+  ▶ $ grep -n "load_config_file" src/dispatch_sub.rs src/repl.rs src/main.rs; for l in… ✓ (14ms)
+  ▶ $ grep -n "cli.rs\|config.rs\|main.rs\|dispatch_sub\|const.*CAP\|fn src_modules" t… ✓ (4ms)
+  ▶ $ grep -n "SUBCOMMAND\|fn is_.*subcommand\|fn bare_word_arg" src/dispatch_sub.rs s… ✓ (6ms)
+  ▶ $ cd $(mktemp -d) && printf '[a]\nb = "x\n' > bad.cfg && git config --file bad.cfg… ✓ (1.0s)
+  ▶ $ grep -n "ROUTED_SUBCOMMANDS" -A20 src/dispatch_near_miss.rs | head -40; grep -rn… ✓ (12ms)
+  ▶ $ sed -n 1,27p src/config_syntax.rs; grep -n "config_syntax" ARCHITECTURE.md | hea… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  14 tools completed in 1m 55s (14 ✓)
+
+Now the false-positive table test first (step 1.2), then the refusal.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cat >> /tmp/fp_test.rs <<'EOF' (43 lines) ✓ (26ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ python3 - <<'EOF' (19 lines) ✓ (22ms)
+  ▶ $ python3 - <<'EOF' (50 lines) ✓ (22ms)
+  ▶ $ python3 - <<'EOF' (37 lines) ✓ (23ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 48.8s (4 ✓)
+
+Now the refusal composer, the mode switch, and the loader entry point.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (152 lines) ✓ (26ms)
+
+Now wire: config.rs loader, main.rs, review.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (46 lines) ✓ (7.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ sed -i 's/crate::dispatch_sub::ROUTED_SUBCOMMANDS/crate::dispatch_near_miss::ROU… ✓ (12.4s)
+  ▶ $ cargo test config_syntax 2>&1 | grep -E "test |panicked|left|right|result" | hea… ✓ (34.4s)
+  ▶ $ cp src/config_syntax.rs /tmp/cs.bak && python3 - <<'EOF' (7 lines) ✓ (37.2s)
+  ▶ $ cp src/config_syntax.rs /tmp/cs.bak && python3 - <<'EOF' (15 lines) ✓ (1m 50s)
+  ▶ $ B=$PWD/target/debug/yoyo; cd $(mktemp -d) && printf 'model = "claude-haiku-5-5\n… ✓ (33ms)
+  ▶ $ python3 - <<'EOF' (12 lines) ✓ (47.9s)
+  ▶ $ timeout 120 ./target/debug/yoyo -p "Reply with exactly PONG" 2>/tmp/err.txt; ech… ✓ (2.9s)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 4m 40s (8 ✓)
+
+Clean config runs normally. Now docs, then full checks.
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ sed -n 34,40p docs/src/troubleshooting/common-issues.md ✓ (3ms)
+  ▶ $ python3 - <<'EOF' (19 lines) ✓ (24ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -rn "malformed\|1034" docs/src README.md | grep -v common-issues.md:3 | hea… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 16.3s (3 ✓)
+
+Update the ARCHITECTURE.md entry briefly (it says "detection-only", which is now false).
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (8 lines) ✓ (24.8s)
+  ▶ $ cargo test 2>&1 | grep -E "^test .*FAILED|test result|panicked" | grep -v "ok. 0… ✓ (3m 20s)
+  ▶ $ cargo test 2>&1 | grep -E "FAILED|failed;" | grep -v " 0 failed" | head; bash te… ✓ (3m 16s)
+  3 tools completed in 7m 15s (3 ✓)
+
+All green. Committing.
+  ╭─ Turn 33 ────────────────────────────────────────────────────────────╮
+  ▶ $ git status --short; git add -A && git commit -q -F - <<'EOF' (47 lines) ✓ (57ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+I settled #1036 by choosing to refuse. If the config file yoyo loads has an unterminated quote or a [section header with no closing ], starting a session now stops with one error and exit code 2, before any API call. That covers the REPL, -p, piped input and yoyo review. The error names each file:line and the problem, and says how to get going: fix the line, or move the file aside. Build, all tests, clippy, fmt check and tests/harness_logic.sh pass, and it's committed as e25b3cf2.
+
+Why refuse: nobody writes an unterminated quote on purpose, so the old quiet default wasn't protecting anyone who chose it. Everyone who hit it had made a typo they didn't know about, and yoyo sent the value with the stray quote anyway (a 404 for model) and still exited 0. I ran the tools users already know on the same broken files, and all three refuse:
+
+| Tool | What it did | Exit |
+|---|---|---|
+| git config --file bad.cfg --get a.b | fatal: bad config line 2 | 128 |
+| cargo metadata with name = "x | invalid basic string | 101 |
+| python3 tomllib.load | TOMLDecodeError | 1 |
+
+The checker had a false positive, now fixed. Before letting it block startup, I tested it against valid TOML shapes and this repo's own .yoyo.toml read from disk. One shape wrongly fired: lines inside a multi-line """ / ''' string were checked as if they were config, so a line like [x or k = "v in a prompt would have refused a valid file. The checker now skips the inside of multi-line strings. One existing near-miss test had a bare prompt = """ line in the middle of its list, which would now hide every line after it. I moved that line to the end so the test still checks the same lines; no assertion was removed.
+
+Inspection commands still only warn, on purpose. yoyo config get, config show, doctor, model and permissions print the old warning and keep working. They never send anything to a provider, and they're how you look at the file the error points to. yoyo review does call a provider, so it refuses too.
+
+What I checked:
+• Test failure checks, run one at a time and undone afterwards (no sabotage left in the tree): breaking the checker makes refusal_names_file_line_problem_and_remedy fail by name. Removing the multi-line skip makes valid_toml_shapes_never_fire fail.
+• Running the real binary on model = "claude-haiku-5-5 (no closing quote) gives the error and exit 2 for both -p and piped input, while config get warns and exits 0.
+• With this repo's valid config, -p "Reply with exactly PONG" printed PONG and exited 0.
+
+Changes outside the task's file list:
+• src/config.rs: one call and its comment changed in the shared config loader.
+• src/dispatch_sub.rs: one line so review refuses too.
+• ARCHITECTURE.md: the config_syntax.rs entry, which still said "detection-only".
+
+docs/src/troubleshooting/common-issues.md now describes the refusal, the exit code and the fix.
+
+Known gaps:
+• A multi-line string that is never closed makes the checker skip the rest of the file, so later problems there go unreported. That can let a bad file through, but it can never refuse a good one.
+• The refusal only applies when the command's first word isn't one of yoyo's subcommands. If a listed subcommand ever falls through to a normal session, that session would only warn.
+  watch: no files changed this turn — skipping
