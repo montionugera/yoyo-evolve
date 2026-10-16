@@ -18,6 +18,8 @@
 #   YOYO_EXTERNAL_SKILLS — Optional comma-separated external skill specs:
 #                        name|git-url|ref. Defaults to yoyo-operator-skill.
 #   YOYO_EXTERNAL_SKILLS_DISABLED — Set to "1" to skip external skill fetches.
+#   YOYO_DEPENDENCY_UPDATES_DISABLED — Set to "1" to skip the session-start `cargo update` of
+#                                  direct dependencies (Step 1a, update_direct_dependencies).
 #   YOYO_DEPENDENCY_SKILLS_DISABLED — Set to "1" to skip skills shipped inside the
 #                                  crates in Cargo.lock; see setup_dependency_skills.
 
@@ -383,6 +385,74 @@ SELF_BACKLOG_LIMIT=60
 # and the drain trigger — and it has already moved once (5 -> 12).
 SELF_ISSUES_LIMIT=12
 
+# ── Step 1a: semver-compatible updates for direct dependencies ──
+# Cargo.toml pins each dependency's range (e.g. a minor version) and Cargo.lock
+# records one exact version, which every build uses (CI builds --locked). So
+# patch releases never arrive unless something runs `cargo update`. This does,
+# for yoyo's direct dependencies only (from `cargo metadata`; none is named
+# here), within the ranges Cargo.toml allows. The new lock is kept only if
+# build and tests pass, as its own commit; otherwise it is restored and the
+# session goes on with the old one. A dependency's shipped skills follow the
+# lock (setup_dependency_skills), so they update with it.
+direct_dependency_specs() { # stdin: `cargo metadata` JSON → one "name@version" per direct dependency
+    python3 -c '
+import json, sys
+m = json.load(sys.stdin)
+pkgs = {p["id"]: p for p in m.get("packages", [])}
+resolve = m.get("resolve") or {}
+nodes = {n["id"]: n for n in resolve.get("nodes", [])}
+for dep in nodes.get(resolve.get("root"), {}).get("deps", []):
+    p = pkgs.get(dep["pkg"])
+    if p:
+        print(p["name"] + "@" + p["version"])
+'
+}
+
+update_direct_dependencies() {
+    DEPS_VERIFIED_SHA=""
+    if [ "${YOYO_DEPENDENCY_UPDATES_DISABLED:-}" = "1" ]; then
+        echo "→ dependency updates disabled by YOYO_DEPENDENCY_UPDATES_DISABLED=1"
+        return 0
+    fi
+    if ! git diff --quiet -- Cargo.lock || ! git diff --cached --quiet -- Cargo.lock; then
+        echo "  dependency updates: Cargo.lock already has uncommitted changes; skipping."
+        return 0
+    fi
+    local before after args=() spec
+    if ! before=$(cargo metadata --format-version 1 --locked 2>/dev/null | direct_dependency_specs) || [ -z "$before" ]; then
+        echo "  Warning: cargo metadata failed; skipping dependency updates."
+        return 0
+    fi
+    while IFS= read -r spec; do args+=(-p "$spec"); done <<< "$before"
+    echo "→ Checking direct dependencies for semver-compatible updates..."
+    if ! cargo update "${args[@]}" >/dev/null 2>&1; then
+        git checkout -- Cargo.lock 2>/dev/null || true
+        echo "  Warning: cargo update failed; keeping Cargo.lock as it was."
+        return 0
+    fi
+    if git diff --quiet -- Cargo.lock; then
+        echo "  dependency updates: none."
+        return 0
+    fi
+    after=$(cargo metadata --format-version 1 --locked 2>/dev/null | direct_dependency_specs || true)
+    local changed
+    changed=$(diff <(echo "$before") <(echo "$after") | awk '/^</{sub(/^< /,""); o[++n]=$0} /^>/{sub(/^> /,""); a[++m]=$0} END{for(i=1;i<=m;i++){split(a[i],x,"@"); for(j=1;j<=n;j++){split(o[j],y,"@"); if(x[1]==y[1]) printf "%s%s %s -> %s", (k++?", ":""), x[1], y[2], x[2]}}}' || true)
+    changed="${changed:-transitive only}"
+    echo "  dependency updates: $changed. Verifying build and tests..."
+    if cargo build --quiet && cargo test --quiet; then
+        git add Cargo.lock
+        git commit -q -m "deps: semver-compatible updates ($changed)" -m "cargo update for direct dependencies within Cargo.toml's ranges; build and tests passed."
+        DEPS_VERIFIED_SHA=$(git rev-parse HEAD)
+        echo "  dependency updates committed ($changed)."
+    else
+        git checkout -- Cargo.lock
+        echo "  Warning: build or tests failed with the updated dependencies ($changed); Cargo.lock restored."
+    fi
+    return 0
+}
+
+update_direct_dependencies
+
 # ── Step 1: Verify starting state ──
 echo "→ Checking build..."
 cargo build --quiet
@@ -395,7 +465,10 @@ cargo build --quiet
 # only who ran the suite differs.
 HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || echo none)
 CI_GREEN=""
-if command -v gh &>/dev/null; then
+if [ -n "${DEPS_VERIFIED_SHA:-}" ] && [ "$HEAD_SHA" = "$DEPS_VERIFIED_SHA" ]; then
+    # Step 1a just ran the full suite on this exact commit (its own dependency update).
+    CI_GREEN="yes"
+elif command -v gh &>/dev/null; then
     # Refresh first: retry attempts start with the job-start App token, which
     # expires at 60min — without this, every retry's query 401s silently and
     # pays the full suite (review finding). refresh_gh_token is fail-safe.
@@ -3556,10 +3629,12 @@ FIXEOF
         rm -f "$FIX_PROMPT"
     else
         echo "  Build: FAIL after $FIX_ATTEMPTS fix attempts — reverting to pre-session state"
-        # NOTE: no Cargo.lock in the pathspec — it is gitignored/never tracked,
-        # and one unmatched pathspec makes git checkout restore NOTHING and exit
-        # non-zero (which, under set -e, killed the script mid-recovery).
-        git checkout "$SESSION_START_SHA" -- src/ Cargo.toml || true
+        # Cargo.lock is tracked (see .gitignore), so it is restored too: a session
+        # that changed the lock and broke the build must not keep the new lock.
+        # Superseded comment, recorded: this said the lock was gitignored and
+        # left it out. Every path here must be tracked, because one unmatched
+        # pathspec makes git checkout restore NOTHING and exit non-zero.
+        git checkout "$SESSION_START_SHA" -- src/ Cargo.toml Cargo.lock || true
         cargo fmt 2>/dev/null || true
         git add -A && git commit -m "Day $DAY ($SESSION_TIME): revert session changes (could not fix build)" || true
         SESSION_REVERTED="true"

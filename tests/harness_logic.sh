@@ -871,8 +871,67 @@ if require "setup_dependency_skills extracted" "$(awk '/^setup_dependency_skills
     check "dependency skills: YOYO_DEPENDENCY_SKILLS_DISABLED=1 adds nothing" \
         "$(ds_case ok disabled)" "none|rc=0"
 fi
-check "evolve.sh: no dependency is named or cloned for its skills" \
-    "$(awk '/^setup_dependency_skills\(\) \{/,/^\}/; /^dependency_skill_dirs\(\) \{/,/^\}/' "$SCRIPT" | grep -ciE 'yoagent|git clone')" "0"
+# ── session-start dependency updates (update_direct_dependencies) ────────────
+# A temp git repo and a stub `cargo`: `metadata` reports the direct deps at the
+# versions written in Cargo.lock, `update` rewrites the lock per case, and
+# build/test pass or fail per case. Prints what cargo update was asked for, the
+# commit (if any), whether DEPS_VERIFIED_SHA is HEAD, and the lock afterwards.
+UD_FN="$(awk '/^direct_dependency_specs\(\) \{/,/^\}/' "$SCRIPT")
+$(awk '/^update_direct_dependencies\(\) \{/,/^\}/' "$SCRIPT")"
+ud_case() { # $1 = bump|none|updfail, $2 = pass|fail (build+test), $3 = disabled|dirty
+    ( set -euo pipefail; d=$(mktemp -d); cd "$d"
+      git init -q; git config user.email t@t; git config user.name t
+      printf 'agentlib 1.2.0\nplain 2.0.0\ndeep 0.1.0\n' > Cargo.lock
+      git add Cargo.lock; git commit -qm base
+      [ "${3:-}" = dirty ] && echo '# local edit' >> Cargo.lock
+      [ "${3:-}" = disabled ] && export YOYO_DEPENDENCY_UPDATES_DISABLED=1
+      export UD_MODE="$1" UD_TESTS="$2" UD_LOG="$d/cargo.log"
+      cargo() {
+          case "$1" in
+            metadata)
+              local a p; a=$(awk '$1=="agentlib"{print $2}' Cargo.lock); p=$(awk '$1=="plain"{print $2}' Cargo.lock)
+              printf '{"packages":[{"id":"r","name":"root","version":"0.1.0"},{"id":"a","name":"agentlib","version":"%s"},{"id":"p","name":"plain","version":"%s"},{"id":"t","name":"deep","version":"0.1.0"}],"resolve":{"root":"r","nodes":[{"id":"r","deps":[{"pkg":"a"},{"pkg":"p"}]},{"id":"a","deps":[{"pkg":"t"}]}]}}' "$a" "$p" ;;
+            update)
+              shift; echo "update $*" >> "$UD_LOG"
+              case "$UD_MODE" in
+                bump)    sed -i.bak 's/^agentlib 1.2.0$/agentlib 1.2.3/' Cargo.lock; rm -f Cargo.lock.bak ;;
+                updfail) echo half-written > Cargo.lock; return 101 ;;
+              esac ;;
+            build|test) echo "$1" >> "$UD_LOG"; [ "$UD_TESTS" = pass ] ;;
+          esac
+      }
+      eval "$UD_FN"; update_direct_dependencies >/dev/null 2>&1
+      head=$(git rev-parse HEAD)
+      printf '%s|%s|verified=%s|lock=%s|dirty=%s' \
+        "$(grep '^update' cargo.log 2>/dev/null | tr '\n' ' ' || true)" \
+        "$(git log -1 --format=%s)" \
+        "$([ "${DEPS_VERIFIED_SHA:-}" = "$head" ] && echo yes || echo no)" \
+        "$(awk '$1=="agentlib"{print $2}' Cargo.lock)" \
+        "$(git diff --quiet -- Cargo.lock && echo no || echo yes)"
+      rm -rf "$d" ) 2>/dev/null
+}
+if require "update_direct_dependencies extracted" "$(awk '/^update_direct_dependencies\(\) \{/,/^\}/' "$SCRIPT")"; then
+    check "dep updates: a patch that passes is committed, direct deps only, and marked verified" \
+        "$(ud_case bump pass)" "update -p agentlib@1.2.0 -p plain@2.0.0 |deps: semver-compatible updates (agentlib 1.2.0 -> 1.2.3)|verified=yes|lock=1.2.3|dirty=no"
+    check "dep updates: a patch that fails build/tests is rolled back, nothing committed" \
+        "$(ud_case bump fail)" "update -p agentlib@1.2.0 -p plain@2.0.0 |base|verified=no|lock=1.2.0|dirty=no"
+    check "dep updates: nothing to update commits nothing" \
+        "$(ud_case none pass)" "update -p agentlib@1.2.0 -p plain@2.0.0 |base|verified=no|lock=1.2.0|dirty=no"
+    check "dep updates: cargo update failing restores the lock" \
+        "$(ud_case updfail pass)" "update -p agentlib@1.2.0 -p plain@2.0.0 |base|verified=no|lock=1.2.0|dirty=no"
+    check "dep updates: YOYO_DEPENDENCY_UPDATES_DISABLED=1 does nothing" \
+        "$(ud_case bump pass disabled)" "|base|verified=no|lock=1.2.0|dirty=no"
+    check "dep updates: an already-edited Cargo.lock is left alone" \
+        "$(ud_case bump pass dirty)" "|base|verified=no|lock=1.2.0|dirty=yes"
+fi
+check "evolve.sh: Step 1 trusts the suite Step 1a just ran on the same commit" \
+    "$(grep -c '"\$HEAD_SHA" = "\$DEPS_VERIFIED_SHA"' "$SCRIPT")" "1"
+check "evolve.sh: a failed-build revert restores Cargo.lock too" \
+    "$(grep -c 'git checkout "\$SESSION_START_SHA" -- src/ Cargo.toml Cargo.lock' "$SCRIPT")" "1"
+check "evolve.sh: dependency updates run before the Step 1 build check" \
+    "$(awk '/^update_direct_dependencies$/{u=NR} /^echo "→ Checking build..."$/{b=NR} END{print (u && b && u<b) ? "yes" : "no"}' "$SCRIPT")" "yes"
+check "evolve.sh: no dependency is named or cloned (dependency skills and updates)" \
+    "$(awk '/^setup_dependency_skills\(\) \{/,/^\}/; /^dependency_skill_dirs\(\) \{/,/^\}/; /^direct_dependency_specs\(\) \{/,/^\}/; /^update_direct_dependencies\(\) \{/,/^\}/' "$SCRIPT" | grep -ciE 'yoagent|git clone')" "0"
 
 # ── skill-evolve retire rule: one rule, and one that can fire (#1017, #858) ──
 # The state table said `score < 0.3 OR 10 sessions unused`, the step that runs
