@@ -33,7 +33,7 @@ yoyo supports 13+ providers out of the box. Pick the one that fits your budget a
 
 | Provider | Env Var | Default Model | Notes |
 |----------|---------|---------------|-------|
-| `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-4-6` | Default. Best overall quality. |
+| `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | Default. Best overall quality. |
 | `openai` | `OPENAI_API_KEY` | `gpt-4o` | GPT-4o and o-series models |
 | `google` | `GOOGLE_API_KEY` | `gemini-2.0-flash` | Gemini models |
 | `openrouter` | `OPENROUTER_API_KEY` | `anthropic/claude-sonnet-4-20250514` | Multi-provider gateway |

@@ -36,7 +36,7 @@ You'll see a banner like this:
   yoyo v0.1.4 — a coding agent growing up in public
   Type /help for commands, /quit to exit
 
-  model: claude-opus-4-6
+  model: claude-opus-5-5
   git:   main
   cwd:   /home/user/project
 ```

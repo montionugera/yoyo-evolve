@@ -188,7 +188,13 @@ pub fn default_model_for_provider(provider: &str) -> String {
         "minimax" => "MiniMax-M2.7".into(),
         "bedrock" => "anthropic.claude-sonnet-4-6".into(),
         "github" => "openai/gpt-4o".into(),
-        _ => "claude-opus-4-6".into(),
+        // The anthropic (and unknown-provider) default is `claude-opus-5-5` by
+        // decision, checked Day 230 (#1037) rather than picked as "newest": it has
+        // a yoagent preset (`anthropic_preset`, most-specific arm) with bundled
+        // pricing ($4/$20, below the $5/$25 Opus 4.6 it replaces), and a
+        // no-config run sends the preset's 64K `max_tokens`, under the 128000
+        // `anthropic_output_maximum`. A future change needs the same three checks.
+        _ => "claude-opus-5-5".into(),
     }
 }
 
@@ -303,6 +309,33 @@ mod tests {
     #[test]
     fn test_bedrock_provider_api_key_env() {
         assert_eq!(provider_api_key_env("bedrock"), Some("AWS_ACCESS_KEY_ID"));
+    }
+
+    /// The anthropic default is a decision with three checks (#1037, Day 230):
+    /// it has a preset, the preset is priced, and the `max_tokens` a no-config
+    /// run sends fits the model's output maximum. Asserted against whatever the
+    /// default is, so moving it to an unchecked id goes red here.
+    #[test]
+    fn anthropic_default_model_is_preset_priced_and_within_its_output_maximum() {
+        let model = default_model_for_provider("anthropic");
+        assert_eq!(model, "claude-opus-5-5");
+        let preset = crate::agent_builder::anthropic_preset(&model)
+            .expect("the anthropic default must have a preset");
+        assert!(
+            preset.cost.is_some(),
+            "the anthropic default must be priced, or /cost reports nothing"
+        );
+        let max = crate::agent_builder::anthropic_output_maximum(&model)
+            .expect("the anthropic default must declare an output maximum");
+        assert!(
+            preset.max_tokens <= max,
+            "a no-config run sends {} max_tokens, above {model}'s {max}",
+            preset.max_tokens
+        );
+        assert!(
+            model_is_known_for_provider("anthropic", &model),
+            "the default must not trip the unknown-model warning"
+        );
     }
 
     #[test]

@@ -4,7 +4,7 @@ yoyo supports **13 providers** out of the box — from Anthropic and OpenAI to l
 
 ## Default model
 
-The default model is `claude-opus-4-6` (Anthropic). You can change it at startup or mid-session.
+The default model is `claude-opus-5-5` (Anthropic). You can change it at startup or mid-session.
 
 ## Changing the model
 
@@ -32,7 +32,7 @@ Use `--provider <name>` to select a provider. Each provider has a default model 
 
 | Provider | Default Model | API Key Env Var |
 |----------|--------------|-----------------|
-| `anthropic` (default) | `claude-opus-4-6` | `ANTHROPIC_API_KEY` |
+| `anthropic` (default) | `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
 | `openai` | `gpt-4o` | `OPENAI_API_KEY` |
 | `google` | `gemini-2.0-flash` | `GOOGLE_API_KEY` |
 | `openrouter` | `anthropic/claude-sonnet-4-20250514` | `OPENROUTER_API_KEY` |
@@ -44,7 +44,7 @@ Use `--provider <name>` to select a provider. Each provider has a default model 
 | `cerebras` | `llama-3.3-70b` | `CEREBRAS_API_KEY` |
 | `zai` | `glm-4-plus` | `ZAI_API_KEY` |
 | `minimax` | `MiniMax-M2.7` | `MINIMAX_API_KEY` |
-| `custom` | `claude-opus-4-6` | *(none — bring your own)* |
+| `custom` | `claude-opus-5-5` | *(none — bring your own)* |
 
 > **Note:** the table shows each provider's *default* model — others are
 > available. For example, MiniMax's flagship `MiniMax-M3` can be selected via

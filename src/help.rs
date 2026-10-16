@@ -56,7 +56,8 @@ pub fn cli_help_text() -> String {
     let _ = writeln!(s, "Options:");
     let _ = writeln!(
         s,
-        "  --model <name>    Model to use (default: claude-opus-4-6)"
+        "  --model <name>    Model to use (default: {})",
+        crate::cli::default_model_for_provider("anthropic")
     );
     let _ = writeln!(
         s,
@@ -1184,6 +1185,23 @@ pub fn handle_help_command(input: &str) -> bool {
 mod tests {
     use super::*;
     use crate::commands::{command_arg_completions, KNOWN_COMMANDS};
+
+    /// `--help` renders the anthropic default from `default_model_for_provider`
+    /// rather than restating it (#1037): it said `claude-opus-4-6` as a literal,
+    /// so moving the default would have left `--help` advertising the old one.
+    #[test]
+    fn cli_help_model_line_derives_the_anthropic_default() {
+        let default = crate::cli::default_model_for_provider("anthropic");
+        let text = cli_help_text();
+        let line = text
+            .lines()
+            .find(|l| l.trim_start().starts_with("--model <name>"))
+            .expect("--help has a --model line");
+        assert_eq!(
+            line,
+            format!("  --model <name>    Model to use (default: {default})")
+        );
+    }
 
     // ── help_text categorization tests ────────────────────────────────────
 

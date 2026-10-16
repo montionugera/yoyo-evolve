@@ -1069,7 +1069,7 @@ mod tests {
         let r = result.unwrap();
         assert_eq!(r.provider, "anthropic");
         assert_eq!(r.api_key, "sk-test-key-123");
-        assert_eq!(r.model, "claude-opus-4-6"); // default
+        assert_eq!(r.model, default_model_for_provider("anthropic")); // default
 
         let output_str = String::from_utf8(output).unwrap();
         assert!(output_str.contains("Step 1"));
