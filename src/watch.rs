@@ -1916,8 +1916,21 @@ pub fn detect_watch_lint_command_for_dir(dir: &std::path::Path) -> Option<String
 /// [`handle_watch_in`], which is the dir-taking seam. Behaviour is unchanged:
 /// project-type detection has always read the process cwd here.
 pub fn handle_watch(input: &str) {
+    // The REPL never exits on a watch status: the code is for the shell arm.
+    let _ = handle_watch_status(input);
+}
+
+/// Exit status of bare `yoyo watch` when no lint/test command can be
+/// detected and none was given (#982): a usage failure, the house `2`
+/// (`def`/`outline`/`grep`, `SETUP_NOT_INTERACTIVE_EXIT`).
+pub(crate) const WATCH_USAGE_EXIT: i32 = 2;
+
+/// Status-returning twin of [`handle_watch`] for the shell `watch` arm
+/// (#982): same output, plus [`WATCH_USAGE_EXIT`] when bare/`all` watch
+/// detected nothing, `0` otherwise. Reads the process cwd like `handle_watch`.
+pub(crate) fn handle_watch_status(input: &str) -> i32 {
     let dir = std::env::current_dir().unwrap_or_default();
-    handle_watch_in(&dir, input);
+    handle_watch_in(&dir, input)
 }
 
 /// Handle the /watch command against an explicit project directory.
@@ -1926,7 +1939,11 @@ pub fn handle_watch(input: &str) {
 /// without moving the process CWD (#780) — the only reason those tests ever
 /// moved the cwd was to let project-type detection see a
 /// `Cargo.toml`.
-pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) {
+///
+/// Returns [`WATCH_USAGE_EXIT`] only for bare/`all` with nothing detected;
+/// every other path (detected, `off`, `status`, `lint`, explicit command)
+/// returns `0`. stdout is the same either way.
+pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) -> i32 {
     let arg = input.strip_prefix("/watch").unwrap_or("").trim();
 
     match arg {
@@ -1952,6 +1969,7 @@ pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) {
                     println!("{DIM}  No lint or test command detected. Specify one:{RESET}");
                     println!("{DIM}    /watch cargo clippy && cargo test{RESET}");
                     println!("{DIM}    /watch npm run lint && npm test{RESET}\n");
+                    return WATCH_USAGE_EXIT;
                 }
             }
         }
@@ -2001,7 +2019,7 @@ pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) {
                 println!(
                     "{DIM}  (to set '{custom_cmd}' as a custom watch command anyway, use the full command, e.g. /watch {custom_cmd} --flags){RESET}\n"
                 );
-                return;
+                return 0;
             }
             set_watch_command(custom_cmd);
             println!(
@@ -2009,6 +2027,7 @@ pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) {
             );
         }
     }
+    0
 }
 
 #[cfg(test)]
@@ -2892,6 +2911,40 @@ mod tests {
 
         // Cleanup
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// #982: bare watch with nothing detected is a usage failure (2), and
+    /// the near-miss — a dir with a Cargo.toml — still returns 0. Tested on
+    /// the status-returning core: the shell arm exits, which would kill this
+    /// test binary.
+    #[serial]
+    #[test]
+    fn handle_watch_in_status_usage_only_when_nothing_detected() {
+        with_clean_watch_state(|| {
+            let empty = tempfile::TempDir::new().expect("create temp dir");
+            // Anti-vacuous: the failing row really is the undetected branch.
+            assert!(detect_watch_all_phases_for_dir(empty.path()).is_none());
+            assert_eq!(handle_watch_in(empty.path(), "/watch"), WATCH_USAGE_EXIT);
+            assert_eq!(
+                handle_watch_in(empty.path(), "/watch all"),
+                WATCH_USAGE_EXIT
+            );
+            assert!(get_watch_command().is_none(), "nothing may be installed");
+
+            let rust = tempfile::TempDir::new().expect("create temp dir");
+            std::fs::write(
+                rust.path().join("Cargo.toml"),
+                "[package]\nname = \"test\"\nversion = \"0.1.0\"\n",
+            )
+            .expect("write temp Cargo.toml");
+            assert_eq!(handle_watch_in(rust.path(), "/watch"), 0);
+            assert!(get_watch_command().is_some());
+
+            // Every other path keeps 0, even from the undetected dir.
+            for input in ["/watch status", "/watch off", "/watch make check"] {
+                assert_eq!(handle_watch_in(empty.path(), input), 0, "{input}");
+            }
+        });
     }
 
     #[test]

@@ -594,7 +594,7 @@ pub(crate) fn try_dispatch_subcommand_in(
             }
             "watch" => {
                 let input = quote_args_as_command(args);
-                crate::watch::handle_watch(&input);
+                exit_if_nonzero(crate::watch::handle_watch_status(&input));
                 return Some(None);
             }
             "status" => {
