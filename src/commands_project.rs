@@ -692,19 +692,25 @@ pub fn handle_docs(input: &str) {
     let _ = handle_docs_status(input);
 }
 
+/// Exit status of `yoyo docs` with no crate name (#982): a usage failure,
+/// the house `2` (bare `grep`/`def`/`outline`/`watch`). Nobody reaches this
+/// branch on purpose: it means the lookup never ran.
+pub(crate) const DOCS_USAGE_EXIT: i32 = 2;
+
 /// [`handle_docs`] plus the shell exit code (#982): 0 when the crate/item was
-/// found or only usage was printed, 1 otherwise ([`docs::docs_exit_code`]).
+/// found, [`DOCS_USAGE_EXIT`] when no crate was given (only usage was
+/// printed), 1 otherwise ([`docs::docs_exit_code`]).
 pub fn handle_docs_status(input: &str) -> i32 {
     if input == "/docs" {
         println!("{DIM}  usage: /docs <crate> [item]");
         println!("  Look up docs.rs documentation for a Rust crate.");
         println!("  Examples: /docs serde, /docs tokio task{RESET}\n");
-        return 0;
+        return DOCS_USAGE_EXIT;
     }
     let args = input.trim_start_matches("/docs ").trim();
     if args.is_empty() {
         println!("{DIM}  usage: /docs <crate> [item]{RESET}\n");
-        return 0;
+        return DOCS_USAGE_EXIT;
     }
     let parts: Vec<&str> = args.splitn(2, char::is_whitespace).collect();
     let crate_name = parts[0].trim();
@@ -2600,6 +2606,16 @@ mod tests {
             KNOWN_COMMANDS.contains(&"/docs"),
             "/docs should be in KNOWN_COMMANDS"
         );
+    }
+
+    /// #982: `docs` with no crate is a usage failure (2) on both usage
+    /// branches; neither touches the network (they return before any fetch).
+    #[test]
+    fn test_docs_status_without_crate_is_usage_exit() {
+        assert_eq!(DOCS_USAGE_EXIT, 2);
+        assert_eq!(handle_docs_status("/docs"), DOCS_USAGE_EXIT);
+        assert_eq!(handle_docs_status("/docs "), DOCS_USAGE_EXIT);
+        assert_eq!(handle_docs_status("/docs   "), DOCS_USAGE_EXIT);
     }
 
     #[test]

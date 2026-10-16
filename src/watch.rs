@@ -1920,14 +1920,14 @@ pub fn handle_watch(input: &str) {
     let _ = handle_watch_status(input);
 }
 
-/// Exit status of bare `yoyo watch` when no lint/test command can be
-/// detected and none was given (#982): a usage failure, the house `2`
+/// Exit status of bare `yoyo watch` (or `watch lint`) when no lint/test
+/// (lint) command can be detected and none was given (#982): a usage failure, the house `2`
 /// (`def`/`outline`/`grep`, `SETUP_NOT_INTERACTIVE_EXIT`).
 pub(crate) const WATCH_USAGE_EXIT: i32 = 2;
 
 /// Status-returning twin of [`handle_watch`] for the shell `watch` arm
-/// (#982): same output, plus [`WATCH_USAGE_EXIT`] when bare/`all` watch
-/// detected nothing, `0` otherwise. Reads the process cwd like `handle_watch`.
+/// (#982): same output, plus [`WATCH_USAGE_EXIT`] when bare/`all`/`lint`
+/// watch detected nothing, `0` otherwise. Reads the process cwd like `handle_watch`.
 pub(crate) fn handle_watch_status(input: &str) -> i32 {
     let dir = std::env::current_dir().unwrap_or_default();
     handle_watch_in(&dir, input)
@@ -1940,9 +1940,9 @@ pub(crate) fn handle_watch_status(input: &str) -> i32 {
 /// moved the cwd was to let project-type detection see a
 /// `Cargo.toml`.
 ///
-/// Returns [`WATCH_USAGE_EXIT`] only for bare/`all` with nothing detected;
-/// every other path (detected, `off`, `status`, `lint`, explicit command)
-/// returns `0`. stdout is the same either way.
+/// Returns [`WATCH_USAGE_EXIT`] only for bare/`all` with nothing detected
+/// and for `lint` with no lint command detected; every other path (detected,
+/// `off`, `status`, explicit command) returns `0`. stdout is the same either way.
 pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) -> i32 {
     let arg = input.strip_prefix("/watch").unwrap_or("").trim();
 
@@ -2006,6 +2006,7 @@ pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) -> i32 {
                     println!("{DIM}  No lint command detected for this project type.{RESET}");
                     println!("{DIM}    /watch cargo clippy{RESET}");
                     println!("{DIM}    /watch npx eslint .{RESET}\n");
+                    return WATCH_USAGE_EXIT;
                 }
             }
         }
@@ -2939,6 +2940,20 @@ mod tests {
             .expect("write temp Cargo.toml");
             assert_eq!(handle_watch_in(rust.path(), "/watch"), 0);
             assert!(get_watch_command().is_some());
+            // Near miss: `watch lint` where a lint command IS detected keeps 0.
+            assert!(detect_watch_lint_command_for_dir(rust.path()).is_some());
+            assert_eq!(handle_watch_in(rust.path(), "/watch lint"), 0);
+
+            // #982: `watch lint` with no lint command detected is the same
+            // usage failure, and installs nothing (cleared first: the Rust
+            // rows above installed one).
+            clear_watch_command();
+            assert!(detect_watch_lint_command_for_dir(empty.path()).is_none());
+            assert_eq!(
+                handle_watch_in(empty.path(), "/watch lint"),
+                WATCH_USAGE_EXIT
+            );
+            assert!(get_watch_command().is_none(), "lint may install nothing");
 
             // Every other path keeps 0, even from the undetected dir.
             for input in ["/watch status", "/watch off", "/watch make check"] {

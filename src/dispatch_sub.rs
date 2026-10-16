@@ -1847,14 +1847,16 @@ mod tests {
         );
     }
 
+    /// Bare `docs` now exits 2 through `exit_if_nonzero` (#982), which would
+    /// end this test process if dispatched here, so this pins the exact code
+    /// the `docs` arm passes to `exit_if_nonzero`: the arm's own input
+    /// builder and the handler's status, for the bare (usage) shape.
     #[test]
     fn test_try_dispatch_subcommand_docs() {
-        let args = vec!["yoyo".into(), "docs".into()];
-        let result = try_dispatch_subcommand(&args);
-        assert!(
-            matches!(result, Some(None)),
-            "expected Some(None) for bare `docs` subcommand"
-        );
+        let args: Vec<String> = vec!["yoyo".into(), "docs".into()];
+        let input = quote_args_as_command(&args);
+        assert_eq!(input, "/docs");
+        assert_eq!(crate::commands_project::handle_docs_status(&input), 2);
     }
 
     #[test]
