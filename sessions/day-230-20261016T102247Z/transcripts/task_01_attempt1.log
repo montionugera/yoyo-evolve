@@ -1,0 +1,156 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; git f… ✓ (425ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep '^diff' /tmp/t2.patch | cat… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git apply --check --exclude='ski… ✓ (47ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 5.9s (3 ✓)
+
+No skills/ paths. Let me read the applied code to make sure I understand it.
+  ╭─ Turn 4 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git diff src/ | sed -n '1,400p' …  ▶ read /tmp/d.txt ✗ (0ms)
+    │ Cannot access /tmp/d.txt: No such file or directory (os error 2)
+ ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git diff src/ | sed -n '1,90p' ✓ (7ms)
+  3 tools completed in 4.0s (2 ✓, 1 ✗)
+
+The display collapses lines; I'll read the file directly.
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ read src/cd_config_note.rs:417..457  ▶ read src/cd_config_note.rs:766..861  ▶ read src/config.rs:2166..2196 ✓ (1ms)
+ ✓ (2ms)
+ ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1.9s (3 ✓)
+
+Code matches the planned shape. Now the checks.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt && git diff --stat && … ✓ (20.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo build 2>&1 | tail -1 && ca… ✓ (4m 2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (9m 23s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 13m 52s (3 ✓)
+
+All 20 test binaries green, no failures. Confirming the module-size gate and the new tests by name:
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --test module_size 2>… ✓ (380ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The gate passes but asks for the register to be updated, so I'll update it.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n '"src/config.rs"' tests/… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -i '368s|("src/config.rs", 4… ✓ (427ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --test module_size 2>… ✓ (21.5s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 31.4s (3 ✓)
+
+The 22 other warnings are already there at HEAD; config.rs's warning is gone. Next, a positive control, run as one atomic step (mutate, test, restore):
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/cd_config_note.rs /tmp/cd… ✓ (58.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control failed by name and was restored to green. Now the probe against the real binary:
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp && rm -rf p1032 && mkdir -p p1032/A p1032/B p1032/C && printf 'hooks.pos… ✓ (282ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Piping everything at once lost input to readline. I'll pace the lines:
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp/p1032/A && (sleep 3; printf '/cd ../B\r'; sleep 2; printf '/cd ../A\r'; … ✓ (11.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Back in A: no NOT-applied line. Into C, which has its own hooks: the warning is still there. To confirm the probe can tell the difference, the same run against the HEAD binary:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git stash -q && cargo build 2>&1… ✓ (30.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+HEAD reproduces the bug and the fix removes it. Next is the non-diff step, the residue comment on #869:
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue view 869 --json state,t… ✓ (659ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Before posting, I'll measure the residue so the comment carries real output rather than a claim from the patch's transcript:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp && rm -rf p869 && mkdir -p p869/A p869/B && printf 'hooks.post.bash = "e… ✓ (9.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Residue confirmed. Posting it to #869:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat > /tmp/c… (17 lines) ✓ (2.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The comment is posted. ARCHITECTURE.md still carries the reverted session's timestamp, so I'll correct it and record the retry and the register bump:
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -i 's|\*\*Later, Day 230 (07…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (10 lines) ✓ (11ms)
+ ✓ (31ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 3.8s (2 ✓)
+
+Last gate before committing: fmt, clippy and the full test suite again.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt -- --check && cargo cl… ✓ (7m 29s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status -… (30 lines) ✓ (83ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 7m 46s (2 ✓)
+
+Fixed: /cd back into the launch directory no longer warns that its own .yoyo.toml is "NOT applied". It's committed as d55e90e3, whose title carries Fixes #1032.
+
+What I did
+• The change: this is the fix that was reverted last session (#1035) only because it was bundled with a protected-file edit. I re-applied that saved patch with skills/ left out; nothing under skills/ is in the commit.
+  • config.rs now records the loaded config's full path at startup.
+  • cd_config_note.rs checks the /cd target's .yoyo.toml against that path. If it's the loaded file, the "NOT applied" list is dropped. If the check fails for any reason, the old warning still prints.
+• Size register: config.rs grew 20 lines (4742 → 4762). The module-size test asked for its register entry to be updated, so I updated it in tests/module_size.rs.
+• Docs: I updated docs/src/configuration/permissions.md and the ARCHITECTURE.md entry (corrected its timestamp, added a note on the revert and retry).
+
+Verification
+• cargo fmt --check, cargo build and clippy with -D warnings are clean, and cargo test passes across all test binaries.
+• Positive control: I forced is_loaded_config to always say "not the loaded file" and ran the tests. cd_back_into_launch_dir_does_not_call_loaded_config_unapplied failed by name. After I restored it, all 32 tests in the module passed.
+• Real binary: I started in A (its .yoyo.toml sets a hook) with --trust-project, then ran /cd ../B and /cd ../A.
+  • The current main binary prints ⚠ warning: /tmp/p1032/A/.yoyo.toml sets hooks and they are NOT applied… on returning to A.
+  • The fixed binary prints no such line, only "hook … fires again".
+  • /cd into C, which has its own hooks, still prints the full warning, so other directories still get the warning. The raw output is in the commit body.
+
+Left on #869
+I ran the leftover case and posted the output on #869 (confirmed it shows in gh issue view 869 --comments). If the launch file also has [permissions] deny entries, going home still prints the deny note. That note ends "allow, hooks and MCP servers would still not be reloaded on /cd". Each clause is true, but it reads as if something is missing for a file that's already in force. Those deny entries also get added to the list a second time. I didn't check whether /permissions then shows them twice.
+  watch: no files changed this turn — skipping

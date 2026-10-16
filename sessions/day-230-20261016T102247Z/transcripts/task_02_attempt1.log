@@ -1,0 +1,154 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1975,2080p src/config.rs ✓ (4ms)
+ ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2100,2200p src/config.rs; s… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn resolve_numeric_settin… ✓ (30ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "load_config_file()" src … ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1020,1045p src/cli.rs; grep… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ls src/lib.rs 2>/dev/null; sed -n … ✓ (8ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 44.5s (7 ✓)
+
+Build the pre-change binary for later comparison, then write the new module with tests.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -1; cp tar… ✓ (224ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/src/config_syntax.rs (224 lines) ✓ (2m 16s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "config.rs" tests/module_s… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (42 lines) ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^use.*YELLOW\|use crate::… ✓ (7ms)
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/config_syntax.rs (2 → 20 lines)
+  + /// Set once a syntax warning has been printed, so it appears once per run.
+  + /// `load_config_file` is called several times in one process (argument
+  + /// parsing, the piped path, the REPL), and each call re-reads the same file.
+  + static SYNTAX_WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+  + 
+  + /// Print the #1034 warning for `content` (read from `shown`) to stderr, at
+  + /// most once per process. Not quiet-gated, like the #1028 numeric warning: a
+  + /// malformed file is a fault, not startup chatter.
+  + pub(crate) fn warn_config_syntax_once(shown: &str, content: &str) {
+  +     use std::sync::atomic::Ordering;
+  +     if let Some(w) = config_syntax_warning(shown, &config_syntax_problems(content)) {
+  +         if !SYNTAX_WARNED.swap(true, Ordering::SeqCst) {
+  +             use crate::format::{RESET, YELLOW};
+  +             eprintln!("{YELLOW}warning:{RESET} {w}");
+  +         }
+  +     }
+  + }
+  + 
+    #[cfg(test)]
+    mod tests {
+ ✓ (4m 19s)
+  + /// Set once a syntax warning has been printed, so it appears once per run.
+  + /// `load_config_file` is called several times in one process (argument
+  + /// parsing, the piped path, the REPL), and each call re-reads the same file.
+  + static SYNTAX_WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+  + 
+  + /// Print the #1034 warning for `content` (read from `shown`) to stderr, at
+  + /// most once per process. Not quiet-gated, like the #1028 numeric warning: a
+  + /// malformed file is a fault, not startup chatter.
+  ... (12 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo build 2>&1 | gr… ✓ (41.4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 8m 20s (7 ✓)
+
+Tests green. Positive control (atomic mutate → run → restore), then the real-binary probe.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/config_syntax.rs /tmp/cs.ba… ✓ (31.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>… (3 lines) ✓ (10.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 49.8s (2 ✓)
+
+config get doesn't use load_config_file. Checking which reader it uses:
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 636,665p src/dispatch_sub.r… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 640,660p src/dispatch_sub.r… ✓ (7ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6.4s (2 ✓)
+
+Two more doors read the file directly (config show, config get). The task's probe is config get, so both get the same one-line call.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 862,885p src/commands_confi… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "const.*CAP\|MAX_LINES\|20… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (28 lines) ✓ (12.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 28.3s (3 ✓)
+
+Now the session path: -p loads config several times per run, so count the warning lines.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp/p1034/bad; printf 'provider = "anthropic"\nmodel = "claude-haiku-5-5\n[p… ✓ (1m 0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+One warning per run. Docs line, then the full gate.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 28,36p docs/src/troubleshoo… ✓ (3ms)
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/docs/src/troubleshooting/common-issues.md (1 → 5 lines)
+    Once you've identified the problem, fix the offending config/skill/server and restart normally.
+  + 
+  + ## "warning: config file is malformed"
+  + 
+  + yoyo found a syntax problem its lenient config reader can't fix for you: a quoted value with no closing quote (`model = "claude-haiku-5-5`) or a `[section` header with no `]`. The warning names each `file:line`. Values are still read as written, so an unterminated quote stays in the value (and a model id with a stray `"` will 404). Fix the named lines; the warning prints once per run.
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (1ms)
+    Once you've identified the problem, fix the offending config/skill/server and restart normally.
+  + 
+  + ## "warning: config file is malformed"
+  + 
+  + yoyo found a syntax problem its lenient config reader can't fix for you: a quoted value with no closing quote (`model = "claude-haiku-5-5`) or a `[section` header with no `]`. The warning names each `file:line`. Values are still read as written, so an unterminated quote stays in the value (and a model id with a stray `"` will 404). Fix the named lines; the warning prints once per run.
+ ✓ (4m 17s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "FAILED|… ✓ (3m 18s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 7m 55s (4 ✓)
+
+All green. Checking whether ARCHITECTURE.md requires an entry per source file:
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "cd_config_note.rs\|config… ✓ (8ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '^- `config[a-z_]*\.rs`' A… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (9 lines) ✓ (55ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "failed;… ✓ (3m 11s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (40 lines) ✓ (52ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 3m 52s (5 ✓)
+
+Committed as 3476edb4. If a .yoyo.toml has a quoted value with no closing quote, or a [section header with no ], yoyo now prints a warning on stderr naming each file:line. It prints once per run. Formatting, clippy, the full cargo test run and tests/harness_logic.sh all pass.
+
+What changed
+• `src/config_syntax.rs` (new): a checker that finds the two problems, the function that writes the warning, and a print-once switch. The path in the warning is cleaned with sanitize_for_display first. The warning has no special glyphs and uses the same warning: prefix as the #1028 bad-number warning.
+• Lines that must not trigger it: a closed value followed by a # comment, an escaped \", one-line arrays, the extra lines of a multi-line array, [mcp_servers.x], and multi-byte text all pass without a warning. Unquoted values (echo it's done) and """ strings are left alone on purpose. The parser accepts both, and calling either an "unterminated quote" would be wrong.
+• Values still read exactly as before. The stray quote stays in the value and the exit code stays 0. This change only adds the warning.
+
+Two things the plan didn't expect
+• Two extra readers. yoyo config get and config show read the file themselves and never go through load_config_file. After wiring only the loader, the issue's own example (config get model) still printed no warning. So handle_config_get and handle_config_show in src/commands_config.rs (not in the planned file list) each got the same one-line call.
+• `config.rs` was already at its size limit. It sat exactly at the 4762-line cap in tests/module_size.rs, so adding even the call would have failed that test. The three identical branches in load_config_file now share one helper, accept_loaded_config, which brought the file down to 4755 lines.
+
+Checks run
+• `config get model` on the broken file: prints warning: config file is malformed (1 syntax problem); … .yoyo.toml:2: unterminated quote.
+• `-p` with both problems in the file: exactly one warning line in stderr, even though the config file is loaded several times per run.
+• A valid file: stdout and stderr from config get model and config show are byte-for-byte the same as the binary before this change.
+• Sabotage check: turning off the open-quote check fails only detected_shapes_fire_on_the_right_line. With it restored, everything passes.
+
+I also added a troubleshooting entry in docs/src/troubleshooting/common-issues.md and an entry for the new file in ARCHITECTURE.md.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
