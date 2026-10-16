@@ -1,0 +1,62 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli…  ▶ $ gh issue list --repo yologdev/yoyo-evolve --state open --limit 40 --json number,… ✓ (9ms)
+ ✓ (421ms)
+  ▶ $ gh issue view 1029 --repo yologdev/yoyo-evolve --json title,body,author,createdA…  ▶ $ ls target/debug/yoyo 2>&1; wc -l src/*.rs src/*/*.rs 2>/dev/null | sort -n | tai… ✓ (11ms)
+ ✓ (391ms)
+  ▶ $ wc -l src/format/*.rs; grep -n "fn render_line\|heading\|'#'\|\"#\"" src/format/… ✓ (5ms)
+  ▶ $ sed -n 600,720p src/format/markdown.rs ✓ (4ms)
+  ▶ $ grep -n "fn render_inline\|fn render_delta\|fn flush_on_whitespace\|fn needs_lin… ✓ (17ms)
+  ▶ $ sed -n 80,160p src/format/markdown.rs; sed -n 225,260p src/format/markdown.rs ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/forma… (30 lines) ✓ (29.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git diff --s… (27 lines) ✓ (29.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "commands_risk_unhittable\…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh run list --repo yologdev/yoyo-e… ✓ (5ms)
+ ✓ (1.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "TOLERANCE\|SLACK\|fn src_… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ./target/debug/yoyo --version; tim… ✓ (3.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for n in 1030 1026 1021; do echo "… ✓ (1.4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  15 tools completed in 2m 29s (15 ✓)
+
+Writing a draft now.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ write session_plan/assessment.md (43 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/assessment.md… ✓ (0ms)
+ ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p skills/yopedia/SKILL.… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 10,24p skills/yopedia/SKILL… ✓ (5ms)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TOKEN%%.*}"; for q in … ✓ (17.7s)
+  ▶ web search 'Claude Code changelog October 2026' ✓ (3.3s)
+  ▶ web search 'streaming markdown renderer terminal LLM partial bold headin…' ✓ (1.8s)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TO… (10 lines) ✓ (1.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 912,925p src/format/markdow… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (21 lines) ✓ (35ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log --oneline -2; git show --s… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  11 tools completed in 1m 21s (11 ✓)
+
+The assessment file is gitignored, and I used -f to commit it anyway, which the harness's command was never meant to do. I'm undoing that local, unpushed commit. The file stays on disk.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git reset -q --soft HEAD~1 && git … ✓ (13ms)
+
+I've written the assessment to session_plan/assessment.md. It isn't committed: session_plan/ is gitignored, so the git add … || true step does nothing, as the harness intends. I first committed it by mistake with git add -f. I reverted that local, unpushed commit, so HEAD is back at ecc5fa14 and the file is still on disk.
+
+Main finding: #1029 is reproduced, and I found where it comes from. @yuanhao filed it with a public screenshot showing yoyo printing raw ## and **. I ran a temporary test against MarkdownRenderer and restored the file afterwards; src/ is clean.
+• **Headings:** the `#` markers always print, whether the line arrives whole or in pieces. The heading branch in `render_line` (`markdown.rs:660`) wraps the raw line in bold and cyan, never removes the #, and never formats bold or italic inside the heading.
+• **Lists:** bold that is split across chunks right after a list or numbered-list marker leaks, e.g. `["- **","apply**: x\n"]` prints `• **apply**: x`. Cause: `try_resolve_block_prefix (~line 420–450) renders the rest of the line with render_inline instead of the #661 version that holds an unmatched **` until its partner arrives. The same text arriving as one whole line renders cleanly.
+• **Minor:** a quote line (>) split across chunks gets an extra space and its italic styling is never switched off.
+• **Existing tests pin the bug:** test_md_header_rendering and test_md_header_h2 assert the heading with its hashes. The fix has to change them deliberately, not delete them.
+• **Precedent:** Codex made the same fix. Its normal display drops the `#`, a raw mode keeps it, and its tests check that streamed output matches whole-text output. The planner still has to decide what a heading looks like with colour off, because removing the # there would leave nothing marking it as a heading.
+
+Other notes for the planner:
+• **#1030:** a typo in `cost_warn_usd` turns the spending budget off silently, whether it comes from the config file, the flag or the env var. It's a small fix outside dispatch, and the trajectory says to avoid dispatch because it took 4 of the last 8 self-driven changes.
+• **Size limit:** `commands_risk_unhittable.rs` is 36 lines over the 2000-line cap and isn't listed as an exception. 14 more lines would make `cargo test` fail and revert the whole task.
+• Health: the binary answers PONG, and yoyo grep on a missing directory exits 2. The last 10 sessions completed 2/2 tasks each with no reverts, and CI is green. The 00:09 evolve run shows as cancelled; I believe it's a duplicate of this session's run, but didn't check.
+
+I also saved one note to yopedia about the Codex precedent.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

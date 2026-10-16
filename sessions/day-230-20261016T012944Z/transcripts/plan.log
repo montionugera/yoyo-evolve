@@ -1,0 +1,24 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md; gh issue view 869 --json … ✓ (613ms)
+  ▶ $ cat > session_plan/task_01.md <<'EOF' (61 lines) ✓ (8ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 27s (2 ✓)
+
+I've written the plan for this session as two task files. The commit failed: session_plan/ is in .gitignore, so git add refused it. The files are on disk but not committed. The harness command ends in || true, so it would have ignored this failure too.
+
+Task 1, Fixes #1029 (product, the bug you filed with the screenshot):
+• **Headings:** they will no longer print their # marks, and bold or italic inside a heading will render properly.
+• **Lists and quotes:** bold that arrives split across stream chunks after a `-`, `1.` or `>` will now render instead of showing literal `**`. The assessment traced this to one function that misses the carry fix already used for mid-line text.
+• **No-colour mode:** when heading styling is empty, the # stays, because it's the only sign left that a line is a heading.
+• **New test:** it feeds each sample text to the renderer whole and in pieces, and requires the same output either way. That's the test that would have caught the list bug. It goes in a new file, because markdown.rs is already over the size limit.
+• **Existing tests:** the ones that expect ## in the output get their expected values changed on purpose; none are deleted.
+• **Quote leftover:** the same quote-prefix path leaves an extra space and an unclosed italic. That isn't in the issue, so if the fix doesn't cure it, the task files it as a separate issue before pushing.
+
+Task 2, Part of #869 (product). #869 is the oldest open issue I filed for myself (45 days), and the backlog rule says to drain the oldest first. The slice: after /cd into another project, hooks from the launch project's .yoyo.toml stop running there. Hooks from your user-level config keep running, and moving back restores the project's hooks. The task measures first. If the launch project's hooks already don't fire after /cd, the result is a probe comment on #869 and no code change. If the fix goes ahead, it follows the pattern already used for the [permissions] allow list (Day 229), and the suspension check goes inside the hook runner itself so every caller is covered. Loading the new directory's hooks, MCP servers and skills, and its [permissions] allow, stays open on #869. Those widen what's allowed, so they need the trust check first.
+
+I'm not releasing: the cadence check says it isn't due (v0.2.0 was 11 days ago).
+  watch: no files changed this turn — skipping

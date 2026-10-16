@@ -1,0 +1,93 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat src/cd_allow.rs | head -200; g… ✓ (15ms)
+ ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "gate_project_hooks\|HookG…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 700,960p src/hooks.rs ✓ (5ms)
+ ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1430,1480p src/cli.rs; sed … ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn load_config_file\|fn l… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1085,1130p src/hooks.rs; se… ✓ (10.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; env | grep -o "^[A-Z_]*API_KEY" ; … ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -on '"claude-haiku[a-z0-9-]*"… ✓ (10ms)
+  ▶ $ cd /tmp && rm -rf probe869 && mkdir -p probe869/A probe869/B… (7 lines) ✓ (3.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "piped mode\|is_terminal()… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  11 tools completed in 42.1s (11 ✓)
+
+Need a tty. I'll drive it with script and a slow feeder.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp/probe869/A && rm -f /tmp/hookprobe.txt; (sleep 4; echo 'Run the bash com… ✓ (1m 27s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -o '"--yes"\|"-y"\|"--auto-ap… ✓ (4ms)
+  ▶ $ cd /tmp/probe869/A && rm -f /tmp/hookprobe.txt; (sleep 4; echo 'Run the bash com… ✓ (1m 12s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "ShellHook {" src tests |… ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "stay in force\|pub(crate)… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 125,200p src/cd_config_note… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "set_current_dir" src --i… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1435,1468p src/dispatch.rs ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=1436 && NR<=1468' src/dis… ✓ (5ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/dispatch.rs:1436..1469 ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "mod cd_allow" src; grep …  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,35p src/cd_allow.rs; grep… ✓ (6ms)
+ ✓ (19ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/src/cd_hooks.rs (292 lines) ✓ (2m 26s)
+
+────────────────────────────────────────────────────────────────────────────────
+  13 tools completed in 7m 6s (13 ✓)
+
+Now wire: module decl, the three phase guards, startup record, /cd note, /hooks marker.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (47 lines) ✓ (11.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "settings stay in force\|… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "stay in force" src/cd_con… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (18 lines) ✓ (40.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/cd_hooks.rs /tmp/cd_hooks.b… ✓ (55.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (3m 46s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo build 2>&1 | tail -1; cd /… ✓ (1m 14s)
+  ▶ $ cat /tmp/hookprobe.txt ✓ (61ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (3m 10s)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 12m 35s (9 ✓, 1 ✗)
+
+Now the ARCHITECTURE.md entry and the #869 comment. First, a file for the contradicting note I saw.
+  ╭─ Turn 32 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 869 --json state,tit… ✓ (914ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/iss… (17 lines) ✓ (1.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (20 lines) ✓ (35ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -i "hook" docs/src/configu… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (24 lines) ✓ (379ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/c86… (12 lines) ✓ (1.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 49.5s (6 ✓)
+
+After /cd into another project, the launch project's own shell hooks no longer run there. They start again when you /cd back. Committed as bb2cbc39 with the title "Part of #869".
+
+Before and after, from a real session. Repo A's .yoyo.toml had a hook that writes the current directory to a probe file after every bash call. I started yoyo in A, ran a bash command, did /cd ../B, ran another, then /cd ../A and a third.
+• Before: the probe file read A, B, A. A's hook was running against B's files.
+• After: it read A, A. The /cd ../B printed "1 hook from the launch project's .yoyo.toml no longer fires here. Fires again if you /cd back under …". /hooks marked the hook suspended, and /cd ../A printed "… fires again".
+
+How it works
+• Which hooks pause: yoyo loads hooks from one config file. At startup (one line added to cli.rs), if that file is the project's own .yoyo.toml, the new src/cd_hooks.rs records every hook it contains. Hooks from your user-level config are never recorded, so they always run.
+• Where the check lives: a hook can only run through three functions, one per phase (pre, post, post-failure). Each one now checks whether the current directory is still inside the launch project before running the hook, so there's nothing for other callers to wire up. A subdirectory of the launch project counts as staying put. If the current directory can't be read, the hook doesn't run.
+• `dispatch.rs` is unchanged. The /cd note is printed from the existing cd_allow reload chain. When no project hooks were recorded (the common case), the check exits before reading anything, so behaviour there is the same as before.
+• The /cd warning used to say the launch directory's settings "stay in force". It now adds that the launch project's own [permissions] allow and hooks pause outside its tree. That wording changed in 7 places in cd_config_note.rs (code and test strings).
+
+Tests: new tests cover staying put, a subdirectory, another project, a sibling folder whose name starts the same (/work/ab vs /work/a), the parent folder, an unreadable directory, and going away and back. Hooks that weren't recorded (and the same command on a different phase) keep running. The note wording is checked for both transitions. Making the check always say "don't pause" turned two tests red by name, and restoring it turned them green. The full suite passes (6,599 tests, 0 failures), along with clippy and fmt.
+
+Docs and tickets: I added the new entry to ARCHITECTURE.md, a sentence each in docs/src/usage/commands.md and docs/src/configuration/permissions.md, and a comment on #869 with the before/after output and what's left.
+
+Still open:
+• On #869: the new directory's own hooks aren't loaded (that needs a trust decision), nor are its [permissions] allow, MCP servers or skills.
+• New bug, filed as #1032, not fixed: /cd back into the launch directory warns that its own .yoyo.toml sections "are NOT applied", even though they are. That warning prints right after the new "fires again" line and contradicts it. The bug predates this change.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

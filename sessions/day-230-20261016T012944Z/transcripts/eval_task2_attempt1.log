@@ -1,0 +1,24 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 160,195p src/cd_allow.rs; g… ✓ (16ms)
+  ▶ $ cd /tmp && rm -rf ev869 && mkdir -p ev869/A ev869/B && cd ev869/A && git init -q… ✓ (39ms)
+  ▶ $ cd /tmp/ev869/A && grep -n "hooks" /home/runner/work/yoyo-evolve/yoyo-evolve/src… ✓ (32ms)
+  ▶ $ cd /tmp/ev869/A && (sleep 3; for l in /hooks "/cd ../B" /hooks "/cd ../A" /hooks… ✓ (12.0s)
+  ▶ $ cd /tmp/ev869/A && printf 'hooks.post.bash = "pwd >> /tmp/ev869/probe"\n' > .yoy… ✓ (12.0s)
+  ▶ $ mkdir -p /home/runner/work/yoyo-evolve/yoyo-evolve/session_p… (8 lines) ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 52.8s (6 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_2.md.
+
+One gap: I didn't see a hook actually skip running in B. That needs a model to make a tool call, so the evidence for it is the unit tests and the before/after probe recorded in ARCHITECTURE.md.
+
+• Does it match the task? Yes. The pause check sits inside all three hook entry points in src/hooks.rs, so every hook run goes through it. It compares the current directory with the launch directory each time a hook would fire, so a subdirectory counts as staying put and /cd back turns the hooks on again. Hooks are only recorded when the config was project-local, so user-level hooks never pause. dispatch.rs is untouched; the /cd note comes from the existing call in cd_allow.rs.
+• Live check: I ran the binary in a terminal session against two temp repos, A and B, with a hook in A's .yoyo.toml, then ran /hooks, /cd ../B, /hooks, /cd ../A, /hooks. /cd ../B printed "1 hook from the launch project's .yoyo.toml no longer fires here…". /hooks in B marked the hook as suspended. /cd ../A printed "fires again (back under /tmp/ev869/A)."
+• New code without a caller? None. Every new function and type in cd_hooks.rs is used in this diff, the module is declared in main.rs, and no enum variants were added.
+• Docs: docs/src/usage/commands.md and docs/src/configuration/permissions.md each gain a few sentences on hooks pausing. The /cd warning text and its tests were updated, and ARCHITECTURE.md has an entry with before/after probe output.
+• Product surface: the change only narrows what runs. Sessions without project hooks skip the check before reading the directory, and no default or flag changed.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,234 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+I'll start by locating the relevant code in markdown.rs.
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (13ms)
+  ▶ read src/format/markdown.rs (870 lines) ✓ (4ms)
+  ▶ read src/format/markdown.rs:99..819 ✓ (4ms)
+  ▶ read src/format/markdown.rs:198..768 ✓ (3ms)
+  ▶ read src/format/markdown.rs:297..719 ✓ (3ms)
+  ▶ read src/format/markdown.rs:396..670 ✓ (2ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 9.2s (6 ✓)
+
+Now the color constants and plain mode handling.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "pub static BOLD\|pub stat… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 290,395p src/format/mod.rs;… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 11s (2 ✓)
+
+Key facts: in cfg(test) colour is always on; at runtime Color renders empty under NO_COLOR. Let me check the size gate and the existing sibling-test pattern.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn '#\[path' src | head -5; … ✓ (23ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 14,55p tests/module_size.rs… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 57.2s (2 ✓)
+
+Plan is clear. Writing the parity test file first (test-first), declared as a child of markdown so it can reach private helpers.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ write src/format/markdown_parity_tests.rs (230 lines) ✓ (2m 15s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the fix. Heading branch first:
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/format/markdown.rs (4 → 4 lines)
+  -         // Header: # at line start → BOLD+CYAN
+  +         // Header: # at line start → BOLD+CYAN, marker dropped (#1029)
+            if trimmed.starts_with('#') {
+  -             return format!("{BOLD}{CYAN}{line}{RESET}");
+  +             return self.render_heading(line, super::color_enabled());
+            }
+  ▶ edit src/format/markdown.rs (1 → 31 lines)
+  +     /// Render a `#` line (#1029). An ATX heading (`#{1,6}` then a space or end)
+  +     /// loses its marker and optional closing `#`s; its text gets inline
+  +     /// rendering, with the heading style re-applied after each span's RESET.
+  +     /// With `color` off every style is empty, so the marker is the only heading
+  +     /// signal left and is kept. Non-ATX lines (`#tag`) keep the old rendering.
+  +     fn render_heading(&self, line: &str, color: bool) -> String {
+  +         let trimmed = line.trim();
+  +         let level = trimmed.bytes().take_while(|&b| b == b'#').count();
+  +         let after = &trimmed[level..]; // `#` is ASCII: a char boundary
+  +         if !(1..=6).contains(&level) || !(after.is_empty() || after.starts_with(' ')) {
+  +             return format!("{BOLD}{CYAN}{line}{RESET}");
+  +         }
+  +         if !color {
+  +             return self.render_inline(line);
+  +         }
+  +         let mut text = after.trim();
+  +         let unclosed = text.trim_end_matches('#');
+  +         if unclosed.is_empty() || unclosed.ends_with(' ') {
+  +             text = unclosed.trim_end();
+  +         }
+  ... (11 more lines)
+ ✓ (19.0s)
+  -         // Header: # at line start → BOLD+CYAN
+  +         // Header: # at line start → BOLD+CYAN, marker dropped (#1029)
+            if trimmed.starts_with('#') {
+  -             return format!("{BOLD}{CYAN}{line}{RESET}");
+  +             return self.render_heading(line, super::color_enabled());
+            }
+ ✓ (38.1s)
+  +     /// Render a `#` line (#1029). An ATX heading (`#{1,6}` then a space or end)
+  +     /// loses its marker and optional closing `#`s; its text gets inline
+  +     /// rendering, with the heading style re-applied after each span's RESET.
+  +     /// With `color` off every style is empty, so the marker is the only heading
+  +     /// signal left and is kept. Non-ATX lines (`#tag`) keep the old rendering.
+  +     fn render_heading(&self, line: &str, color: bool) -> String {
+  +         let trimmed = line.trim();
+  +         let level = trimmed.bytes().take_while(|&b| b == b'#').count();
+  ... (13 more lines)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "render_heading\|color_ena… ✓ (18.4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 1s (3 ✓)
+
+The first edit seems lost; checking the heading branch.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "Header: #" -A3 src/format… ✓ (7ms)
+  ▶ edit src/format/markdown.rs (4 → 4 lines)
+  -         // Header: # at line start → BOLD+CYAN
+  +         // Header: # at line start → BOLD+CYAN, marker dropped (#1029)
+            if trimmed.starts_with('#') {
+  -             return format!("{BOLD}{CYAN}{line}{RESET}");
+  +             return self.render_heading(line, super::color_enabled());
+            }
+ ✓ (2m 32s)
+  -         // Header: # at line start → BOLD+CYAN
+  +         // Header: # at line start → BOLD+CYAN, marker dropped (#1029)
+            if trimmed.starts_with('#') {
+  -             return format!("{BOLD}{CYAN}{line}{RESET}");
+  +             return self.render_heading(line, super::color_enabled());
+            }
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 2m 44s (2 ✓)
+
+Now the block-prefix path (carry), the blockquote wait-for-one-char, and the italic RESET at line end.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (67 lines) ✓ (27ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the quote_italic_open field and its RESET at line end.
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (55 lines) ✓ (28.8s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All new parity tests pass; only the four tests that pinned the marker leak fail. Updating their expected values deliberately:
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (15 lines) ✓ (29.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Parity tests pass. markdown.rs is now 3224 vs a 3177 register entry; I'll move existing tests (verbatim) into the sibling file to stay inside the budget.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 900,1050p src/format/markdo… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Moving the first block of basic tests (code block → partial-delta fence) verbatim into the sibling file, with render_full → render_whole (identical helper).
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (18 lines) ✓ (48.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+markdown.rs is now 3152 (budget 3177). Checking whether the size gate wants the register lowered, then the positive control.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test module_size 2>&1… ✓ (10.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 450,458p tests/module_size.… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (9 lines) ✓ (437ms)
+  3 tools completed in 18.4s (3 ✓)
+
+Now the positive control — one atomic mutate→test→restore, with a NEUTERED marker, reverting the list-prefix path to render_inline:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/format/… (9 lines) ✓ (57.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; head -20 CHANGELOG.md; grep -n "fo… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^- \`format/markdown\|for… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (15 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (2m 17s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --test orphan_modules 2… ✓ (274ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 5m 35s (5 ✓, 1 ✗)
+
+The orphan gate doesn't see #[path] children by default; checking how the existing smart_edit_crlf_tests.rs passes.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "path\b\|#\[path\|smart_ed… ✓ (5ms)
+
+It matches by module name, so the convention is to name the module after the file stem. Renaming parity_tests → markdown_parity_tests:
+  ╭─ Turn 31 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's/^mod parity_tests;$/mod … ✓ (38.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (3m 41s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 4m 31s (2 ✓)
+
+Everything passes: fmt, clippy, the full cargo test with no failures, and the harness at 203/0. Defect (d) got fixed along with the rest, so there's no residue to file. Committing:
+  ╭─ Turn 33 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (34 lines) ✓ (75ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+#1029 is fixed and committed as fde3f1ba. Build, clippy, fmt check and cargo test all pass (6237 unit tests plus every integration suite, 0 failures), and tests/harness_logic.sh is 203/0. I couldn't run a live model stream, so the evidence is the tests.
+
+What changed in `src/format/markdown.rs`:
+• **Headings:** the `#` marker is gone in colour mode, and so is an optional closing `##`. Bold inside a heading now renders, and the heading's style comes back after each bold span. With colour off, every style is empty, so the # stays as the only sign it's a heading; a test covers both modes. Lines like #tag or seven #s aren't headings and render as before, and a test pins that.
+• **List and quote prefixes:** when `-`, `1.` or `>` is followed in the same delta by an opening `**`, the `**` is now held until its closing pair arrives, as text in the middle of a line already was (#661). This fixes all three splits named in the issue.
+• **Blockquote defect (d):** I fixed this one too instead of filing it. `>` now waits one more character so the optional space is dropped, the same way a whole line drops it, and the italic is closed at the end of the line. Nothing was left over, so no new issue.
+
+Before/after bytes:
+• `"## The **apply step"`: before `\e[1m\e[36m## The apply** step\e[0m, after \e[1m\e[36mThe \e[1mapply\e[0m\e[1m\e[36m step\e[0m`
+• `["- ","apply: x\n"]: before \e[36m•\e[0m apply: x, after \e[36m•\e[0m \e[1mapply\e[0m: x`
+
+New `src/format/markdown_parity_tests.rs`: it renders each fixture whole, line by line, one character at a time and through the exact splits from the issue, and checks the full output strings are identical. It also checks that the fixtures really contain the # and ** being tested, and that no # or ** leaks outside code. One exception: per-character streaming inside a code fence dims each piece separately by design (#147), so that case compares the visible text rather than the bytes.
+
+Things you might not expect:
+• **Four existing tests changed:** they expected headings to keep their #. I changed their expected values on purpose, each with a #1029 comment; no test was deleted.
+• **A file outside the task list:** to keep `markdown.rs` inside its size budget, I moved its first block of basic tests unchanged into the new file. That brought it to 3152 lines, under its 3177 entry. The size check then asked me to lower the entry to 3152, so I edited tests/module_size.rs.
+• **A rename:** the new test module is named `markdown_parity_tests`, because the orphan-file check matches modules by file name and failed on my first name, `parity_tests`.
+
+Check that the new tests catch the bug: I switched the list path back to the old renderer, with a NEUTERED marker on that line. Four parity tests failed, naming the ["- **", "apply**: x\n"] split. After restoring it they pass again, and no marker is left in the file.
+
+I added a CHANGELOG line under Unreleased and a note in ARCHITECTURE.md. The commit title says "Fixes #1029", so the issue will close when this is pushed.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/2 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/2 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/format/markdown_parity_tests.rs, src/format/markdown.rs

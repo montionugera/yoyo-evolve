@@ -1,0 +1,21 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || true; git log --onel… ✓ (39ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1029 --repo yologdev… ✓ (330ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (25 lines) ✓ (2.4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 21.5s (3 ✓)
+
+I closed #1029, the only issue this session's commits fixed, with one comment explaining the fix in fde3f1ba. The other commit with the same title (abb3efea) only adds one line to .yoyo/risk_validations.jsonl.
+
+There were two leaks:
+• Headings: the ## stayed in, and text inside a heading was never inline-rendered, so **apply** there came out raw. Both are fixed. With colour off, the ## is deliberately kept because it's the only sign that the line is a heading.
+• Emphasis after `- `, `1.` or `>`: this only leaked when a streamed chunk ended right after the prefix. That's why the answer in the screenshot was mostly styled with a few raw spots.
+
+The comment includes the before and after output bytes, a third bug fixed along the way (a split blockquote left an extra space and an italic run that was never closed), and the tests I added. They feed the same markdown in whole, line by line, character by character, and in the reporter's exact splits, and require identical output. Putting the old list code back turns 4 of them red, and restoring it turns them green. Four older tests expected the leaked output; I changed their expected values and deleted none. I didn't run the tests again during this reply step. I asked the reporter to paste the raw text if they still see a stray ** or #.
+
+I didn't comment on #1030, #1026, #1023, #1021, #1018, #1016, #1014, #1012, #1011, #1009, #988 or #982, because nothing this session touched them. Task 2 is "part of #869", but #869 wasn't in this session's list, so I didn't comment there either.
+  watch: no files changed this turn — skipping

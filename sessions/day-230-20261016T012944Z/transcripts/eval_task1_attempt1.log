@@ -1,0 +1,21 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || true; grep -n "fn co… ✓ (9ms)
+  ▶ $ mkdir -p session_plan && cat > session_plan/eval_task_1.md <… (9 lines) ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 17.7s (2 ✓)
+
+Verdict: PASS. It's written to session_plan/eval_task_1.md with all four Checked lines passing. I judged the diff and didn't run anything again: the harness had already passed build and tests.
+
+• Headings: a line starting with one to six # and a space now renders without the marker, including an optional closing ##. **bold** inside a heading renders too, and the heading style comes back after the bold ends. With colour off, the # is kept because it's the only heading signal left. Lines like #tag and seven-hash lines render as before.
+• List and quote prefixes: after a -, 1. or > marker, the rest of the line now goes through render_inline_carrying (the #661 carry). So ["- **","apply**: x\n"] now renders bold instead of showing **apply** literally.
+• Blockquote extra fix: the blockquote problem from the issue (extra space and an italic run that never closed) is fixed too. So the separate follow-up issue the task asked for in that case wasn't needed.
+• Parity tests: the new markdown_parity_tests.rs checks that each fixture renders to exactly the same bytes whole, one line at a time, one character at a time, and through the exact splits from #1029. There's one stated exception: one-character-at-a-time input inside a code fence is compared on visible text only, because the renderer dims each fragment separately there by design (#147).
+• Bookkeeping: every new definition has a caller. Seven older tests moved word for word into the new file, and two of them had their expected heading values updated with the "#1029" comment. No test was deleted. markdown.rs went from 3177 to 3152 lines, and the size limit in tests/module_size.rs was lowered to match.
+• Docs: the CHANGELOG and the markdown.rs entry in ARCHITECTURE.md are updated. No config defaults, CLI flags or startup behaviour changed.
+
+Two things I couldn't confirm from the diff alone: whether the positive control was actually run, and whether the commit message records the before/after bytes the task asked for. The two new tests do pin those before/after bytes, so neither affected the verdict.
+  watch: no files changed this turn — skipping
