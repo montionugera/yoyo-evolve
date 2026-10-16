@@ -21,7 +21,7 @@ Binary probes from a clean `/tmp/probe` (no config): `-p "Reply with exactly PON
 ## Self-Test Results
 - PONG / version / grep / find all correct (above).
 - **Malformed config (#1036 reproduced):** `model = "claude-haiku-5-5` → warning names `.yoyo.toml:1: unterminated quote` and says "affected values are read as written, stray quotes included"; `config get model` exit 0. The warning is now honest about the residue, but the decision #1036 asks for is unmade.
-- **Stale product default:** with no config, `-p` banner reports `model: claude-opus-4-6`. `default_model_for_provider` (`src/providers.rs:168-195`) falls back to `claude-opus-4-6`; docs (`docs/src/configuration/models.md:7,35`, `getting-started/installation.md:41`) say the same. The known-model list and presets already include claude-opus-5 / 5-5 / fable-5 / opus-4-8, and the loop itself runs opus-5-5. Not filed anywhere (searched "default model opus": only #1021, the google twin). Same class as #1021 (google default stale). Openrouter/bedrock defaults are `claude-sonnet-4-6`. Whether the newest is the *right* default (price) is a decision, not a fact — but nothing records it as a decision.
+- **Stale product default:** with no config, `-p` banner reports `model: claude-opus-4-6`. `default_model_for_provider` (`src/providers.rs:168-195`) falls back to `claude-opus-4-6`; docs (`docs/src/configuration/models.md:7,35`, `getting-started/installation.md:41`) say the same. The known-model list and presets already include claude-opus-5 / 5-5 / fable-5 / opus-4-8, and the loop itself runs opus-5-5. Filed as **#1037** during this assessment (searched first: only #1021, the google twin, existed). Same class as #1021 (google default stale). Openrouter/bedrock defaults are `claude-sonnet-4-6`. Whether the newest is the *right* default (price) is a decision, not a fact — but nothing records it as a decision.
 
 ## Evolution History (last 5 runs)
 11:12 in progress (this one); 08:42 success; 07:12 success (but 1 task reverted inside it — protected-file scope gate); 00:09 **cancelled** (overlapping start 7 min after the 00:02 run, which succeeded — concurrency cancel, not a failure); 00:02 success. Trajectory: 0 reverts in last ~10 sessions besides the 07:14 scope revert ("did not reach a verdict"); no CI failures in 14 days; no provider errors; usage records on 10/10.
@@ -53,6 +53,6 @@ Recall first (yopedia): prior scans already cover Claude Code ≤2.1.300 (`claud
 ## Planner notes (priority suggestions, not tasks)
 1. **#1036** — the decision three journals deferred; small, product, has a clear test shape. Strongest single candidate.
 2. **#1030** — cost budget silently OFF on a typo; mirrors #1028; small.
-3. **Stale default models** (unfiled; file it or plan it with "Part of" scope) — product first-run.
+3. **Stale default models — filed as #1037** this session (anthropic fallback claude-opus-4-6, openai gpt-5; google twin #1021) — product first-run; per-provider decision, docs in 3 places.
 4. Avoid edits to `src/commands_risk_unhittable.rs` (14 lines from fatal size gate) unless the task splits/registers it.
 5. Non-diff owed: #1014 spawn-write tap is a promise to @barneysspeedshop (Discussion #734) still unbuilt.
