@@ -1,0 +1,85 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; wc -l tests/doc… ✓ (12ms)
+
+────────────────────────────────────────────────────────────────────────────────
+
+Protected list confirmed: none of the target files are on it.
+  ╭─ Turn 2 ─────────────────────────────────────────────────────────────╮
+  ▶ read tests/doc_version_claims.rs ✓ (1ms)
+  ▶ read tests/doc_version_claims.rs:99..257 ✓ (0ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -rn 'yoagent-version-claim:' --include=*.rs --include=*.md . | grep -v '^./… ✓ (178ms)
+  ▶ $ grep -rho 'yoagent-version-claim: 0\.25\.5' --include=*.rs --include=*.md src CL… ✓ (15ms)
+  ▶ $ python3 - <<'EOF' (145 lines) ✓ (381ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 36.8s (5 ✓)
+
+Red for the right reason. Now the mechanical rewrite:
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ grep -rl 'yoagent-version-claim: 0\.25\.5' src CLAUDE.md ARC… (5 lines) ✓ (8.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ git diff -U0 src CLAUDE.md | grep '^[+-][^+-]' | cut -c1-220 ✓ (13ms)
+  ▶ $ f=tests/doc_version_claims.rs; cp $f /tmp/dvc.bak && python3… (8 lines) ✓ (609ms)
+  ▶ $ f=tests/doc_version_claims.rs; for pair in 'if parts[0] == lock_major \&\& parts… ✓ (1.2s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 27.6s (4 ✓)
+
+The first sabotage didn't land: the NEUTERED count was 0, so its green result proves nothing. I'll redo it with the edit made in Python:
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ f=tests/doc_version_claims.rs; cp $f /tmp/dvc.bak; python3 -… (3 lines) ✓ (314ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ python3 - <<'EOF' (46 lines) ✓ (1.4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 18.5s (2 ✓)
+
+Now the full suite:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cargo build 2>&1 | tail -1 && cargo clippy --all-targets -- -D warnings 2>&1 | t… ✓ (6m 2s)
+  ▶ $ cargo test 2>&1 | grep -E "^test result" | grep -vc " 0 failed"; grep -n 'versio… ✓ (2m 25s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 8m 36s (2 ✓)
+
+Everything is green: build, clippy, fmt, all 20 test binaries with 0 failures, and harness_logic (212/0). Committing:
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ git add -A && git commit -q -m "Day 230 (21:38): Part of #10… (5 lines) ✓ (46ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Version-claim markers now name MAJOR.MINOR (0.25), so a yoagent patch release no longer fails the test that rolled back 0.25.6 in both Day 230 sessions. Build, clippy, fmt, every cargo test binary and bash tests/harness_logic.sh (212 passed) all pass. Committed as 82cd761f, titled Part of #1039, not "Fixes".
+
+What changed
+• The rule (`tests/doc_version_claims.rs`): the whole check is now one function, check_marker(marker, locked), and the repo-wide scan calls it. Each case has its own test row:
+  • 0.25 with the lock at 0.25.6 or 0.25.5 passes, and so does 1.0 with 1.0.3.
+  • 0.25 with the lock at 0.26.0 fails. The message says the minor moved and still tells you to re-read the paragraph and update the marker to 0.26. A jump to 1.25.0 fails too.
+  • A patch-form marker like 0.25.5 fails as the wrong form ("drop the patch number"), even when it matches the lock exactly, so only one marker form is accepted.
+  • Other malformed markers (v0.25, 0.x, 0.25.5.1, empty) also fail as the wrong form.
+• The markers: all 17 were rewritten in one sed: ARCHITECTURE.md 5, CLAUDE.md 1, and 11 across 7 src/ files. All 17 are comments, and none was left in the patch form. The plan said 27; the other 10 were in session_plan/, which the test doesn't scan and I didn't edit.
+• Docs: the test's module doc and a dated note in ARCHITECTURE.md record the old exact-patch rule as superseded, with the reason (Cargo.toml's "0.25" pin already accepts patches). They also state the risk I'm accepting: a patch can make a claim false, as 0.25.5 did for search, and such a claim is now a bug to fix when found.
+• Cargo.toml and Cargo.lock are untouched; the lock stays at 0.25.5. None of the edited files is on evolve.sh's protected list (I re-checked).
+
+Sabotage checks
+I ran these one at a time and restored each. Before each test run I confirmed the sabotage edit was actually in the file. My first sed attempt didn't match, so I discarded that green result and redid the edit in Python.
+• Disabling the minor comparison failed the 0.26.0 row (line 291).
+• Disabling the wrong-form branch failed the 0.25.5 row (line 304).
+• After restoring, the file has no NEUTERED lines left and all tests pass.
+
+Still open on #1039 (also in the commit body)
+• The next session's Step 1a has to actually take yoagent 0.25.6 or 0.25.7, which this session can't see happen.
+• Once the lock moves, the upstream changes need re-reading:
+  • 0.25.6 bundles DeepSeek prices, which bears on the DeepSeek divergence list in src/format/cost.rs.
+  • 0.25.7 makes McpToolAdapter::with_prefix real, which undercuts CLAUDE.md's "MCP gotchas" premise that a colliding server can only be skipped.
+  watch: no files changed this turn — skipping

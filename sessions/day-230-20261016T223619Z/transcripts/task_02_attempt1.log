@@ -1,0 +1,170 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "parse_cost_threshold\|YO… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 340,460p src/prompt_budget.…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log --oneline -8; grep -rn "#1… ✓ (4ms)
+ ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 230,330p src/cli_config.rs;… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 20,45p src/restricted.rs; g… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l src/prompt_budget.rs; grep -… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "2000\|1500\|cap\b\|CAP" t… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 440,473p src/prompt_budget.… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 47.6s (8 ✓)
+
+Now add the function after resolve_cost_threshold.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ edit src/prompt_budget.rs (4 → 79 lines)
+        parse_cost_threshold(flag)
+            .or_else(|| parse_cost_threshold(env))
+            .or_else(|| parse_cost_threshold(config))
+  + }
+  + 
+  + /// Byte budget for the user's raw value inside [`cost_threshold_warning`],
+  + /// cut on a char boundary (never a raw byte index, #250).
+  + const COST_WARN_VALUE_MAX_BYTES: usize = 64;
+  + 
+  + /// The startup warning for one cost-budget source whose value
+  + /// [`parse_cost_threshold`] refuses (#1030). `None` when the value is usable.
+  + ///
+  + /// **Who reaches the `Some` branch, and did they choose it?** Everyone who
+  + /// gets here wrote a cost alarm down — a flag, an env var or a config key —
+  + /// and nobody writes `abc`, `-1` or `nan` on purpose, so before this the
+  + /// alarm they asked for was silently off and they were never told. `0` is
+  + /// treated the same way: neither `--help` nor the docs document `0` as
+  + /// "off" (off is the *default*, reached by setting nothing), so a `0` is a
+  + /// value that cannot fire, not a chosen switch.
+  + ///
+  ... (59 more lines)
+ ✓ (12.2s)
+        parse_cost_threshold(flag)
+            .or_else(|| parse_cost_threshold(env))
+            .or_else(|| parse_cost_threshold(config))
+  + }
+  + 
+  + /// Byte budget for the user's raw value inside [`cost_threshold_warning`],
+  + /// cut on a char boundary (never a raw byte index, #250).
+  + const COST_WARN_VALUE_MAX_BYTES: usize = 64;
+  ... (13 more lines)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the call site.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (36 lines) ✓ (6.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "parse_args(\|parse_args_… ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 12.6s (2 ✓)
+
+Fine — one production call. Now tests in prompt_budget's test module.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn resolve_cost_threshold… ✓ (2ms)
+  ▶ edit src/prompt_budget.rs (2 → 86 lines)
+  +     /// #1030: every value `parse_cost_threshold` refuses gets one warning that
+  +     /// names its source and says the alarm is OFF; usable values get `None`.
+  +     #[test]
+  +     fn cost_threshold_warning_names_source_and_says_off_for_every_bad_value() {
+  +         for source in ["--cost-warn", "YOYO_COST_WARN_USD", "cost_warn_usd"] {
+  +             // `0` is not documented as "off" anywhere (off is the default,
+  +             // reached by setting nothing), so it warns like any non-positive.
+  +             for raw in ["abc", "-1", "nan", "inf", "", "0", "0.0"] {
+  +                 let msg = cost_threshold_warning(source, raw, None)
+  +                     .unwrap_or_else(|| panic!("expected a warning for {source} = {raw:?}"));
+  +                 assert_eq!(
+  +                     msg,
+  +                     format!(
+  +                         "invalid {source} value '{raw}' (use a positive number of US dollars, e.g. 5.0); the cost warning is OFF for this run"
+  +                     )
+  +                 );
+  +             }
+  +             // Near-miss guard: usable values stay silent, byte-for-byte None.
+  +             for raw in ["2.5", "10", " 5 "] {
+  +                 assert_eq!(cost_threshold_warning(source, raw, None), None, "{raw}");
+  ... (66 more lines)
+ ✓ (3m 8s)
+  +     /// #1030: every value `parse_cost_threshold` refuses gets one warning that
+  +     /// names its source and says the alarm is OFF; usable values get `None`.
+  +     #[test]
+  +     fn cost_threshold_warning_names_source_and_says_off_for_every_bad_value() {
+  +         for source in ["--cost-warn", "YOYO_COST_WARN_USD", "cost_warn_usd"] {
+  +             // `0` is not documented as "off" anywhere (off is the default,
+  +             // reached by setting nothing), so it warns like any non-positive.
+  +             for raw in ["abc", "-1", "nan", "inf", "", "0", "0.0"] {
+  ... (13 more lines)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 795,816p src/prompt_budget.… ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (13 lines) ✓ (19.0s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 3m 57s (4 ✓)
+
+Positive control (atomic mutate → test → restore), then the real probe.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/prompt_… (9 lines) ✓ (39.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control: the 3 new tests went red, restore went green, marker gone. Real probe:
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1|tail -1; B=$PWD/t… ✓ (7.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Works on all three doors, before any API call. Docs:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn -i "cost.warn\|COST_WARN"… ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^#" docs/src/features/cos… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (15 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && echo FMT_O… ✓ (15.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test > /tmp/test.log 2>&1; e… ✓ (2m 34s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 5m 25s (4 ✓, 1 ✗)
+
+All green. Committing.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --s… (45 lines) ✓ (18ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+A typo'd cost alarm now tells you it's off instead of switching off silently. This is committed as 9470fd3d, and build, test (6,627 passed, 0 failed), clippy and fmt are all green.
+
+The fix: if --cost-warn, YOYO_COST_WARN_USD or cost_warn_usd has a value that can't be a budget (abc, -1, 0, nan), yoyo prints one warning to stderr at startup. It names the source and the value and says what happens next. I ran the built binary in an empty temp dir and it printed:
+```
+warning: invalid --cost-warn value 'abc' (use a positive number of US dollars, e.g. 5.0); the cost warning is OFF for this run
+```
+The env-var and config doors print the same kind of line. All three appeared before the "No API key found" error, so the warning arrives before any money is spent.
+
+Decisions, all written in the code comments and the commit:
+• Warn, don't refuse to start. The cost budget only ever produces a warning and never stops a run, so refusing to start would be louder than the feature it guards. And since the line comes before any spend, you can stop at $0.
+• `0` warns. Neither --help nor the docs say 0 means "off". Off is the default, and you get it by setting nothing.
+• The message only says "OFF" when it really is off. A bad value on one source falls through to the next one. I found that --cost-warn abc with YOYO_COST_WARN_USD=5 still runs with a $5 budget, so "OFF" would have been false there. That case now says ignored; the $5.00 budget from a lower-priority source applies. Following the plan's wording exactly would have printed the wrong message, so I departed from it here.
+• An empty `YOYO_COST_WARN_USD` counts as unset. VAR= yoyo is the normal shell way to clear a variable for one command, so it's a chosen "off". This also departs from the plan's "empty → warn" row. An empty flag or config value still warns.
+• The raw value goes through sanitize_for_display and is capped at 64 bytes without splitting a character. parse_cost_threshold and its existing tests are unchanged.
+
+Tests: three new tests cover the table of bad and good values per source, the fall-through cases, and escape bytes plus the length cap. For the positive control I made cost_threshold_warning always return None. Three tests went red, and after restoring the code all tests passed with no NEUTERED marker left.
+
+Docs: cost_warn wasn't documented anywhere in docs/ before. I added a short "Spending warning" section to docs/src/features/cost-tracking.md.
+
+Still open on #1030: max_auto_continues still drops a bad value silently.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/prompt_budget.rs
