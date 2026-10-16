@@ -921,6 +921,10 @@ pub fn handle_hooks(hooks: &[crate::hooks::ShellHook]) {
             hook.name, phase, hook.tool_pattern
         );
         println!("      command: {}", hook.command);
+        if let Some(m) = crate::cd_hooks::hooks_listing_marker(crate::cd_hooks::is_suspended(hook))
+        {
+            println!("      {m}");
+        }
     }
     println!("{RESET}");
 }

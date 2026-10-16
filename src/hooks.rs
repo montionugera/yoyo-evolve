@@ -714,6 +714,13 @@ pub struct ShellHook {
 }
 
 impl ShellHook {
+    /// A launch-project hook pauses while the session sits outside that
+    /// project after `/cd` (#869; `cd_hooks.rs`). Consulted by all three phase
+    /// entries, the only callers of `run_command`.
+    fn suspended_by_cd(&self) -> bool {
+        crate::cd_hooks::is_suspended(self)
+    }
+
     /// Check if this hook should fire for the given tool name.
     fn matches_tool(&self, tool_name: &str) -> bool {
         self.tool_pattern == "*" || self.tool_pattern == tool_name
@@ -817,7 +824,7 @@ impl Hook for ShellHook {
         tool_name: &str,
         params: &serde_json::Value,
     ) -> Result<Option<String>, String> {
-        if self.phase != HookPhase::Pre || !self.matches_tool(tool_name) {
+        if self.phase != HookPhase::Pre || !self.matches_tool(tool_name) || self.suspended_by_cd() {
             return Ok(None);
         }
 
@@ -848,7 +855,8 @@ impl Hook for ShellHook {
         params: &serde_json::Value,
         output: &str,
     ) -> Result<PostHookResult, String> {
-        if self.phase != HookPhase::Post || !self.matches_tool(tool_name) {
+        if self.phase != HookPhase::Post || !self.matches_tool(tool_name) || self.suspended_by_cd()
+        {
             return Ok(PostHookResult::passthrough(output));
         }
 
@@ -891,7 +899,10 @@ impl Hook for ShellHook {
         params: &serde_json::Value,
         error: &str,
     ) -> Result<PostHookResult, String> {
-        if self.phase != HookPhase::PostFailure || !self.matches_tool(tool_name) {
+        if self.phase != HookPhase::PostFailure
+            || !self.matches_tool(tool_name)
+            || self.suspended_by_cd()
+        {
             return Ok(PostHookResult::passthrough(""));
         }
 

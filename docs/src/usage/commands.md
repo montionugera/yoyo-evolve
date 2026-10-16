@@ -65,6 +65,10 @@ The exceptions are the parts that only narrow, which `/cd` does apply: the new
 directory's deny lists and `[directories] allow`, and suspending the launch
 project's own `[permissions] allow` patterns while you are outside its tree
 (see [Permissions → After `/cd`](../configuration/permissions.md#after-cd)).
+The launch project's own hooks pause the same way: a hook from the launch
+directory's `.yoyo.toml` does not fire while you are outside its tree, and fires
+again when you `/cd` back under it (hooks from your user-level config always fire;
+`/hooks` marks paused ones as suspended).
 
 ## Conversation
 

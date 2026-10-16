@@ -2865,6 +2865,7 @@ directory ({e}); this run is trusted, later runs will not be."
         eprintln!("{YELLOW}{msg}{RESET}");
     }
     let shell_hooks = gated_hooks.hooks;
+    crate::cd_hooks::record_at_startup(&shell_hooks); // #869: pause on /cd away
 
     // Opt-in user notification command: inert unless `notify_command` is set in
     // the config file (product-safe default). Gated on the same boundary as the

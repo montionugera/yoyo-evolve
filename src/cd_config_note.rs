@@ -171,7 +171,7 @@ pub(crate) fn cd_config_note(
             } else {
                 format!(
                     "It also sets {} and they are NOT applied{sep} the launch directory's \
-                     settings stay in force. Restart yoyo here to use them (#869).",
+                     settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use them (#869).",
                     sections.join(", ")
                 )
             };
@@ -180,12 +180,12 @@ pub(crate) fn cd_config_note(
         CdConfigReading::Sets(sections, _, _, _) if sections.is_empty() => None,
         CdConfigReading::Sets(sections, _, _, _) => Some(format!(
             "  {dir}/.yoyo.toml sets {} and they are NOT applied in this session{sep} \
-             the launch directory's settings stay in force. Restart yoyo here to use them (#869).",
+             the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use them (#869).",
             sections.join(", ")
         )),
         CdConfigReading::Unreadable => Some(format!(
             "  {dir}/.yoyo.toml exists but could not be read, and NONE of it is applied in this \
-             session{sep} the launch directory's settings stay in force. Restart yoyo here to use it (#869)."
+             session{sep} the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use it (#869)."
         )),
     }
 }
@@ -474,7 +474,7 @@ mod tests {
             "  /r/.yoyo.toml: its 2 [permissions] deny patterns are now enforced on bash \
              commands for the rest of this session (another /cd does not remove them; file tools \
              never read this list). It also sets [permissions] allow, hooks and they are NOT \
-             applied: the launch directory's settings stay in force. Restart yoyo here to use \
+             applied: the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use \
              them (#869)."
         );
     }
@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(
             cd_config_note("/repo", &reading, false).unwrap(),
             "  /repo/.yoyo.toml sets [permissions] allow and they are NOT applied in this \
-             session — the launch directory's settings stay in force. Restart yoyo here to use \
+             session — the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use \
              them (#869)."
         );
     }
@@ -674,14 +674,14 @@ mod tests {
         assert_eq!(
             render_cd_config_note(&note, note_volume(&reading), false),
             "\x1b[2m  /repo/.yoyo.toml exists but could not be read, and NONE of it is applied \
-             in this session — the launch directory's settings stay in force. Restart yoyo here \
+             in this session — the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here \
              to use it (#869).\x1b[0m"
         );
         let plain = cd_config_note("/repo", &reading, true).unwrap();
         assert_eq!(
             render_cd_config_note(&plain, note_volume(&reading), true),
             "\x1b[2m  /repo/.yoyo.toml exists but could not be read, and NONE of it is applied \
-             in this session: the launch directory's settings stay in force. Restart yoyo here \
+             in this session: the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here \
              to use it (#869).\x1b[0m"
         );
     }

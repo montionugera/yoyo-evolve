@@ -180,6 +180,9 @@ pub(crate) fn apply_cd_allow_suspension(target: &Path) {
     } else {
         Vec::new()
     };
+    // Day 230: the launch project's hooks pause by the same rule; their note
+    // rides this call so dispatch.rs stays untouched.
+    crate::cd_hooks::note_cd_hooks(target);
     let suspended = apply_suspension_with(&CD_SUSPENDED_ALLOW, launch, target, &user_allow);
     if let (Some(launch), false) = (launch, crate::format::is_quiet()) {
         if let Some(note) = suspension_note(&suspended, &launch.dir) {
