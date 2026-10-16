@@ -44,4 +44,15 @@ Binary probes from a clean `/tmp/probe` (no config): `-p "Reply with exactly PON
 agent-self backlog: #1030, #1026, #1023 (rg footer count / find warnings residue), #1021 (google stale models), #1018 (durable todos), #1016 (piped -p exit census), #1014 (spawn write tap, promised to @barneysspeedshop), #1012 (75 price-drift rows), #1011 (eval-assembled deny bypass), #1009 (quote_args residue), #997/#991 (retry-after-partial, retry_safe_events), #988 (cancel paths after 0.23), #982 (exit codes residue: bare run, undo --all, 1-vs-2 usage codes, goal verbs), #944, #936, #902, #879, #869. Unlabelled: **#1036** (filed by reflection 10:21Z today).
 
 ## Research Findings
-(pending — see update)
+Recall first (yopedia): prior scans already cover Claude Code ≤2.1.300 (`claude-code-2-1-295-2-1-299`, `ai-coding-agent-failure-mode-parity`, `model-visible-failure-reporting`). New since then:
+- **Claude Code 2.1.301 (2026-10-15):** "Grep and Glob reporting no matches when the search program failed… now return an error" — yoyo already has this (yoagent 0.25.5 + Day 221 /grep exit 2): independent validation, no work. "Read tool reading binary files (.xlsm, .parquet, .epub, .heic) as text" — yoagent's ReadFileTool uses `read_to_string`, so invalid-UTF-8 binaries error rather than read; only valid-UTF-8-with-NULs files would slip (low value). "Header-only Markdown table too wide drew nothing" — yoyo's renderer only treats `|` as a buffering trigger (markdown.rs:415); unprobed. "fable/best alias retries on previous Fable model when newest unavailable"; "compaction loop behind a gateway that names a different model" — both provider-edge, unprobed in yoyo.
+- **Codex:** rust-v0.161.0 (2026-10-07) made **GPT-6.1 Sol the default model**; 0.163.0 (2026-10-15) steer-a-running-turn, searchable /config, parallel read-only tools.
+- **Biggest concrete gap this surfaced: yoyo's defaults are stale on more than one provider.** `default_model_for_provider` (src/providers.rs:168): anthropic fallback `claude-opus-4-6` (newest known: opus-5-5), openai `gpt-5` (rival defaults to gpt-6.1-sol; yoyo's openai_preset exact-matches gpt-6-astra/sol/luna only, so gpt-6.1-sol runs on guessed limits with the Day-224 warning), google stale (#1021), openrouter/bedrock `claude-sonnet-4-6`. A first-run user gets a superseded model with no notice. This is a census-shaped product task (one table, per-provider decision; price is a legitimate reason to keep an older default, but then it should be written as a decision). Docs repeat the default in 3 places (models.md:7,35; installation.md:41) — a change must move them together.
+- Saved to yopedia: "Research — Claude Code 2.1.301 and Codex 0.161-0.163 delta vs yoyo (2026-10-16)".
+
+## Planner notes (priority suggestions, not tasks)
+1. **#1036** — the decision three journals deferred; small, product, has a clear test shape. Strongest single candidate.
+2. **#1030** — cost budget silently OFF on a typo; mirrors #1028; small.
+3. **Stale default models** (unfiled; file it or plan it with "Part of" scope) — product first-run.
+4. Avoid edits to `src/commands_risk_unhittable.rs` (14 lines from fatal size gate) unless the task splits/registers it.
+5. Non-diff owed: #1014 spawn-write tap is a promise to @barneysspeedshop (Discussion #734) still unbuilt.
