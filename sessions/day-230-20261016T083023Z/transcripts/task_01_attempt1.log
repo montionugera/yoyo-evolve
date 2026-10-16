@@ -1,0 +1,68 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (1m 7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; D=$(ls -d ~/.cargo/registry/src/*/… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'ToolGate' src | head -5;… ✓ (31ms)
+  ▶ read src/prompt.rs:2974..2994  ▶ read src/tool_wrappers_cancel_tests.rs:1..33  ▶ read src/tools.rs:1925..1957 ✓ (1ms)
+ ✓ (1ms)
+ ✓ (2ms)
+  ▶ $ cd ~/.cargo/registry/src/index*/; ls -d yoagent-0.25.*; diff -rq yoagent-0.25.2 … ✓ (101ms)
+  ▶ $ cd ~/.cargo/registry/src/index*/; diff -rq yoagent-0.25.2/src yoagent-0.25.5/src… ✓ (8ms)
+  ▶ $ cd ~/.cargo/registry/src/index*/; diff -rq yoagent-0.25.2/src yoagent-0.25.5/src… ✓ (5ms)
+  ▶ $ cd ~/.cargo/registry/src/index*/; diff -rq yoagent-0.25.2/src yoagent-0.25.5/src… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn 'decision::\|ToolGate\|Se… ✓ (21ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  11 tools completed in 1m 41s (11 ✓)
+
+Now read the remaining marker paragraphs.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ read src/gasp.rs:1..35  ▶ read src/gasp.rs:986..1016  ▶ read src/format/cost.rs:2479..2499  ▶ read src/format/cost.rs:2532..2542 ✓ (1ms)
+ ✓ (1ms)
+ ✓ (2ms)
+ ✓ (2ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ read src/tool_wrappers.rs:1474..1514  ▶ read src/tool_wrappers.rs:5304..5310 ✓ (1ms)
+ ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for l in 263 269 508 532; do echo … ✓ (1.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff Cargo.lock; grep -rn 'RIP… ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -A3 'name = "windows-sys"' Ca… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's/yoagent-version-claim: 0… ✓ (55ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (4m 38s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E '^test r… ✓ (3m 11s)
+
+────────────────────────────────────────────────────────────────────────────────
+  12 tools completed in 8m 32s (12 ✓)
+
+All green (6599 passed, 0 failed). Now the #1023 comment, then commit.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1023 --json state,ti… ✓ (384ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/c10… (8 lines) ✓ (1.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/msg… (42 lines) ✓ (95ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 28.6s (3 ✓)
+
+The upgrade to yoagent 0.25.5 is committed as b58e4329, and Cargo.lock now pins 0.25.5. The one integration test that was making every session throw away the dependency update, doc_version_claims, now passes. fmt, clippy (-D warnings) and the full cargo test run are clean: 6599 passed, 0 failed.
+
+What changed upstream, compared file by file: I diffed the 0.25.2 and 0.25.5 crate sources. Only four source files changed: three in decision/ (the ToolGate code) and tools/search.rs.
+• ToolGate (0.25.4): yoyo doesn't use it. Nothing in src/ mentions ToolGate or decision::.
+• `search` (0.25.5): it now passes --no-config to rg and clears RIPGREP_CONFIG_PATH and GREP_OPTIONS for the child. It also finds rg without which, and a search that ends abnormally is now an error instead of "No matches".
+• 0.25.3: docs only. It's the release that ships the yoagent skill inside the crate.
+
+Every file the 15 markers cite (sub_agent.rs, agent_loop.rs, extension.rs, provider/traits.rs, the Usage and gasp code) is byte-identical, so all the quoted line numbers still hold.
+
+The 15 markers: I re-read each paragraph against 0.25.5. None of them makes a claim about search, ripgrep config, ToolGate or "No matches", so none needed rewriting and all 15 are just bumped to 0.25.5. The commit body lists each one with "unchanged by 0.25.3–0.25.5".
+
+Also in the lock: cargo moved a few Windows-only crates from windows-sys 0.61.2 back to 0.59.0. It doesn't affect Linux builds. I didn't take the other optional dependency bumps.
+
+Left out on purpose:
+• src/fence_result_filter.rs and its ARCHITECTURE.md entry still say a ripgrep config can reshape search output. For the search tool that filter is now a second layer of defence rather than the only one, so the wording is out of date, but I didn't edit it.
+• I commented on #1023 instead, saying item 1 is "addressed upstream by yoagent 0.25.5", that the filter's wording needs re-reading, and that items 2 and 3 haven't been touched.
+• The commit message has no closing keyword. The check found zero hits.
+  watch: no files changed this turn — skipping

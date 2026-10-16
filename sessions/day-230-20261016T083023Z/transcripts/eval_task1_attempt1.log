@@ -1,0 +1,21 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -1 --format='%H %s%n%b' | … ✓ (159ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -1 --f… (9 lines) ✓ (8ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 15.5s (2 ✓)
+
+PASS. The upgrade landed as asked: Cargo.lock now pins yoagent 0.25.5, and all 15 yoagent-version-claim markers moved from 0.25.2 to 0.25.5. The verdict is in session_plan/eval_task_1.md.
+
+• Marker paragraphs: none needed rewording. yoagent's changelog shows 0.25.3 is docs only, 0.25.4 changes ToolGate (which yoyo doesn't use), and 0.25.5 changes only the search tool. None of the 15 paragraphs says anything about search, ripgrep, ToolGate or "No matches", so bumping the version alone was right. The commit body says the cited source files are unchanged between the two versions, so the line numbers in those paragraphs still hold. I read the changelog but did not diff the crates myself.
+• No markers left behind: a grep for yoagent-version-claim: 0.25.2 finds nothing in .rs or .md files outside session_plan/.
+• Commit message: it has the per-marker ledger and the out-of-scope note about src/fence_result_filter.rs and #1023. It also says the #1023 comment was posted; I didn't check that on GitHub. The #1033 check for closing keywords finds none.
+• Product surface: not touched. The src/ changes are comment-only, and no defaults, flags or startup behaviour changed.
+
+One cleanup note, not a failure: the lock also moved several Windows-only dependencies from windows-sys 0.61.2 back to 0.59.0. The commit body says this was a side effect of the update, and it doesn't affect the Linux build.
+
+I didn't re-run the build or tests, since the harness had already passed them.
+  watch: no files changed this turn — skipping

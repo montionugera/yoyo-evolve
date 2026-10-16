@@ -1,0 +1,139 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (12ms)
+  ▶ $ sed -n 2155,2240p src/config.rs; grep -n "Fixes\|Part of\|closing\|keyword" skil…  ▶ $ grep -n "fn \|cd_config_note\|unapplied" src/cd_config_note.rs | head -80 ✓ (4ms)
+ ✓ (7ms)
+  ▶ $ sed -n 1,240p src/cd_config_note.rs; sed -n 410,445p src/cd_config_note.rs; grep… ✓ (15ms)
+  ▶ $ sed -n 131,175p src/cd_config_note.rs; sed -n 1440,1480p src/dispatch.rs ✓ (5ms)
+  ▶ $ sed -n 175,182p src/cd_config_note.rs; grep -n "read_cd_config" -B30 -A12 src/di… ✓ (5ms)
+  ▶ $ grep -n "record_loaded_config_path\|LAUNCH_\|launch_dir\|fn launch" src/config.r… ✓ (6ms)
+  ▶ $ sed -n 2100,2142p src/config.rs ✓ (3ms)
+  ▶ $ sed -n 440,447p src/cd_config_note.rs; sed -n 515,528p src/cd_config_note.rs; se… ✓ (7ms)
+  ▶ $ grep -n -i "fixes\|part of #\|closing\|keyword" skills/evolve/SKILL.md | head; w… ✓ (4ms)
+  ▶ $ grep -n -i "commit\|issue" skills/evolve/SKILL.md | head -30 ✓ (4ms)
+  ▶ $ sed -n 60,72p skills/evolve/SKILL.md; git log --oneline -1 bb2cbc39 2>&1 | head … ✓ (6ms)
+  ▶ edit skills/evolve/SKILL.md (2 → 9 lines)
+    One commit per improvement.
+  +    **Closing keywords live in the title AND the body.** GitHub closes an issue when any pushed
+  +    commit message has `close[sd]?|fix(e[sd])?|resolve[sd]?` (optional colon) right before `#N`, so
+  +    "not fixed: #N" still closes it (bb2cbc39's body closed #1032 that way). Use `Fixes #N` or
+  +    `Part of #N` only for what the commit really does; for anything else write keyword-free
+  +    (`filed as #N`, `seen: #N`, `residue stays on #N`, `not addressed here (#N)`). Before
+  +    committing, run `grep -niE '\b(fix(e[sd])?|close[sd]?|resolve[sd]?):? +#[0-9]+' <message file>`:
+  +    every hit must be an issue this commit fixes completely.
+    8. 
+ ✓ (0ms)
+    One commit per improvement.
+  +    **Closing keywords live in the title AND the body.** GitHub closes an issue when any pushed
+  +    commit message has `close[sd]?|fix(e[sd])?|resolve[sd]?` (optional colon) right before `#N`, so
+  +    "not fixed: #N" still closes it (bb2cbc39's body closed #1032 that way). Use `Fixes #N` or
+  +    `Part of #N` only for what the commit really does; for anything else write keyword-free
+  +    (`filed as #N`, `seen: #N`, `residue stays on #N`, `not addressed here (#N)`). Before
+  +    committing, run `grep -niE '\b(fix(e[sd])?|close[sd]?|resolve[sd]?):? +#[0-9]+' <message file>`:
+  +    every hit must be an issue this commit fixes completely.
+    8. 
+
+────────────────────────────────────────────────────────────────────────────────
+  13 tools completed in 1m 4s (13 ✓)
+
+Now the config.rs accessor and the pure helper with tests.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (36 lines) ✓ (21ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ python3 - <<'EOF' (141 lines) ✓ (30.5s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 1s (2 ✓)
+
+Positive control (atomic mutate→run→restore): make is_loaded_config always false.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/cd_config_note.rs /tmp/bak.rs && sed -i 's/(Ok(here), Ok(loaded)) => here… ✓ (29.0s)
+
+Red by name, restored. Now the full gate.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cargo fmt -- --check && cargo clippy --all-targets -- -D warnings 2>&1 | tail -3… ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cargo fmt -- --check && cargo clippy --all-targets -- -D warnings 2>&1 | tail -3 ✓ (1.7s)
+  ▶ $ cargo build 2>&1 | tail -1 && cargo test 2>&1 | grep -E "^test result|FAILED|pan… ✓ (3m 28s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cargo test 2>&1 | grep -E "^test result" | grep -v " 0 failed" | head; echo "---… ✓ (6m 33s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 12m 25s (3 ✓, 1 ✗)
+
+Try the issue's REPL repro with the built binary (no API call should be needed for /cd):
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ BIN=$PWD/target/debug/yoyo; T=$(mktemp -d); mkdir -p $T/A $T/B; printf 'hooks.pr… ✓ (19ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ BIN=$PWD/target/debug/yoyo; T=$(mktemp -d); mkdir -p $T/A $T/B; printf 'hooks.pr… ✓ (8.0s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 17.1s (2 ✓)
+
+Repro confirms: no "NOT applied" line on return to A, and the "fires again" line remains. Now a short ARCHITECTURE.md note for the file.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "cd_config_note" ARCHITECTURE.md | head; grep -rn "NOT applied" docs/src… ✓ (7ms)
+  ▶ $ sed -n 1361,1380p ARCHITECTURE.md | cut -c1-300; wc -l ARCHITECTURE.md ✓ (5ms)
+  ▶ $ sed -n 1369p ARCHITECTURE.md ✓ (4ms)
+  ▶ $ python3 - <<'EOF' (20 lines) ✓ (37ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -n -i "launch directory\|NOT applied\|back into\|/cd back" docs/src/configu… ✓ (4ms)
+  ▶ $ sed -n 540,560p docs/src/configuration/permissions.md | cut -c1-250 ✓ (3ms)
+  ▶ $ sed -n 558,562p docs/src/configuration/permissions.md ✓ (3ms)
+  ▶ edit docs/src/configuration/permissions.md (1 → 1 lines)
+  - and yoyo prints a warning naming what was skipped. Restart yoyo in that directory to use it (#869).
+  + and yoyo prints a warning naming what was skipped. Restart yoyo in that directory to use it (#869). `/cd` back into the directory whose `.yoyo.toml` yoyo loaded at startup prints no such warning, because that file is the one in force.
+  ▶ $ cargo fmt -- --check && cargo clippy --all-targets -- -D warnings 2>&1 | tail -1… ✓ (1ms)
+  - and yoyo prints a warning naming what was skipped. Restart yoyo in that directory to use it (#869).
+  + and yoyo prints a warning naming what was skipped. Restart yoyo in that directory to use it (#869). `/cd` back into the directory whose `.yoyo.toml` yoyo loaded at startup prints no such warning, because that file is the one in force.
+ ✓ (3m 49s)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 4m 31s (9 ✓)
+
+All green. Now write the commit message and run the step-1 grep on it before committing.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cat > /tmp/msg.txt <<'EOF' (22 lines) ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+GitHub needs a keyword before each issue number, so "Fixes #1033 and #1032" would only close #1033 (the grep's single hit shows the same thing). I'll add an explicit line to the body.
+  ╭─ Turn 31 ────────────────────────────────────────────────────────────╮
+  ▶ $ printf '\nFixes #1033\nFixes #1032\n' >> /tmp/msg.txt; grep -niE '\b(fix(e[sd])?… ✓ (53ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+One thing I found while doing this belongs in the #1033 rule itself: a keyword closes only the issue right after it. I'll add that in one line.
+  ╭─ Turn 32 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (15 lines) ✓ (35ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+I fixed both issues in two commits. fmt, clippy (-D warnings), build and the full cargo test all passed.
+
+#1033 (closing keywords in the commit body): I added the rule to step 7 of skills/evolve/SKILL.md. GitHub closes an issue when a keyword sits right before #N anywhere in the message, title or body, so "not fixed: #N" still closes it. The new text cites the bb2cbc39 / #1032 incident, lists wording that doesn't close anything, and gives the grep to run before committing. I found one more gap while writing my own commit message: a keyword only closes the issue right after it, so the required title "Fixes #1033 and #1032" would have closed #1033 but not #1032. The grep showed it too, matching only #1033 on that line. So the body has Fixes #1033 and Fixes #1032 on their own lines, and a small second commit (ec339d33) adds a "one keyword per issue" line to the skill.
+
+#1032 (`/cd` back home said the loaded `.yoyo.toml` was NOT applied):
+• Cause: the loaded config path is stored as plain .yoyo.toml, relative to the launch directory, so after a /cd nothing could compare the target's file with the one actually loaded.
+• `src/config.rs`: it now also saves that path resolved to a full path at load time, while the current directory is still the launch directory, and exposes it as loaded_config_resolved_path(). The existing path and loaded_config_is_project_local are unchanged.
+• `src/cd_config_note.rs`: a new function, is_loaded_config(target, loaded), takes both paths as arguments and resolves both, so symlinks and .. paths still match. A second one, reading_for_note, drops only the "NOT applied" list when the target's file is the loaded one. If resolving a path fails, the old warning prints rather than nothing.
+• Tests: returning through a .. path or a symlink (both directions) prints no note. A different directory with the same hook gets the exact old warning, checked with assert_eq! on the full string. With no config loaded, or the loaded file missing, the warning is unchanged.
+• Checks: forcing is_loaded_config to return false made the launch-directory test fail by name, and it passed again once restored. I also ran the issue's steps in a real REPL session (A with a hook, /cd ../B, /cd ../A): the "NOT applied" line is gone and the "fires again" line is still there.
+• Docs: a new ARCHITECTURE.md entry, plus one sentence in docs/src/configuration/permissions.md.
+
+What's left, on #869: if the launch file also has deny entries, going back home still prints the "deny applied" note. That note ends with "would still not be reloaded on /cd", which is true but beside the point for the file that's already in force. It doesn't close #869, and the commit messages only mention #869 without a closing keyword.
+
+One small thing: the second commit's message quotes "Fixes #1033 and" as its example, so it carries a closing keyword for #1033 again. That's harmless, since #1033 really is fixed.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

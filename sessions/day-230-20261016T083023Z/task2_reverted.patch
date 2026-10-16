@@ -1,0 +1,233 @@
+diff --git a/ARCHITECTURE.md b/ARCHITECTURE.md
+index ab1a50b7..0b9e47b7 100644
+--- a/ARCHITECTURE.md
++++ b/ARCHITECTURE.md
+@@ -1368,7 +1368,17 @@ The unfixed leakers are filed as **#1009** with full evidence. They weren't fixe
+ 
+ **Tests** (pure; the launch record is a parameter, never the global): transition table (stay, subdirectory, other project, prefix sibling, parent, unreadable cwd), away-and-back round trip, near-miss (a non-recorded hook with the same pattern, and the same command on another phase, keep firing outside), note wording on both transitions and silence otherwise, launch dir sanitized (anti-vacuous ESC in the fixture). Positive control, atomic: `hook_suspended_at` → `false // NEUTERED` failed `transition_table_away_back_and_subdirectory` and `a_hook_that_is_not_the_launch_projects_keeps_firing_outside` by name; restored, green.
+ 
+-**Still not handled by `/cd`:** the NEW directory's hooks are not loaded (widens; needs the trust gate), its `[permissions] allow`, MCP servers, skills. **Seen, not fixed:** `/cd` back INTO the launch directory prints the `cd_config_note` warning that its own `.yoyo.toml` sections "are NOT applied" while they are (#1032).
++**Still not handled by `/cd`:** the NEW directory's hooks are not loaded (widens; needs the trust gate), its `[permissions] allow`, MCP servers, skills. **Seen, not fixed:** `/cd` back INTO the launch directory prints the `cd_config_note` warning that its own `.yoyo.toml` sections "are NOT applied" while they are (#1032). **Later, Day 230 (07:14): that misfire is fixed (#1032), see the next entry.**
++
++### `src/cd_config_note.rs` / `src/config.rs` — Day 230 (07:14): `/cd` back into the launch directory no longer calls its own `.yoyo.toml` "NOT applied" (#1032)
++
++**Cause.** `cd_config_note` read `<target>/.yoyo.toml` and never compared it with the file `load_config_file` actually loaded. `LOADED_CONFIG_PATH` records `.yoyo.toml` as a **relative** path, so after a `/cd` it cannot be resolved against the current dir. `record_loaded_config_path` now also stores `LOADED_CONFIG_RESOLVED` (canonicalized while the cwd is still the launch dir, falling back to `cwd.join`), read through `config::loaded_config_resolved_path()`. `LOADED_CONFIG_PATH` and `loaded_config_is_project_local` are unchanged.
++
++**Fix.** Pure `is_loaded_config(target, loaded)` canonicalizes both paths (symlinks and `..` spellings match). It returns `false` if nothing was loaded or either canonicalization fails, so a failure falls back to the old warning, never to silence. `reading_for_note(reading, is_loaded)` drops only the NOT-applied section list. Deny entries (still reported as applied) and `Unreadable` stay as they were. `print_cd_config_note` applies both before choosing the text and the volume. `dispatch.rs` is untouched. Also covers `/cd ~` when `~/.yoyo.toml` was the loaded file.
++
++**Tests** (temp dirs, the loaded path passed as a parameter): back into A through a `..` path and through a symlink in both directions → `None`, with an anti-vacuous check that A's file really sets `hooks`; **near-miss:** B with the same hook while A's file is loaded → the full warning, pinned by `assert_eq!`; no loaded config → the same full string; loaded file missing → still warns; deny entries survive the filter. Positive control, atomic: making `is_loaded_config` always return `false` (`NEUTERED`) failed `cd_back_into_launch_dir_does_not_call_loaded_config_unapplied` by name; restored, green. Live repro under `script` (A with a hook, `/cd ../B`, `/cd ../A`): no NOT-applied line, and the "fires again" line from `cd_hooks` remains.
++
++**Residue (stays on #869):** if the launch file also has deny entries, the applied-deny note still prints on return, and its tail says allow/hooks/MCP "would still not be reloaded on /cd". That is true, but it is beside the point for the file that was loaded. The deny entries are appended again too (no change in behaviour, since they were already in force). Only `.yoyo.toml` is compared, which is the only name `CONFIG_FILE_NAMES` holds today.
+ 
+ ### `src/cd_allow.rs` / `src/config.rs` / `src/commands_permissions.rs` — Day 229 (14:40): after `/cd`, the LAUNCH project's `[permissions] allow` stops auto-approving outside its tree (#869 slice)
+ 
+diff --git a/docs/src/configuration/permissions.md b/docs/src/configuration/permissions.md
+index 75636edb..9e2e7a6b 100644
+--- a/docs/src/configuration/permissions.md
++++ b/docs/src/configuration/permissions.md
+@@ -555,4 +555,4 @@ is tracked in issue #749.
+ 
+ `/cd` also narrows the **launch** project's own grants. If you started yoyo in a trusted project whose `.yoyo.toml` has `[permissions] allow = ["cargo *"]`, those patterns were written for that project's tree. Once you `/cd` outside it, they stop auto-approving: `cargo build` in the other directory asks first, `/cd` prints a line naming the suspended patterns, and `/permissions` lists them under `Suspended allow patterns` instead of `Allow patterns`. Two exceptions: a pattern your own config (`~/.yoyo.toml` or `~/.config/yoyo/config.toml`) also lists keeps applying, and `--allow` flags are never suspended, because both are yours rather than the project's. `/cd` back into the launch directory, or any directory below it, and they apply again.
+ 
+-The deny lists last for the rest of the session and only grow: `/cd`-ing back does not remove anything. Everything else in the new directory's config (`[permissions] allow`, hooks, MCP servers, skills) is still **not** reloaded, and yoyo prints a warning naming what was skipped. Restart yoyo in that directory to use it (#869). The launch project's own shell hooks pause while you are outside its tree, like its `[permissions] allow`, and fire again when you `/cd` back under it; hooks from your user-level config are unaffected. `/rename` (and the model's `rename_symbol` tool) also honour the `/cd`-added `[directories] deny` entries, and so does the REPL's auto-context, which never attaches a denied file to the model's prompt. Other readers, namely the project-instruction-file loaders and skill loading, still use only the startup `[directories]` fence. `/map` uses no fence at all, by design: it shows a sketch to you, not to the model.
++The deny lists last for the rest of the session and only grow: `/cd`-ing back does not remove anything. Everything else in the new directory's config (`[permissions] allow`, hooks, MCP servers, skills) is still **not** reloaded, and yoyo prints a warning naming what was skipped. Restart yoyo in that directory to use it (#869). `/cd` back into the directory whose `.yoyo.toml` yoyo loaded at startup prints no such warning, because that file is the one in force. The launch project's own shell hooks pause while you are outside its tree, like its `[permissions] allow`, and fire again when you `/cd` back under it; hooks from your user-level config are unaffected. `/rename` (and the model's `rename_symbol` tool) also honour the `/cd`-added `[directories] deny` entries, and so does the REPL's auto-context, which never attaches a denied file to the model's prompt. Other readers, namely the project-instruction-file loaders and skill loading, still use only the startup `[directories]` fence. `/map` uses no fence at all, by design: it shows a sketch to you, not to the model.
+diff --git a/skills/evolve/SKILL.md b/skills/evolve/SKILL.md
+index 0bcf702e..e338bf7b 100644
+--- a/skills/evolve/SKILL.md
++++ b/skills/evolve/SKILL.md
+@@ -64,6 +64,14 @@ When a task touches more than one source file:
+ 5. If any check fails, read the error and fix it. Keep trying until it passes.
+ 6. Only if you've tried 3+ times and are stuck, revert this change with `git checkout -- .` (this reverts to your last commit, preserving previous work)
+ 7. **Commit** — `git add -A && git commit -m "Day N (HH:MM): <short description>"`. One commit per improvement.
++   **Closing keywords live in the title AND the body.** GitHub closes an issue when any pushed
++   commit message has `close[sd]?|fix(e[sd])?|resolve[sd]?` (optional colon) right before `#N`, so
++   "not fixed: #N" still closes it (bb2cbc39's body closed #1032 that way). Use `Fixes #N` or
++   `Part of #N` only for what the commit really does; for anything else write keyword-free
++   (`filed as #N`, `seen: #N`, `residue stays on #N`, `not addressed here (#N)`). Before
++   committing, run `grep -niE '\b(fix(e[sd])?|close[sd]?|resolve[sd]?):? +#[0-9]+' <message file>`:
++   every hit must be an issue this commit fixes completely. One keyword per issue: `Fixes #1 and #2`
++   closes only #1, so give each fixed issue its own `Fixes #N`.
+ 8. **Then move on to the next improvement.** Keep going until you run out of session time or ideas.
+ 
+ ## Never fake completion
+diff --git a/src/cd_config_note.rs b/src/cd_config_note.rs
+index 51955599..2221ddad 100644
+--- a/src/cd_config_note.rs
++++ b/src/cd_config_note.rs
+@@ -414,9 +414,44 @@ pub(crate) fn path_guard_refusal(
+     path_guard_refusal_with(&CD_DENIED_DIRS, startup, path)
+ }
+ 
++/// Is `<target>/.yoyo.toml` the very file this session loaded at startup (#1032)?
++/// Both paths are canonicalized, so a symlink or a `..` spelling still matches.
++/// `false` when nothing was loaded or either path cannot be canonicalized, so
++/// a failure falls back to today's note, never to silence.
++pub(crate) fn is_loaded_config(target: &Path, loaded: Option<&Path>) -> bool {
++    let Some(loaded) = loaded else {
++        return false;
++    };
++    match (
++        std::fs::canonicalize(target.join(".yoyo.toml")),
++        std::fs::canonicalize(loaded),
++    ) {
++        (Ok(here), Ok(loaded)) => here == loaded,
++        _ => false,
++    }
++}
++
++/// `reading` as `/cd` should report it: when the file IS the loaded config
++/// (back in the launch directory), its sections are applied, so the
++/// NOT-applied list is dropped (#1032). Deny entries and unreadable files are
++/// untouched; any other directory gets `reading` back unchanged.
++pub(crate) fn reading_for_note(reading: &CdConfigReading, is_loaded: bool) -> CdConfigReading {
++    match reading {
++        CdConfigReading::Sets(_, deny, dir_deny, dir_allow) if is_loaded => CdConfigReading::Sets(
++            Vec::new(),
++            deny.clone(),
++            dir_deny.clone(),
++            dir_allow.clone(),
++        ),
++        other => other.clone(),
++    }
++}
++
+ /// Print the note for an already-read `reading` to stderr.
+ pub(crate) fn print_cd_config_note(target: &Path, reading: &CdConfigReading) {
+     let plain = crate::format::is_plain_output();
++    let is_loaded = is_loaded_config(target, crate::config::loaded_config_resolved_path());
++    let reading = &reading_for_note(reading, is_loaded);
+     let note = cd_config_note(&target.display().to_string(), reading, plain);
+     // Deliberately NOT gated on quiet mode, for either volume. A warning is not
+     // chrome: `--quiet` is auto-on whenever stdin and stdout are both piped, so a
+@@ -731,6 +766,97 @@ mod tests {
+         base.join(rel).to_string_lossy().into_owned()
+     }
+ 
++    const HOOK_TOML: &str = "hooks.pre.bash = \"echo hi\"\n";
++
++    /// The note `/cd` prints for `target`, given which file the session loaded.
++    fn note_at(target: &Path, loaded: Option<&Path>) -> Option<String> {
++        let reading = read_cd_config(target);
++        let reading = reading_for_note(&reading, is_loaded_config(target, loaded));
++        cd_config_note(&target.display().to_string(), &reading, true)
++    }
++
++    #[test]
++    fn cd_back_into_launch_dir_does_not_call_loaded_config_unapplied() {
++        // #1032: launch dir A sets a hook; /cd back into A must not say it is NOT applied.
++        let (_d, base) = tmp();
++        let a = base.join("A");
++        std::fs::create_dir_all(&a).unwrap();
++        std::fs::write(a.join(".yoyo.toml"), HOOK_TOML).unwrap();
++        // Anti-vacuous: the file really does set an unapplied section.
++        assert_eq!(read_cd_config(&a), sets(HOOK_TOML));
++        assert!(
++            matches!(read_cd_config(&a), CdConfigReading::Sets(ref s, ..) if s == &vec!["hooks"])
++        );
++
++        // Loaded path spelled with `..`.
++        let dotted = base.join("A").join("..").join("A").join(".yoyo.toml");
++        assert_eq!(note_at(&a, Some(&dotted)), None);
++
++        // Reached through a symlinked directory.
++        #[cfg(unix)]
++        {
++            let link = base.join("link-to-A");
++            std::os::unix::fs::symlink(&a, &link).unwrap();
++            assert_eq!(note_at(&link, Some(&a.join(".yoyo.toml"))), None);
++            assert_eq!(note_at(&a, Some(&link.join(".yoyo.toml"))), None);
++        }
++    }
++
++    #[test]
++    fn different_dir_with_same_sections_keeps_the_exact_warning() {
++        // Near-miss guard for #1032: B sets the same hook, A's file was loaded.
++        let (_d, base) = tmp();
++        let (a, b) = (base.join("A"), base.join("B"));
++        for d in [&a, &b] {
++            std::fs::create_dir_all(d).unwrap();
++            std::fs::write(d.join(".yoyo.toml"), HOOK_TOML).unwrap();
++        }
++        let expected = format!(
++            "  {}/.yoyo.toml sets hooks and they are NOT applied in this session: the launch \
++             directory's settings stay in force, except that its own [permissions] allow and \
++             hooks pause outside its tree. Restart yoyo here to use them (#869).",
++            b.display()
++        );
++        assert_eq!(
++            note_at(&b, Some(&a.join(".yoyo.toml"))),
++            Some(expected.clone())
++        );
++        // No loaded config at all: unchanged.
++        assert_eq!(note_at(&b, None), Some(expected));
++        assert!(!is_loaded_config(&b, None));
++    }
++
++    #[test]
++    fn missing_loaded_file_falls_back_to_the_warning_not_silence() {
++        let (_d, base) = tmp();
++        let a = base.join("A");
++        std::fs::create_dir_all(&a).unwrap();
++        std::fs::write(a.join(".yoyo.toml"), HOOK_TOML).unwrap();
++        let gone = base.join("gone").join(".yoyo.toml");
++        assert!(!is_loaded_config(&a, Some(&gone)));
++        assert!(note_at(&a, Some(&gone)).unwrap().contains("NOT applied"));
++    }
++
++    #[test]
++    fn loaded_config_keeps_its_applied_deny_entries() {
++        // Only the NOT-applied list is dropped; deny entries still report as applied.
++        let reading = sets(PERMS_TOML);
++        assert_eq!(reading_for_note(&reading, true), reading);
++        let both = sets("[permissions]\nallow = [\"git *\"]\ndeny = [\"rm *\"]\n");
++        match reading_for_note(&both, true) {
++            CdConfigReading::Sets(s, d, _, _) => {
++                assert!(s.is_empty());
++                assert_eq!(d, vec!["rm *".to_string()]);
++            }
++            other => panic!("{other:?}"),
++        }
++        assert_eq!(reading_for_note(&both, false), both);
++        assert_eq!(
++            reading_for_note(&CdConfigReading::Unreadable, true),
++            CdConfigReading::Unreadable
++        );
++    }
++
+     #[test]
+     fn dir_deny_note_says_applied_to_file_tools() {
+         let reading = sets(DIR_DENY_TOML);
+diff --git a/src/config.rs b/src/config.rs
+index 25e2282b..7e5d417a 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -2166,9 +2166,29 @@ static LOADED_CONFIG_PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::
+ 
+ /// Record which config file won the search. First writer wins.
+ fn record_loaded_config_path(path: std::path::PathBuf) {
++    // Resolve NOW, while the cwd is still the launch directory: the recorded
++    // path may be relative (`.yoyo.toml`), and after a `/cd` it would resolve
++    // against the wrong directory (#1032). Falls back to the cwd join when the
++    // file cannot be canonicalized; first writer wins, like the raw path.
++    let resolved = std::fs::canonicalize(&path).unwrap_or_else(|_| {
++        std::env::current_dir()
++            .map(|cwd| cwd.join(&path))
++            .unwrap_or_else(|_| path.clone())
++    });
++    let _ = LOADED_CONFIG_RESOLVED.set(resolved);
+     let _ = LOADED_CONFIG_PATH.set(path);
+ }
+ 
++/// `LOADED_CONFIG_PATH` resolved against the launch cwd at load time (#1032).
++static LOADED_CONFIG_RESOLVED: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
++
++/// The config file this session loaded, as an absolute (canonical when
++/// possible) path, or `None` when no config file was loaded. Read by `/cd`'s
++/// disclosure so it never calls the loaded file "NOT applied" (#1032).
++pub(crate) fn loaded_config_resolved_path() -> Option<&'static std::path::Path> {
++    LOADED_CONFIG_RESOLVED.get().map(|p| p.as_path())
++}
++
+ /// Is `path` — the config file that won the search — the *project-local* one,
+ /// i.e. a `.yoyo.toml` sitting in the current working directory?
+ ///
