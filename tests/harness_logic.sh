@@ -926,6 +926,8 @@ if require "update_direct_dependencies extracted" "$(awk '/^update_direct_depend
 fi
 check "evolve.sh: Step 1 trusts the suite Step 1a just ran on the same commit" \
     "$(grep -c '"\$HEAD_SHA" = "\$DEPS_VERIFIED_SHA"' "$SCRIPT")" "1"
+check "evolve.sh: the skipped-suite line says Step 1a, not CI, when Step 1a ran it" \
+    "$(grep -c 'SUITE_SOURCE="Step 1a already ran the full suite on' "$SCRIPT")" "1"
 check "evolve.sh: a failed-build revert restores Cargo.lock too" \
     "$(grep -c 'git checkout "\$SESSION_START_SHA" -- src/ Cargo.toml Cargo.lock' "$SCRIPT")" "1"
 check "evolve.sh: dependency updates run before the Step 1 build check" \

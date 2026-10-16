@@ -465,9 +465,11 @@ cargo build --quiet
 # only who ran the suite differs.
 HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || echo none)
 CI_GREEN=""
+SUITE_SOURCE="CI already green on $HEAD_SHA"
 if [ -n "${DEPS_VERIFIED_SHA:-}" ] && [ "$HEAD_SHA" = "$DEPS_VERIFIED_SHA" ]; then
     # Step 1a just ran the full suite on this exact commit (its own dependency update).
     CI_GREEN="yes"
+    SUITE_SOURCE="Step 1a already ran the full suite on $HEAD_SHA (dependency update)"
 elif command -v gh &>/dev/null; then
     # Refresh first: retry attempts start with the job-start App token, which
     # expires at 60min — without this, every retry's query 401s silently and
@@ -486,7 +488,7 @@ fi
 # uncommitted edits; HEAD still matches green CI, but the tree is not what
 # CI tested. Only skip the suite when worktree == HEAD exactly.
 if [ "$CI_GREEN" = "yes" ] && git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
-    echo "  CI already green on $HEAD_SHA — compiling test profile only (suite run skipped)."
+    echo "  $SUITE_SOURCE — compiling test profile only (suite run skipped)."
     cargo test --quiet --no-run
 else
     cargo test --quiet
