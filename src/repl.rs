@@ -1517,7 +1517,7 @@ pub async fn run_repl(
 }
 
 /// Default maximum number of automatic follow-up prompts per user turn.
-const DEFAULT_MAX_AUTO_CONTINUES: u32 = 5;
+pub(crate) const DEFAULT_MAX_AUTO_CONTINUES: u32 = 5;
 
 /// Compute the effective auto-continue limit for the current turn.
 ///

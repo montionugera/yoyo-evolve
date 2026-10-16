@@ -1125,6 +1125,44 @@ pub fn parse_max_auto_continues_from_config(
         .map(|n| n.min(20))
 }
 
+/// Longest raw `max_auto_continues` value echoed back in its warning (bytes,
+/// cut on a char boundary, marked with `...`). Same budget as cost_warn's.
+const MAX_AUTO_CONTINUES_VALUE_MAX_BYTES: usize = 64;
+
+/// The startup warning for a `max_auto_continues` value that
+/// [`parse_max_auto_continues_from_config`] does not take as written (#1030).
+///
+/// Two branches reach a warning, and nobody reaches either on purpose:
+/// a value that is not a whole number `0..` (`"abc"`, `"-1"`, `""`) is
+/// dropped and the default cap (`default_cap`) applies; a number above 20 is
+/// clamped to 20. Every in-range value, `0` included (`0` turns REPL
+/// auto-continue off and is accepted by `/config set`), returns `None`.
+///
+/// Why a warning and not a refusal: this knob is a CAP on REPL
+/// auto-continues, and both fallbacks are bounded (the default, or the hard
+/// ceiling of 20), never "off-switch removed" and never unbounded, so a typo
+/// here cannot make a run spend without limit; refusing to start would make a
+/// typo in a convenience cap louder than the feature. The line prints before
+/// any token is spent, so a user who reads it can stop at $0. The value is repo-authored config,
+/// so it goes through `cli::sanitize_for_display` before it is echoed.
+pub(crate) fn max_auto_continues_warning(raw: &str, default_cap: u32) -> Option<String> {
+    let outcome = match raw.parse::<u32>() {
+        Ok(n) if n <= 20 => return None,
+        Ok(_) => "capped at 20".to_string(),
+        Err(_) => format!("the auto-continue cap uses the default ({default_cap})"),
+    };
+    let shown = crate::cli::sanitize_for_display(raw);
+    let capped = crate::format::safe_truncate(&shown, MAX_AUTO_CONTINUES_VALUE_MAX_BYTES);
+    let ellipsis = if capped.len() < shown.len() {
+        "..."
+    } else {
+        ""
+    };
+    Some(format!(
+        "invalid max_auto_continues value '{capped}{ellipsis}' (use a whole number from 0 to 20); {outcome}"
+    ))
+}
+
 /// Check whether the terminal bell should be suppressed via config.
 ///
 /// Reads `no_bell` from the given config map. Defaults to `false`
@@ -3319,6 +3357,61 @@ env = { API_KEY = "secret" }
         let mut config = std::collections::HashMap::new();
         config.insert("max_auto_continues".to_string(), "abc".to_string());
         assert_eq!(parse_max_auto_continues_from_config(&config), None);
+    }
+
+    #[test]
+    fn max_auto_continues_warning_names_value_and_outcome() {
+        // Unparseable: dropped, default cap used.
+        for raw in ["abc", "-1", "", "5.0", "1e3"] {
+            assert_eq!(
+                max_auto_continues_warning(raw, 5),
+                Some(format!(
+                    "invalid max_auto_continues value '{raw}' (use a whole number from 0 to 20); the auto-continue cap uses the default (5)"
+                )),
+                "{raw:?}"
+            );
+        }
+        // Out of range: clamped to 20.
+        for raw in ["21", "500"] {
+            assert_eq!(
+                max_auto_continues_warning(raw, 5),
+                Some(format!(
+                    "invalid max_auto_continues value '{raw}' (use a whole number from 0 to 20); capped at 20"
+                )),
+                "{raw:?}"
+            );
+        }
+        // The warning agrees with what the parser actually does.
+        let mut config = std::collections::HashMap::new();
+        config.insert("max_auto_continues".to_string(), "500".to_string());
+        assert_eq!(parse_max_auto_continues_from_config(&config), Some(20));
+        config.insert("max_auto_continues".to_string(), "abc".to_string());
+        assert_eq!(parse_max_auto_continues_from_config(&config), None);
+    }
+
+    #[test]
+    fn max_auto_continues_warning_is_silent_for_valid_values() {
+        // Near-miss guard: every value the parser takes as written, 0 and 20
+        // included, is byte-for-byte None.
+        for raw in ["0", "1", "5", "19", "20"] {
+            assert_eq!(max_auto_continues_warning(raw, 5), None, "{raw:?}");
+        }
+    }
+
+    #[test]
+    fn max_auto_continues_warning_escapes_control_bytes_and_caps_length() {
+        let hostile = "\x1b[31mx";
+        assert!(hostile.as_bytes().contains(&0x1b), "fixture lost its ESC");
+        let out = max_auto_continues_warning(hostile, 5).expect("junk warns");
+        assert!(
+            !out.as_bytes().contains(&0x1b),
+            "ESC reached the terminal: {out:?}"
+        );
+
+        let long = "\u{2713}".repeat(100); // 300 bytes of a 3-byte char
+        let out = max_auto_continues_warning(&long, 5).expect("junk warns");
+        assert!(out.contains("...'"), "cut not marked: {out}");
+        assert!(out.len() < long.len(), "value not capped");
     }
 
     #[test]

@@ -2407,6 +2407,16 @@ pub(crate) fn parse_args_with_config(
     }
     crate::prompt_budget::set_cost_threshold(cost_threshold);
 
+    // max_auto_continues (#1030): a junk or >20 value used to be dropped or
+    // clamped without a word. Same shape and gating as the cost_warn lines
+    // above: one stderr line, not quiet-gated, run continues with the
+    // fallback. Reasoning in `config::max_auto_continues_warning`.
+    if let Some(w) = file_config.get("max_auto_continues").and_then(|raw| {
+        crate::config::max_auto_continues_warning(raw, crate::repl::DEFAULT_MAX_AUTO_CONTINUES)
+    }) {
+        eprintln!("{YELLOW}warning:{RESET} {w}");
+    }
+
     // [model_pricing."<id>"]: user-supplied per-model rates (issue #833).
     // A wrong cost is worse than no cost, because it is actionable-looking —
     // anyone on a negotiated contract, behind a re-pricing proxy, or running a

@@ -125,7 +125,9 @@ model declining to speak, not work left on the table.
 "finished quietly" — some providers legitimately end a tool-using turn with no
 closing prose. Turning this on for everyone would make those providers loop.
 The worst case is bounded, not infinite: the existing auto-continue budget (5
-per prompt, `max_auto_continues` in config) still applies, so a quiet-finishing
+per prompt, `max_auto_continues` in config, a whole number from 0 to 20; a
+value outside that, like `"abc"` or `500`, prints a startup warning and falls
+back to 5 or caps at 20) still applies, so a quiet-finishing
 provider costs you up to 5 extra turns of wasted tokens per prompt — annoying,
 not runaway. If your provider chats normally at the end of a turn, you'll never
 notice the flag; if it goes silent mid-task, this is the knob.
