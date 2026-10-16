@@ -134,7 +134,7 @@ yoyo is built on [yoagent](https://github.com/yologdev/yoagent). Before implemen
 - Hardcoded token limits — yoagent has `ExecutionLimits` (max_turns, max_total_tokens, max_duration)
 - Ignoring `MessageStart`/`MessageEnd` events — yoagent streams these for agent stop messages
 
-**When you use or upgrade yoagent, read the `yoagent` skill first.** It ships inside the yoagent crate, matched to the version in Cargo.lock, and covers which feature fits which job, the pitfalls, and what changed per version. It is reference for yoagent work you have chosen, not a source of tasks.
+**When you use or upgrade yoagent, read the `yoagent` skill first.** It ships inside the yoagent crate, and the evolve harness loads it from the exact version in Cargo.lock (it loads any dependency that ships `skills/`, naming none). It covers which feature fits which job, the pitfalls, and what changed per version. It is reference for yoagent work you have chosen, not a source of tasks.
 
 **Before building agent infrastructure in src/:**
 1. Search yoagent's source (`~/.cargo/registry/src/*/yoagent-*/src/`) for existing features

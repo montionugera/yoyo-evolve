@@ -830,43 +830,49 @@ if require "save_reverted_task_diff extracted" "$SAVE_FN"; then
         "$(grep -c -F 'save_reverted_task_diff "$PRE_TASK_SHA" "task${TASK_NUM}_reverted"' "$SCRIPT")" "1"
 fi
 
-# ── yoagent's own skill, matched to Cargo.lock (setup_yoagent_skill) ─────────
-# Offline: a fixture Cargo.lock, a fake CARGO_HOME, pre-seeded tag checkouts,
-# and `cargo` stubbed out, so no case reaches the network. Each case prints the
-# skill flags the function appended (or "none") and its exit status.
-YS_FN=$(awk '/^setup_yoagent_skill\(\) \{/,/^\}/' "$SCRIPT")
-ys_case() { # $1 = lock yoagent version ("" = no yoagent), $2 = registry|clone|none, $3 = disabled?
+# ── skills shipped inside dependency crates (setup_dependency_skills) ────────
+# Offline: `cargo` is stubbed to print a fixture `cargo metadata` document whose
+# packages live in a temp dir. Only DIRECT dependencies of the root count, only
+# a skills/ dir holding a <name>/SKILL.md counts, and no crate is named in the
+# harness. Each case prints the skill flags appended (or "none") and the status.
+DS_FN="$(awk '/^dependency_skill_dirs\(\) \{/,/^\}/' "$SCRIPT")
+$(awk '/^setup_dependency_skills\(\) \{/,/^\}/' "$SCRIPT")"
+ds_case() { # $1 = ok|fail (cargo metadata), $2 = disabled?
     ( set -euo pipefail; d=$(mktemp -d); cd "$d"
-      if [ -n "$1" ]; then printf '[[package]]\nname = "yoagent"\nversion = "%s"\n' "$1" > Cargo.lock
-      else printf '[[package]]\nname = "serde"\nversion = "1.0.0"\n' > Cargo.lock; fi
-      export CARGO_HOME="$d/cargo"; mkdir -p "$CARGO_HOME/registry/src/idx"
-      export YOYO_EXTERNAL_SKILLS_DIR="$d/ext"
-      tag="v$1"; [ "$1" = "0.25.2" ] && tag="v0.25.3"
-      case "$2" in
-        registry) mkdir -p "$CARGO_HOME/registry/src/idx/yoagent-$1/skills/yoagent"
-                  echo x > "$CARGO_HOME/registry/src/idx/yoagent-$1/skills/yoagent/SKILL.md" ;;
-        clone)    mkdir -p "$d/ext/yoagent-$tag/skills/yoagent"
-                  echo x > "$d/ext/yoagent-$tag/skills/yoagent/SKILL.md" ;;
-      esac
-      [ "${3:-}" = disabled ] && export YOYO_YOAGENT_SKILL_DISABLED=1
-      cargo() { return 1; }; git() { return 1; }   # never fetch or clone in a test
+      mk() { mkdir -p "$d/$1"; echo '[package]' > "$d/$1/Cargo.toml"; }
+      mk agentlib-1.2.0; mkdir -p agentlib-1.2.0/skills/agentlib; echo x > agentlib-1.2.0/skills/agentlib/SKILL.md
+      mk emptyskills-1.0.0; mkdir -p emptyskills-1.0.0/skills/notes   # a skills/ dir with no SKILL.md
+      mk plain-2.0.0                                                   # no skills/ at all
+      mk deep-0.1.0; mkdir -p deep-0.1.0/skills/deep; echo x > deep-0.1.0/skills/deep/SKILL.md  # transitive only
+      cat > meta.json <<JSON
+{"packages":[
+ {"id":"root","name":"root","version":"0.1.0","manifest_path":"$d/Cargo.toml"},
+ {"id":"a","name":"agentlib","version":"1.2.0","manifest_path":"$d/agentlib-1.2.0/Cargo.toml"},
+ {"id":"e","name":"emptyskills","version":"1.0.0","manifest_path":"$d/emptyskills-1.0.0/Cargo.toml"},
+ {"id":"p","name":"plain","version":"2.0.0","manifest_path":"$d/plain-2.0.0/Cargo.toml"},
+ {"id":"t","name":"deep","version":"0.1.0","manifest_path":"$d/deep-0.1.0/Cargo.toml"}],
+ "resolve":{"root":"root","nodes":[
+  {"id":"root","deps":[{"pkg":"a"},{"pkg":"e"},{"pkg":"p"}]},
+  {"id":"a","deps":[{"pkg":"t"}]}]}}
+JSON
+      if [ "$1" = ok ]; then cargo() { cat "$d/meta.json"; }; else cargo() { return 101; }; fi
+      [ "${2:-}" = disabled ] && export YOYO_DEPENDENCY_SKILLS_DISABLED=1
       YOYO_SKILL_FLAGS=()
-      eval "$YS_FN"; setup_yoagent_skill >/dev/null; rc=$?
+      eval "$DS_FN"; setup_dependency_skills >/dev/null; rc=$?
       out="${YOYO_SKILL_FLAGS[*]:-none}"; echo "${out//$d/D}|rc=$rc"
       rm -rf "$d" ) 2>/dev/null
 }
-if require "setup_yoagent_skill extracted" "$YS_FN"; then
-    check "yoagent skill: registry crate for the locked version is used" \
-        "$(ys_case 9.9.9 registry)" "--skills D/cargo/registry/src/idx/yoagent-9.9.9/skills|rc=0"
-    check "yoagent skill: an existing tag checkout is reused without cloning" \
-        "$(ys_case 9.9.8 clone)" "--skills D/ext/yoagent-v9.9.8/skills|rc=0"
-    check "yoagent skill: a 0.25.2 lock uses the v0.25.3 checkout" \
-        "$(ys_case 0.25.2 clone)" "--skills D/ext/yoagent-v0.25.3/skills|rc=0"
-    check "yoagent skill: YOYO_YOAGENT_SKILL_DISABLED=1 adds nothing" \
-        "$(ys_case 9.9.9 registry disabled)" "none|rc=0"
-    check "yoagent skill: no yoagent in Cargo.lock adds nothing and does not fail" \
-        "$(ys_case "" none)" "none|rc=0"
+if require "setup_dependency_skills extracted" "$(awk '/^setup_dependency_skills\(\) \{/,/^\}/' "$SCRIPT")" &&
+   require "dependency_skill_dirs extracted" "$(awk '/^dependency_skill_dirs\(\) \{/,/^\}/' "$SCRIPT")"; then
+    check "dependency skills: only a direct dependency that ships a SKILL.md is loaded" \
+        "$(ds_case ok)" "--skills D/agentlib-1.2.0/skills|rc=0"
+    check "dependency skills: cargo metadata failing adds nothing and does not fail" \
+        "$(ds_case fail)" "none|rc=0"
+    check "dependency skills: YOYO_DEPENDENCY_SKILLS_DISABLED=1 adds nothing" \
+        "$(ds_case ok disabled)" "none|rc=0"
 fi
+check "evolve.sh: no dependency is named or cloned for its skills" \
+    "$(awk '/^setup_dependency_skills\(\) \{/,/^\}/; /^dependency_skill_dirs\(\) \{/,/^\}/' "$SCRIPT" | grep -ciE 'yoagent|git clone')" "0"
 
 # ── skill-evolve retire rule: one rule, and one that can fire (#1017, #858) ──
 # The state table said `score < 0.3 OR 10 sessions unused`, the step that runs
