@@ -1460,7 +1460,12 @@ pub(crate) async fn dispatch_command(ctx: &mut DispatchContext<'_>) -> CommandRe
                             // append-only; Day 226: [directories] deny, file tools; Day 228:
                             // [directories] allow, replaced by each /cd);
                             // everything else is still only disclosed.
-                            let reading = crate::cd_config_note::read_cd_config(&target);
+                            // Day 230: minus what startup already enforces, when this is
+                            // the loaded file (back home): nothing re-appended or re-announced.
+                            let reading = crate::cd_config_note::reading_for_cd(
+                                &target,
+                                &crate::cd_config_note::read_cd_config(&target),
+                            );
                             crate::cd_deny::append_cd_deny(crate::cd_config_note::deny_entries(
                                 &reading,
                             ));

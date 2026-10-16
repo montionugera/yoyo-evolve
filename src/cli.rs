@@ -2808,6 +2808,8 @@ directory ({e}); this run is trusted, later runs will not be."
             eprintln!("{YELLOW}{msg}{RESET}");
         }
     }
+    // #869 (Day 230): what /cd back into the launch dir must not re-append.
+    crate::cd_config_note::record_startup_fences(&permissions.deny, &dir_restrictions);
 
     // --context-strategy <compaction|checkpoint> (CLI only, not in config file)
     let context_strategy = args

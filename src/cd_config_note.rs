@@ -447,6 +447,93 @@ pub(crate) fn reading_for_note(reading: &CdConfigReading, is_loaded: bool) -> Cd
     }
 }
 
+/// The fences this session actually enforces from startup, as raw entries:
+/// the bash deny list the executors were built with and the final
+/// `[directories]` lists (after `--deny`/`--deny-dir` overrides and
+/// `--restricted`'s extra allow entry). Recorded once, in `cli.rs`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct StartupFences {
+    pub deny: Vec<String>,
+    pub dir_deny: Vec<String>,
+    pub dir_allow: Vec<String>,
+}
+
+static STARTUP_FENCES: std::sync::OnceLock<StartupFences> = std::sync::OnceLock::new();
+
+/// Record the startup fences. First writer wins.
+pub(crate) fn record_startup_fences(deny: &[String], dirs: &crate::config::DirectoryRestrictions) {
+    let _ = STARTUP_FENCES.set(StartupFences {
+        deny: deny.to_vec(),
+        dir_deny: dirs.deny.clone(),
+        dir_allow: dirs.allow.clone(),
+    });
+}
+
+/// `reading` minus whatever the startup policy already enforces, but ONLY when
+/// `<target>/.yoyo.toml` is the loaded file (`is_loaded`). `/cd` home must not
+/// re-append or re-announce the launch deny list (#869, Day 230). The rule is
+/// "already enforced", not "same file": a `--deny` flag overrides the file's
+/// deny at startup, and a file edited since startup has new entries, and both
+/// of those still apply and are announced. Per list:
+/// - `[permissions] deny`: an entry is dropped iff the startup list holds it.
+/// - `[directories] deny`: dropped iff it is absolute or `~` AND the startup
+///   list holds it verbatim. A relative startup entry resolves against the
+///   CURRENT cwd, so `/cd`'s target-anchored copy is not a duplicate of it.
+/// - `[directories] allow`: replaced by every `/cd`, so it is dropped as a
+///   whole iff it equals the startup allow list as a set; then in the launch
+///   dir both resolve to the same paths and the startup list alone is the same
+///   fence. Any difference keeps it (dropping part of an allow list widens).
+///
+/// A foreign directory (`!is_loaded`) or no record gets `reading` unchanged.
+pub(crate) fn without_startup_enforced(
+    reading: &CdConfigReading,
+    is_loaded: bool,
+    startup: Option<&StartupFences>,
+) -> CdConfigReading {
+    let (CdConfigReading::Sets(sections, deny, dir_deny, dir_allow), true, Some(st)) =
+        (reading, is_loaded, startup)
+    else {
+        return reading.clone();
+    };
+    let deny = deny
+        .iter()
+        .filter(|e| !st.deny.contains(e))
+        .cloned()
+        .collect();
+    let dir_deny = dir_deny
+        .iter()
+        .filter(|e| {
+            let anchored = e.starts_with('~') || Path::new(e.as_str()).is_absolute();
+            !(anchored && st.dir_deny.contains(e))
+        })
+        .cloned()
+        .collect();
+    let same_allow = {
+        let mut a = dir_allow.clone();
+        let mut b = st.dir_allow.clone();
+        a.sort();
+        a.dedup();
+        b.sort();
+        b.dedup();
+        a == b
+    };
+    let dir_allow = if same_allow {
+        Vec::new()
+    } else {
+        dir_allow.clone()
+    };
+    CdConfigReading::Sets(sections.clone(), deny, dir_deny, dir_allow)
+}
+
+/// The reading `/cd` acts on: the one read of `<target>/.yoyo.toml`, minus
+/// what the startup policy already enforces when it is the loaded file. The
+/// deny append, the `[directories]` fence and the note all take THIS value,
+/// so what is applied and what is announced cannot disagree.
+pub(crate) fn reading_for_cd(target: &Path, reading: &CdConfigReading) -> CdConfigReading {
+    let is_loaded = is_loaded_config(target, crate::config::loaded_config_resolved_path());
+    without_startup_enforced(reading, is_loaded, STARTUP_FENCES.get())
+}
+
 /// Print the note for an already-read `reading` to stderr.
 pub(crate) fn print_cd_config_note(target: &Path, reading: &CdConfigReading) {
     let plain = crate::format::is_plain_output();
@@ -854,6 +941,127 @@ mod tests {
         assert_eq!(
             reading_for_note(&CdConfigReading::Unreadable, true),
             CdConfigReading::Unreadable
+        );
+    }
+
+    // --- Day 230 (#869): /cd home re-appends and re-announces nothing ---
+
+    const HOME_DENY_TOML: &str = "[permissions]\ndeny = [\"rm *\"]\n";
+
+    fn fences(deny: &[&str], dir_deny: &[&str], dir_allow: &[&str]) -> StartupFences {
+        let v = |s: &[&str]| s.iter().map(|x| x.to_string()).collect();
+        StartupFences {
+            deny: v(deny),
+            dir_deny: v(dir_deny),
+            dir_allow: v(dir_allow),
+        }
+    }
+
+    /// What `/cd` does with `target`, end to end over local lists: the bash
+    /// deny it appends, and the note it prints (plain).
+    fn cd_into(
+        target: &Path,
+        is_loaded: bool,
+        st: &StartupFences,
+        bash: &DenyAdditions,
+    ) -> Option<String> {
+        let reading = without_startup_enforced(&read_cd_config(target), is_loaded, Some(st));
+        crate::cd_deny::append_deny_with(bash, deny_entries(&reading));
+        let reading = reading_for_note(&reading, is_loaded);
+        cd_config_note(&target.display().to_string(), &reading, true)
+    }
+
+    fn foreign_deny_note(dir: &Path) -> String {
+        format!(
+            "  {}/.yoyo.toml: its 1 [permissions] deny pattern is now enforced on bash commands \
+             for the rest of this session (another /cd does not remove it; file tools never read \
+             this list). Its [permissions] allow, hooks and MCP servers would still not be \
+             reloaded on /cd (#869).",
+            dir.display()
+        )
+    }
+
+    #[test]
+    fn cd_home_neither_reappends_nor_announces_the_startup_deny() {
+        let (_d, base) = tmp();
+        let a = base.join("A");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::write(a.join(".yoyo.toml"), HOME_DENY_TOML).unwrap();
+        // Anti-vacuous: the raw reading really carries the deny entry.
+        assert_eq!(deny_entries(&read_cd_config(&a)), ["rm *".to_string()]);
+        let st = fences(&["rm *"], &[], &[]);
+        let bash = local();
+        // Two round trips home.
+        assert_eq!(cd_into(&a, true, &st, &bash), None);
+        assert_eq!(cd_into(&a, true, &st, &bash), None);
+        assert!(crate::sync_util::lock_or_recover(&bash).is_empty());
+        // Nothing loosened: the startup list still refuses it.
+        assert!(crate::cd_deny::effective_user_deny_refusal(&st.deny, &bash, "rm foo").is_some());
+    }
+
+    #[test]
+    fn foreign_dir_with_the_same_deny_keeps_its_exact_note_and_append() {
+        // Near-miss guard: B is not the loaded file, so nothing is dropped.
+        let (_d, base) = tmp();
+        let b = base.join("B");
+        std::fs::create_dir_all(&b).unwrap();
+        std::fs::write(b.join(".yoyo.toml"), HOME_DENY_TOML).unwrap();
+        let st = fences(&["rm *"], &[], &[]);
+        let bash = local();
+        assert_eq!(cd_into(&b, false, &st, &bash), Some(foreign_deny_note(&b)));
+        assert_eq!(
+            *crate::sync_util::lock_or_recover(&bash),
+            ["rm *".to_string()]
+        );
+        // Round trip back into B: still announced, still one copy.
+        assert_eq!(cd_into(&b, false, &st, &bash), Some(foreign_deny_note(&b)));
+        assert_eq!(
+            *crate::sync_util::lock_or_recover(&bash),
+            ["rm *".to_string()]
+        );
+        // No startup record at all: unchanged too.
+        let r = read_cd_config(&b);
+        assert_eq!(without_startup_enforced(&r, true, None), r);
+    }
+
+    #[test]
+    fn cd_home_still_applies_deny_the_startup_did_not_enforce() {
+        // `--deny "git push *"` overrode the file's deny at startup, so "rm *"
+        // was never enforced; coming home applies and announces it, as today.
+        let (_d, base) = tmp();
+        let a = base.join("A");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::write(a.join(".yoyo.toml"), HOME_DENY_TOML).unwrap();
+        let st = fences(&["git push *"], &[], &[]);
+        let bash = local();
+        assert_eq!(cd_into(&a, true, &st, &bash), Some(foreign_deny_note(&a)));
+        assert_eq!(
+            *crate::sync_util::lock_or_recover(&bash),
+            ["rm *".to_string()]
+        );
+    }
+
+    #[test]
+    fn cd_home_directories_drop_only_what_startup_enforces_identically() {
+        let r = sets("[directories]\ndeny = [\"secrets\", \"/abs/vault\"]\nallow = [\"src\"]\n");
+        // Absolute entry already enforced: dropped. Relative one resolves
+        // against the current cwd at startup, so /cd's anchored copy stays.
+        // Allow equal as a set: dropped.
+        let st = fences(&[], &["secrets", "/abs/vault"], &["src"]);
+        assert_eq!(
+            without_startup_enforced(&r, true, Some(&st)),
+            CdConfigReading::Sets(vec![], vec![], vec!["secrets".into()], vec![])
+        );
+        // Allow differs (e.g. --restricted added the cwd): kept whole.
+        let st = fences(&[], &[], &["src", "/launch"]);
+        assert_eq!(
+            without_startup_enforced(&r, true, Some(&st)),
+            CdConfigReading::Sets(
+                vec![],
+                vec![],
+                vec!["secrets".into(), "/abs/vault".into()],
+                vec!["src".into()]
+            )
         );
     }
 

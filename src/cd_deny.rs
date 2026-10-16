@@ -125,6 +125,15 @@ mod tests {
         assert_eq!(*list.lock().unwrap(), s(&["rm *", "curl *"]));
     }
 
+    #[test]
+    fn appending_the_same_entries_again_is_idempotent() {
+        // B -> A -> B -> A into a foreign deny-bearing dir: one copy, not two.
+        let list = local();
+        assert_eq!(append_deny_with(&list, &s(&["rm *"])), 1);
+        assert_eq!(append_deny_with(&list, &s(&["rm *"])), 0);
+        assert_eq!(*list.lock().unwrap(), s(&["rm *"]));
+    }
+
     #[tokio::test]
     async fn parent_bash_refuses_an_entry_added_after_build() {
         let list = local();
