@@ -1,0 +1,41 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+The commit is already there. I'll check what it contains and whether the #1023 comment was posted.
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; git l… ✓ (421ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The commit is in and the #1023 comment is posted. All that's left is the full gate.
+  ╭─ Turn 2 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt -- --check && cargo cl… ✓ (3m 50s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (2m 51s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6m 52s (2 ✓)
+
+This task was already finished before the interruption. Commit 2b0e1afd is in, and the full check (fmt, clippy with -D warnings, build, cargo test) passes on it with a clean working tree. There was nothing left to change, so I made no new commit.
+
+What the commit did:
+• The note the model receives. When the search fence withholds lines, the note no longer blames "a ripgrep config via RIPGREP_CONFIG_PATH". That stopped being true with yoagent 0.25.5, which passes --no-config to rg and clears RIPGREP_CONFIG_PATH and GREP_OPTIONS for both rg and the grep fallback. The note now just says those lines didn't name a file under the searched path, so the fence couldn't check them. It doesn't guess at a cause the code can't know.
+• Withholding stays. The fence still drops lines it can't check, and the module doc now lists the shapes that can still produce them:
+  • a file name containing a newline (seen happen with GNU grep 3.11);
+  • a binary-match notice printed on stdout (GNU grep before 3.5, according to its changelog);
+  • an rg or grep wrapper on PATH that adds its own flags;
+  • any output the parser doesn't recognise.
+  The sentence that depends on yoagent's --no-config carries a yoagent-version-claim: 0.25.5 marker, so the next upgrade has to re-read it.
+• Test. A new test checks the exact note text at the point the model receives it, and checks that neither RIPGREP_CONFIG_PATH nor "ripgrep config" appears. It failed against the old text before the rewrite. No existing test was edited.
+• ARCHITECTURE.md. In the Day-229 entry, the old "--no-config cannot be added" sentence is marked as a superseded claim (true until 0.25.5, b58e4329).
+• #1023. The comment is posted with the commit hash, the shapes above, and the two items still open: item 2 (the stale (N matches) footer) and item 3 (find warning lines that pass denied path names).
+
+One false statement is still in the docs: docs/src/configuration/permissions.md lines 212–215 still say a ripgrep config can reshape search results and that unsetting RIPGREP_CONFIG_PATH brings dropped matches back. That file was outside this task's scope, so I didn't change it; it's named in both the commit message and the #1023 comment.
+
+The commit hasn't been pushed yet.
+  watch: no files changed this turn — skipping

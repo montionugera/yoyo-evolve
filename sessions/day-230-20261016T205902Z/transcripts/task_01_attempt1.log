@@ -1,0 +1,170 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ f=$(ls ~/.cargo/registry/src/*/yoagent-0.25.5/src/tools/search.rs); grep -n "no-… ✓ (5ms)
+ ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,40p src/fence_result_filt… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; nl -ba src/fence_result_filter.rs … ✓ (4ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs (40 lines) ✓ (0ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs:140..510 ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn \|RIPGREP\|ripgrep\|un… ✓ (13ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs:296..421  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rln "yoagent-version-claim" … ✓ (1ms)
+ ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p tests/doc_version_cla… ✓ (3ms)
+  ▶ $ f=$(ls ~/.cargo/registry/src/*/yoagent-0.25.5/src/tools/search.rs); sed -n 60,12… ✓ (6ms)
+  ▶ $ f=$(ls ~/.cargo/registry/src/*/yoagent-0.25.5/src/tools/search.rs); sed -n 240,2… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fence_tool_result" -B8 sr… ✓ (26ms)
+  ▶ $ cd $(mktemp -d); mkdir d; printf 'tok\n' > "d/a (2 lines) ✓ (9ms)
+  ▶ web search 'GNU grep 3.5 NEWS "binary file matches" now sent to standard…' ✓ (1.6s)
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs (13 → 22 lines)
+  - //! **Fail closed on lines it cannot attribute (#1023).** `search` is yoagent's
+  - //! tool, which spawns `rg` itself, so yoyo does not build its argv and cannot
+  - //! add `--no-config`; `rg` reads whatever `RIPGREP_CONFIG_PATH` names. A config
+  - //! can change the OUTPUT SHAPE this filter reads a path from — measured on
+  - //! ripgrep 14.1.0: `--no-filename` printed the denied file's line as a bare
+  - //! `1:TOKEN`, `--null` put a NUL where the `:` was, `--json` printed JSON
+  - //! objects, `--path-separator=X` printed `XtmpX…` — and every one of those lines
+  - //! used to pass as "not a result line". So while a fence is active and the root
+  - //! is a directory, a line before yoagent's own footer is kept only if its first
+  - //! `path:N:` candidate names a path under the searched root (and holds no NUL).
+  - //! Anything else is dropped and counted in its own note. The property is
+  - //! "a user's ripgrep config never shapes what a fenced search returns", decided
+  - //! by where a line's path came from — no list of rg flags is consulted.
+  + //! **Fail closed on lines it cannot attribute (#1023).** While a fence is active
+  + //! and the root is a directory, a line before yoagent's own footer is kept only
+  + //! if its first `path:N:` candidate names a path under the searched root (and
+  + //! holds no NUL). Anything else is dropped and counted in its own note. The
+  + //! property is "no line reaches the model unless the fence could name the file
+  + //! it came from", decided by where a line's path came from — no list of rg
+  + //! flags or output formats is consulted.
+  ... (15 more lines)
+ ✓ (4m 8s)
+  - //! **Fail closed on lines it cannot attribute (#1023).** `search` is yoagent's
+  - //! tool, which spawns `rg` itself, so yoyo does not build its argv and cannot
+  - //! add `--no-config`; `rg` reads whatever `RIPGREP_CONFIG_PATH` names. A config
+  - //! can change the OUTPUT SHAPE this filter reads a path from — measured on
+  - //! ripgrep 14.1.0: `--no-filename` printed the denied file's line as a bare
+  - //! `1:TOKEN`, `--null` put a NUL where the `:` was, `--json` printed JSON
+  - //! objects, `--path-separator=X` printed `XtmpX…` — and every one of those lines
+  - //! used to pass as "not a result line". So while a fence is active and the root
+  ... (13 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "MARKER\|fn \|-->" tests/d… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  17 tools completed in 5m 20s (17 ✓)
+
+Good, mid-line markers are supported. Now the note and its tests.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs (1 → 1 lines)
+  -         "[{count} {noun} withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form (a ripgrep config via RIPGREP_CONFIG_PATH can reshape output), so it was dropped rather than risk a leak]"
+  +         "[{count} {noun} withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs (5 → 6 lines)
+        /// `RIPGREP_CONFIG_PATH` naming a one-flag config (ripgrep 14.1.0, Day 229
+        /// probe, `{R}` = the searched root, `secrets/` denied). Every row named
+        /// the denied file or carried its line, and every row passed the
+  -     /// pre-#1023 filter untouched.
+  +     /// pre-#1023 filter untouched. Since yoagent 0.25.5 a config can no longer
+  +     /// produce these, but a wrapper `rg` on `PATH` still can, so they stay.
+ ✓ (4m 8s)
+  -         "[{count} {noun} withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form (a ripgrep config via RIPGREP_CONFIG_PATH can reshape output), so it was dropped rather than risk a leak]"
+  +         "[{count} {noun} withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
+ ✓ (7m 41s)
+        /// `RIPGREP_CONFIG_PATH` naming a one-flag config (ripgrep 14.1.0, Day 229
+        /// probe, `{R}` = the searched root, `secrets/` denied). Every row named
+        /// the denied file or carried its line, and every row passed the
+  -     /// pre-#1023 filter untouched.
+  +     /// pre-#1023 filter untouched. Since yoagent 0.25.5 a config can no longer
+  +     /// produce these, but a wrapper `rg` on `PATH` still can, so they stay.
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs (4 → 38 lines)
+            let untouched = fence_tool_result("bash", mk(), &refused, true, &root);
+            assert_eq!(get(&untouched), text);
+  +     }
+  + 
+  +     /// The note the MODEL receives for an unattributable line, pinned at the
+  +     /// emission point (`fence_tool_result`'s text block). The fixture is the
+  +     /// shape measured on GNU grep 3.11 for a file named `a\nb.txt` (Day 230):
+  +     /// the name's newline splits the result into two lines, neither naming a
+  +     /// file under the root. It must not blame a ripgrep config: yoagent 0.25.5
+  +     /// passes `--no-config` and clears `RIPGREP_CONFIG_PATH`, so the old
+  +     /// parenthetical told the model a cause that can no longer happen.
+  +     #[test]
+  +     fn unattributed_note_names_no_cause_the_code_cannot_know() {
+  +         let (_dir, root, r) = fixture();
+  +         let refused = |p: &str| r.check_path(p).is_err();
+  +         let body = format!("{root}/src/a.txt:1:ok {CANARY}\n{root}/src/x\ny.txt:1:ok\n(2 matches)");
+  +         // Anti-vacuous: the split line really is unattributable on its own.
+  +         assert!(!attributable_to_root("y.txt:1:ok", &root));
+  +         let res = yoagent::types::ToolResult {
+  +             content: vec![yoagent::types::Content::Text { text: body }],
+  ... (18 more lines)
+ ✓ (2m 18s)
+            let untouched = fence_tool_result("bash", mk(), &refused, true, &root);
+            assert_eq!(get(&untouched), text);
+  +     }
+  + 
+  +     /// The note the MODEL receives for an unattributable line, pinned at the
+  +     /// emission point (`fence_tool_result`'s text block). The fixture is the
+  +     /// shape measured on GNU grep 3.11 for a file named `a\nb.txt` (Day 230):
+  +     /// the name's newline splits the result into two lines, neither naming a
+  ... (13 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo test fence_resu… ✓ (1.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "RIPGREP_CONFIG_PATH can r… ✓ (5ms)
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/fence_result_filter.rs (1 → 1 lines)
+  - form (a ripgrep config via RIPGREP_CONFIG_PATH can reshape output), so it was dropped rather than risk a leak]"
+  + form, so the fence could not check it and dropped it rather than risk a leak]"
+ ✓ (4m 5s)
+  - form (a ripgrep config via RIPGREP_CONFIG_PATH can reshape output), so it was dropped rather than risk a leak]"
+  + form, so the fence could not check it and dropped it rather than risk a leak]"
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "version-claim\|wrapper \`… ✓ (176ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 14m 28s (7 ✓)
+
+Now ARCHITECTURE.md.
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fence_result_filter.rs\` … ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1350,1366p ARCHITECTURE.md ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (12 lines) ✓ (57ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 208,218p docs/src/configura… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 16.0s (4 ✓)
+
+Now the full gate.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo buil… ✓ (3m 27s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -cE "FAILED… ✓ (5m 52s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --s… (50 lines) ✓ (52ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view … (15 lines) ✓ (1.5s)
+  4 tools completed in 9m 52s (4 ✓)
+
+The search fence no longer tells the model that a ripgrep config can reshape its output. That has been false since yoagent 0.25.5. It's committed as 2b0e1afd, titled "Part of #1023". The full check (fmt, build, clippy with -D warnings, cargo test) is green: 6622 passed, 0 failed.
+
+What's true now: I read yoagent 0.25.5's tools/search.rs. Its search passes --no-config to rg and removes RIPGREP_CONFIG_PATH and GREP_OPTIONS from the child's environment. That applies to rg and to the grep fallback.
+
+What I changed in `src/fence_result_filter.rs`:
+• The note the model receives when a line is dropped no longer names a ripgrep config. It now says the line didn't name a file under the searched path, so the fence couldn't check it and dropped it.
+• The module doc is in present tense and lists what can still trigger the drop:
+  • a file name containing a newline: measured on GNU grep 3.11. d/a\nb.txt comes out as d/a and b.txt:1:tok, and neither line can be traced to a file.
+  • a grep that prints its "binary file matches" notice on stdout: older GNU grep (before 3.5) did this, per its release notes.
+  • a wrapper `rg` or `grep` on `PATH` that adds its own flags.
+  • any output form the parser doesn't recognise.
+
+  The sentence relying on yoagent's --no-config now has a yoagent-version-claim: 0.25.5 marker, so the next upgrade's version check will make someone re-read it.
+• The drop itself is unchanged. It stays as a second line of defence.
+• New test: unattributed_note_names_no_cause_the_code_cannot_know checks the exact text that comes out of fence_tool_result. It also checks that neither RIPGREP_CONFIG_PATH nor ripgrep config appears. It failed against the old note before I rewrote it. No existing test pinned the old text, and I didn't edit any.
+
+ARCHITECTURE.md: in the Day-229 entry I marked "--no-config cannot be added there" as a superseded claim (true until 0.25.5, b58e4329) instead of deleting it. The entry now gives the current reason for dropping lines it can't attribute, and quotes the new note.
+
+Still wrong, left out on purpose: docs/src/configuration/permissions.md:212-215 still tells users that a ripgrep config reshapes fenced search results, and to unset RIPGREP_CONFIG_PATH to get dropped matches back. That file was outside this task, so I listed it in the commit body and on #1023 rather than editing it.
+
+Still open on #1023: item 2 (the (N matches) / (N files) footer still shows the pre-filter count after lines are withheld) and item 3 (find/rg warning lines after the footer can name denied paths). I posted the commit, the remaining drop triggers and these open items as a comment on #1023.
+
+One slip: I made two edits to the same file
+
+  (interrupted)
