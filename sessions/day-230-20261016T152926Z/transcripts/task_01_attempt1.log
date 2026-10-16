@@ -1,0 +1,91 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 35,70p src/providers.rs; se…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "claude-opus-5\|fn anthrop… ✓ (4ms)
+ ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 760,860p src/agent_builder.… ✓ (25ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.5/; grep -n "fn claude_opus_5_5" -A30 sr… ✓ (7ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.5/; sed -n 1,90p src/provider/prices.jso… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1395,1410p src/format/cost.… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "default_model_for_provide… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1184,1200p src/help.rs; gre… ✓ (13ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 41.0s (9 ✓)
+
+Add the help test first (it will fail against the hard-coded line once the default moves), then the edits.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (54 lines) ✓ (28ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Add a regression test pinning the decision's three checks against whatever the default is:
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 44,60p src/providers.rs; se… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (38 lines) ✓ (22ms)
+  2 tools completed in 11.9s (2 ✓)
+
+Use the real function instead of my local copy:
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (17 lines) ✓ (41.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the docs.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 30,50p docs/src/configurati… ✓ (9ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i '7s/`claude-opus-4-6`/`clau… ✓ (18ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 13.3s (2 ✓)
+
+Remaining doc hit (models.md:83) is an example config, not a default claim — left. Full verification:
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo clippy --all-ta… ✓ (3m 54s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (3m 17s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 7m 21s (2 ✓)
+
+The empty-dir run is green: banner model: claude-opus-5-5, reply PONG. CLAUDE.md says the harness test fails on hardcoded model ids, so I'll run it before committing:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; bash tests/harness_logic.sh 2>&1 |… ✓ (2.9s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (35 lines) ✓ (904ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 23.0s (2 ✓)
+
+A no-config Anthropic run now uses claude-opus-5-5 instead of the older claude-opus-4-6, and --help builds its default from the code instead of a hard-coded string. Build, tests, clippy, fmt and tests/harness_logic.sh (212 passed) are all green. It's committed as e7a33c5b.
+
+Why `claude-opus-5-5`: I checked three things before changing it (step 1 of the plan):
+• Preset: it has its own entry in anthropic_preset, with a 1M window and a 64K default for max_tokens.
+• Price: yoagent's price table has it at $4/$20, which is cheaper than the $5/$25 Opus 4.6 it replaces. The plan expected "the same price tier"; it's actually below it, and the comment above the default says so.
+• Output limit: with no config, no max_tokens is set, so the run sends the preset's 64K. That's under the model's 128,000 maximum.
+
+What changed:
+• `src/providers.rs`: the fallback default is now claude-opus-5-5, with a comment saying it's a decision and listing the three checks. A new test runs those same checks against whatever the default is, and also checks it doesn't set off the unknown-model warning.
+• `src/help.rs`: the --model line now shows default_model_for_provider("anthropic"), and a test checks the exact line.
+• `src/setup.rs`: the setup-wizard test compares against that function instead of a fixed string.
+• Docs: I updated the lines that state the default in models.md (intro, the anthropic row, and the custom row, which uses the same fallback), installation.md, the quick-start.md banner, and fork.md. I left the example config at models.md:83 and the dated measurements alone.
+
+Checked in an empty temp dir with no config:
+```
+yoyo (prompt mode) — model: claude-opus-5-5
+PONG
+  --model <name>    Model to use (default: claude-opus-5-5)
+```
+
+Still open on #1037: openai (gpt-5), openrouter and bedrock (claude-sonnet-4-6) and 7 unchecked providers still default without a stated decision. That sentence is in the commit body and in a comment on #1037. While editing I also saw that installation.md and fork.md list gpt-4o as the OpenAI default, but the code says gpt-5. That's part of the openai work, so I didn't touch it.
+  watch: no files changed this turn — skipping

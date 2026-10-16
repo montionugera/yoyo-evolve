@@ -1,0 +1,21 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log --oneline -1; ls target/de… ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 74,90p docs/src/configurati… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -1 --format=%B | tail -6 ✓ (4ms)
+  ▶ write session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 17.1s (4 ✓)
+
+I gave it a PASS and wrote the verdict to session_plan/eval_task_1.md.
+
+• Default model: with no config, the anthropic fallback is now claude-opus-5-5. The comment above it gives the reasons: it has a preset, the preset is priced, and the 64K max_tokens a no-config run sends is under the model's 128000 output limit. A new test checks all three, plus that the model doesn't trigger the unknown-model warning.
+• `--help`: the line is now built from the same default instead of a hard-coded string. Running the built binary prints --model <name>    Model to use (default: claude-opus-5-5), and a test checks that exact line. The setup wizard test in src/setup.rs also compares against the default instead of a hard-coded model name.
+• Docs: every docs line that states the anthropic default now says claude-opus-5-5. The one remaining claude-opus-4-6 in the docs (models.md:83) is a config example, not a statement of the default, so leaving it matches the task.
+• Commit message: it includes the --help line and the residue sentence (the other providers whose defaults are still undecided stay on #1037). I didn't check whether that sentence was also posted as a comment on #1037.
+
+I couldn't capture the startup banner line. A no-config run in an empty temp dir stopped with "No API key found", so I used the --help output as evidence instead, which the task allows.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

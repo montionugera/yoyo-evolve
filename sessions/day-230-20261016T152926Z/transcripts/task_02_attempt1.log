@@ -1,0 +1,63 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; grep … ✓ (26ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1905,2060p src/watch.rs; … ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 570,615p src/dispatch_sub… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "SEARCH_USAGE_EXIT\|pub … ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (119 lines) ✓ (28ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt && cargo build 2>&1 | … ✓ (43.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 1m 30s (6 ✓)
+
+Positive control (atomic, serial): neuter the usage return and confirm the new test reddens, then restore.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/watch.rs /tmp/w.bak && se… ✓ (1m 4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && B=$PWD/target/debug/yoyo; d=$(mk… ✓ (20ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo clippy --all-targets -- -D… ✓ (7m 2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "watch" docs/src/usage/… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (16 lines) ✓ (38ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 8m 37s (5 ✓)
+
+Now update #982's body in place.
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue view 982 --json body,st… ✓ (615ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n -i "watch" /tmp/b.md | c… ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (7 lines) ✓ (3.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git fetch -q origin && git branc… ✓ (225ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 24.1s (4 ✓)
+
+Running bare yoyo watch in a directory where it can't detect a lint or test command now exits 2, the usage-error code. It used to exit 0. The printed text hasn't changed. It's committed as 2b5a5c17 and pushed to main, and #982's body records the fix.
+
+What changed
+• `src/watch.rs`: the watch handler now returns a status code. It returns 2 only when bare watch or watch all finds nothing to run, and 0 on every other path. The interactive /watch command ignores the code, so it never exits the process.
+• `src/dispatch_sub.rs`: the shell watch command now exits with that code, the same way def and outline already do.
+• `docs/src/usage/commands.md`: the exit-codes paragraph now describes this case.
+
+Checks
+• New test: it calls the status function directly, since calling the exiting command in-process would kill the test binary. It checks four things:
+  • An empty temp directory returns 2 for both /watch and /watch all, and no watch command gets set.
+  • A temp directory with a Cargo.toml returns 0.
+  • status, off and an explicit command return 0 even in the empty directory.
+  • Detection really finds nothing in the empty directory, so the test can't pass by accident.
+• Sabotage check: I temporarily made the empty-directory case return 0, and the new test failed by name. After restoring it, the test passed again (the temporary change was restored in the same command).
+• Built binary:
+  • Empty directory: the "Specify one" text appears and it exits 2.
+  • Directory with a Cargo.toml: exits 0.
+  • watch make check and watch status: both exit 0.
+• cargo build, cargo test (all suites passed), cargo clippy --all-targets -- -D warnings and cargo fmt -- --check all passed.
+
+#982's body: I added an entry to its "Already fixed" paragraph, keyed by the no-command-detected condition rather than by the verb. It also names one more case of the same bug that I left unfixed: yoyo watch lint with no lint command detected prints its own "No lint command detected" usage text and still exits 0. I found that by reading the code and haven't run it. The commit message names it too.
+
+The commit says "Part of #982", not "Fixes", because the issue still has many members open.
+  watch: no files changed this turn — skipping
