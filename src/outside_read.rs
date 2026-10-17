@@ -1,5 +1,5 @@
 //! Opt-in ask-once fence for `read_file`, `search` and `list_files` outside
-//! the working directory (part of #879).
+//! the directory yoyo was launched in (part of #879).
 //!
 //! **Off by default, and off means byte-identical.** The fence is active only
 //! when the environment variable `YOYO_ASK_OUTSIDE_READS` is exactly `1`, read
@@ -9,18 +9,41 @@
 //! the launch folder, Codex's read-only sandbox reads anywhere), and a default
 //! that asks would break every piped/CI user with no terminal to answer (#448).
 //!
+//! **The anchor is the LAUNCH directory, not the live cwd (Day 231).** The
+//! property this fence protects is consent: the user agreed to reads under the
+//! tree they launched yoyo in. That is provenance (who chose this tree), not
+//! state (where the session happens to stand), and `/cd` is navigation, not
+//! consent to read everything under the new directory. Until Day 231 the
+//! fence compared against `current_dir()` at each call, so after `/cd ~` all
+//! of `~`, `~/.ssh` included, counted as inside and nothing was asked.
+//! Claude Code anchors on the launch dir too. So `main` records the cwd once,
+//! canonicalized, before any tool runs ([`record_launch_dir`]), and that is
+//! the anchor; the live cwd is a fallback only when nothing was recorded.
+//! Approvals already given persist across `/cd` unchanged, so `/cd` never
+//! makes an approved path ask again. The cost, stated: after `/cd` to a
+//! directory outside the launch tree, reads there ask, once per directory
+//! (see the remembered keys below; a yes does not cover subdirectories).
+//!
+//! **Fails closed when it cannot tell.** No recorded launch dir and an
+//! unreadable cwd (deleted directory) means no anchor, and then every
+//! resolvable target is outside, so it is ASKED about, never silently
+//! allowed. A relative path with an unreadable cwd cannot be resolved at all,
+//! so it is refused with a request for an absolute path. (Until Day 231
+//! `current_dir().ok()?` returned "proceed" here.)
+//!
 //! **What "outside" means.** The target is resolved with `fs::canonicalize`
 //! (symlinks followed, `..` removed; a relative path is joined to the current
-//! directory first), the same resolution the directory fence uses for #996, and
-//! compared against the canonicalized current directory. A symlink inside the
-//! working directory that points outside it is outside. A path that cannot be
-//! resolved (it does not exist) is not asked about: `read_file` reports its
-//! own error, and there is nothing to read.
+//! directory first, where the tool itself resolves it), the same resolution
+//! the directory fence uses for #996, and compared against the canonicalized
+//! launch directory. A symlink inside the launch directory that points outside
+//! it is outside. A path that cannot be resolved (it does not exist) is not
+//! asked about: `read_file` reports its own error, and there is nothing to read.
 //!
 //! **Which tools, and which argument.** `read_file`'s `path`, and the ROOT
 //! (`path`) of `search` and `list_files`. A missing root means the tool's
-//! default, the current directory, which is inside, so nothing is asked (the
-//! wrapper only calls [`check`] when `path` is present).
+//! default, the current directory, and is not checked (the wrapper only calls
+//! [`check`] when `path` is present), so after `/cd` an unrooted search still
+//! walks the new cwd unasked: a residue of the anchor change, not covered here.
 //!
 //! **Ask once per directory, and the remembered key.** A yes is remembered for
 //! the rest of the session as an [`Approval`]:
@@ -51,7 +74,7 @@
 //!
 //! **Not a sandbox.** This fences the three read tools' path argument only.
 //! `bash` can still `cat` the same file, writes (`write_file`, `edit_file`,
-//! `rename_symbol`) are a different fence, and a search rooted inside the cwd
+//! `rename_symbol`) are a different fence, and a search rooted inside the launch directory
 //! still follows whatever its own walker follows. `--restricted` and
 //! `--allow-dir` remain the hard fences.
 //!
@@ -104,17 +127,43 @@ fn is_enabled() -> bool {
     *ENABLED.get_or_init(|| enabled_from(std::env::var(ENV_VAR).ok().as_deref()))
 }
 
-/// The canonical target when `path` resolves to somewhere outside `cwd`;
-/// `None` when it is inside, or when it cannot be resolved at all.
-fn resolve_outside(path: &str, cwd: &Path) -> Option<PathBuf> {
+/// The directory yoyo was launched in, canonicalized, recorded once at
+/// startup by [`record_launch_dir`] before any tool runs. `/cd` never moves it.
+static LAUNCH_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Record the launch directory (the cwd at startup). First writer wins, so a
+/// later `/cd` cannot re-anchor the fence. Called once from `main`.
+pub(crate) fn record_launch_dir() {
+    if let Ok(cwd) = std::env::current_dir() {
+        let dir = std::fs::canonicalize(&cwd).unwrap_or(cwd);
+        let _ = LAUNCH_DIR.set(dir);
+    }
+}
+
+/// The fence's anchor: the recorded launch dir, else the cwd (tests and any
+/// caller that never recorded one), else `None`, which [`resolve_outside`]
+/// treats as "everything is outside" (fail closed). Pure.
+fn anchor_from(recorded: Option<&Path>, cwd: Option<&Path>) -> Option<PathBuf> {
+    recorded.or(cwd).map(Path::to_path_buf)
+}
+
+/// The canonical target when `path` resolves to somewhere outside `anchor`;
+/// `None` when it is inside, or when it cannot be resolved at all. A relative
+/// `path` is joined to `cwd` (where the tool itself will resolve it), but the
+/// inside-test is against `anchor`, the launch dir. No anchor means no inside:
+/// every resolvable target is outside, so it is asked about, never allowed.
+fn resolve_outside(path: &str, cwd: Option<&Path>, anchor: Option<&Path>) -> Option<PathBuf> {
     let p = Path::new(path);
     let joined = if p.is_absolute() {
         p.to_path_buf()
     } else {
-        cwd.join(p)
+        cwd?.join(p)
     };
     let target = std::fs::canonicalize(joined).ok()?;
-    let root = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let Some(anchor) = anchor else {
+        return Some(target);
+    };
+    let root = std::fs::canonicalize(anchor).unwrap_or_else(|_| anchor.to_path_buf());
     if target.starts_with(&root) {
         None
     } else {
@@ -137,18 +186,37 @@ fn approval_for(tool: &str, target: &Path) -> Approval {
     )
 }
 
+/// How the refusals and the prompt name the anchor.
+fn anchor_phrase(anchor: Option<&Path>) -> String {
+    match anchor {
+        Some(a) => format!("the directory yoyo was launched in '{}'", a.display()),
+        None => "the directory yoyo was launched in (which could not be determined)".to_string(),
+    }
+}
+
 /// The refusal a non-interactive run gets.
-fn no_tty_refusal(tool: &str, target: &Path, cwd: &Path, approval: &Approval) -> String {
+fn no_tty_refusal(tool: &str, target: &Path, anchor: Option<&Path>, approval: &Approval) -> String {
     let (holder, named) = match approval {
         Approval::Files(_) => ("the file", "its directory"),
         Approval::Tree(_) => ("that directory", "that directory"),
     };
     format!(
-        "{ENV_VAR}=1{stem}{tool} refused '{}': it is outside the working directory '{}', \
+        "{ENV_VAR}=1{stem}{tool} refused '{}': it is outside {}, \
          and there is no terminal to ask on. To allow it, unset {ENV_VAR}, run yoyo from a \
          directory that contains {holder}, or name {named} with --allow-dir.",
         target.display(),
-        cwd.display(),
+        anchor_phrase(anchor),
+        stem = crate::tool_wrappers::REFUSAL_STEM_MODE_ACTIVE,
+    )
+}
+
+/// The refusal for a relative path when the current directory cannot be
+/// read: there is no target to ask about, so refuse rather than allow.
+fn no_cwd_refusal(tool: &str, path: &str) -> String {
+    format!(
+        "{ENV_VAR}=1{stem}{tool} refused '{path}': the current directory cannot be read, \
+         so this relative path cannot be checked against the launch directory. Use an \
+         absolute path.",
         stem = crate::tool_wrappers::REFUSAL_STEM_MODE_ACTIVE,
     )
 }
@@ -156,7 +224,7 @@ fn no_tty_refusal(tool: &str, target: &Path, cwd: &Path, approval: &Approval) ->
 /// The refusal an interactive "no" gets.
 fn declined_refusal(tool: &str, target: &Path) -> String {
     format!(
-        "{}{tool} on '{}' (outside the working directory)",
+        "{}{tool} on '{}' (outside the directory yoyo was launched in)",
         crate::tool_wrappers::REFUSAL_STEM_PATH_DENIED,
         target.display()
     )
@@ -169,7 +237,8 @@ fn decide(
     tool: &str,
     path: &str,
     explicit_allow: bool,
-    cwd: &Path,
+    cwd: Option<&Path>,
+    anchor: Option<&Path>,
     store: &Mutex<HashSet<Approval>>,
     is_tty: bool,
     ask: &mut dyn FnMut(&str, &Path, &Approval) -> bool,
@@ -177,7 +246,10 @@ fn decide(
     if !enabled || !FENCED_TOOLS.contains(&tool) || explicit_allow {
         return None;
     }
-    let target = resolve_outside(path, cwd)?;
+    if cwd.is_none() && Path::new(path).is_relative() {
+        return Some(no_cwd_refusal(tool, path));
+    }
+    let target = resolve_outside(path, cwd, anchor)?;
     let approval = approval_for(tool, &target);
     // Held across the prompt so two parallel calls cannot both ask.
     let mut approved = crate::sync_util::lock_or_recover(store);
@@ -185,7 +257,7 @@ fn decide(
         return None;
     }
     if !is_tty {
-        return Some(no_tty_refusal(tool, &target, cwd, &approval));
+        return Some(no_tty_refusal(tool, &target, anchor, &approval));
     }
     if ask(tool, &target, &approval) {
         approved.insert(approval);
@@ -204,7 +276,7 @@ fn ask_on_terminal(tool: &str, target: &Path, approval: &Approval) -> bool {
         Approval::Tree(_) => format!("{tool} over all of {dir} (recursive)"),
     };
     eprint!(
-        "{YELLOW}  ⚠ {tool} wants '{target}', outside the working directory. Allow {scope} this session? {RESET}({GREEN}y{RESET}/{RED}n{RESET}) "
+        "{YELLOW}  ⚠ {tool} wants '{target}', outside the directory yoyo was launched in. Allow {scope} this session? {RESET}({GREEN}y{RESET}/{RED}n{RESET}) "
     );
     io::stderr().flush().ok();
     let mut response = String::new();
@@ -224,13 +296,17 @@ pub(crate) fn check(
     if !is_enabled() {
         return None;
     }
-    let cwd = std::env::current_dir().ok()?;
+    // A deleted or unreadable cwd is not a reason to allow: `None` flows on
+    // and fails closed (see `resolve_outside` and `no_cwd_refusal`).
+    let cwd = std::env::current_dir().ok();
+    let anchor = anchor_from(LAUNCH_DIR.get().map(PathBuf::as_path), cwd.as_deref());
     decide(
         true,
         tool,
         path,
         !restrictions.allow.is_empty(),
-        &cwd,
+        cwd.as_deref(),
+        anchor.as_deref(),
         &APPROVED,
         io::stdin().is_terminal(),
         &mut ask_on_terminal,
@@ -273,25 +349,35 @@ mod tests {
     #[test]
     fn predicate_inside_outside_symlink_and_missing() {
         let (_tmp, root, work) = tree();
-        assert_eq!(resolve_outside("inside.txt", &work), None);
         assert_eq!(
-            resolve_outside(work.join("inside.txt").to_str().unwrap(), &work),
+            resolve_outside("inside.txt", Some(&work), Some(&work)),
             None
         );
         assert_eq!(
-            resolve_outside("../outside.txt", &work),
+            resolve_outside(
+                work.join("inside.txt").to_str().unwrap(),
+                Some(&work),
+                Some(&work)
+            ),
+            None
+        );
+        assert_eq!(
+            resolve_outside("../outside.txt", Some(&work), Some(&work)),
             Some(root.join("outside.txt"))
         );
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(root.join("outside.txt"), work.join("link")).unwrap();
             assert_eq!(
-                resolve_outside("link", &work),
+                resolve_outside("link", Some(&work), Some(&work)),
                 Some(root.join("outside.txt")),
                 "a symlink inside the cwd that points outside is outside"
             );
         }
-        assert_eq!(resolve_outside("../does-not-exist", &work), None);
+        assert_eq!(
+            resolve_outside("../does-not-exist", Some(&work), Some(&work)),
+            None
+        );
     }
 
     #[test]
@@ -308,7 +394,8 @@ mod tests {
             "read_file",
             "../nope",
             false,
-            &work,
+            Some(&work),
+            Some(&work),
             &s,
             true,
             &mut ask,
@@ -328,7 +415,17 @@ mod tests {
         };
         for p in ["../a/x", "../a/y", "../b/z"] {
             assert_eq!(
-                decide(true, "read_file", p, false, &work, &s, true, &mut ask),
+                decide(
+                    true,
+                    "read_file",
+                    p,
+                    false,
+                    Some(&work),
+                    Some(&work),
+                    &s,
+                    true,
+                    &mut ask
+                ),
                 None
             );
         }
@@ -344,15 +441,35 @@ mod tests {
             asked.set(asked.get() + 1);
             false
         };
-        let out = decide(true, "read_file", "../a/x", false, &work, &s, true, &mut no);
+        let out = decide(
+            true,
+            "read_file",
+            "../a/x",
+            false,
+            Some(&work),
+            Some(&work),
+            &s,
+            true,
+            &mut no,
+        );
         assert_eq!(
             out,
             Some(format!(
-                "User denied read_file on '{}' (outside the working directory)",
+                "User denied read_file on '{}' (outside the directory yoyo was launched in)",
                 root.join("a/x").display()
             ))
         );
-        decide(true, "read_file", "../a/x", false, &work, &s, true, &mut no);
+        decide(
+            true,
+            "read_file",
+            "../a/x",
+            false,
+            Some(&work),
+            Some(&work),
+            &s,
+            true,
+            &mut no,
+        );
         assert_eq!(asked.get(), 2, "a no must ask again next time");
         assert!(crate::tool_wrappers::is_deterministic_refusal(
             &out.unwrap()
@@ -365,13 +482,13 @@ mod tests {
         let msg = no_tty_refusal(
             "read_file",
             Path::new("/etc/hosts"),
-            cwd,
+            Some(cwd),
             &Approval::Files(PathBuf::from("/etc")),
         );
         assert_eq!(
             msg,
             "YOYO_ASK_OUTSIDE_READS=1 is active — read_file refused '/etc/hosts': it is outside \
-             the working directory '/work/proj', and there is no terminal to ask on. To allow it, \
+             the directory yoyo was launched in '/work/proj', and there is no terminal to ask on. To allow it, \
              unset YOYO_ASK_OUTSIDE_READS, run yoyo from a directory that contains the file, or \
              name its directory with --allow-dir."
         );
@@ -390,7 +507,8 @@ mod tests {
             "read_file",
             "../outside.txt",
             false,
-            &work,
+            Some(&work),
+            Some(&work),
             &s,
             false,
             &mut ask,
@@ -400,7 +518,7 @@ mod tests {
             Some(no_tty_refusal(
                 "read_file",
                 &root.join("outside.txt"),
-                &work,
+                Some(work.as_path()),
                 &Approval::Files(root.clone())
             ))
         );
@@ -411,7 +529,8 @@ mod tests {
                 "read_file",
                 "inside.txt",
                 false,
-                &work,
+                Some(&work),
+                Some(&work),
                 &s,
                 false,
                 &mut ask
@@ -432,7 +551,8 @@ mod tests {
                 "read_file",
                 "../outside.txt",
                 false,
-                &work,
+                Some(&work),
+                Some(&work),
                 &s,
                 false,
                 &mut ask
@@ -442,7 +562,17 @@ mod tests {
         // Disabled is a passthrough for the two root-taking tools too.
         for tool in ["search", "list_files"] {
             assert_eq!(
-                decide(false, tool, "../a", false, &work, &s, false, &mut ask),
+                decide(
+                    false,
+                    tool,
+                    "../a",
+                    false,
+                    Some(&work),
+                    Some(&work),
+                    &s,
+                    false,
+                    &mut ask
+                ),
                 None
             );
         }
@@ -454,7 +584,8 @@ mod tests {
                     tool,
                     "../outside.txt",
                     false,
-                    &work,
+                    Some(&work),
+                    Some(&work),
                     &s,
                     false,
                     &mut ask
@@ -469,7 +600,8 @@ mod tests {
                 "read_file",
                 "../outside.txt",
                 true,
-                &work,
+                Some(&work),
+                Some(&work),
                 &s,
                 false,
                 &mut ask
@@ -496,12 +628,22 @@ mod tests {
             // No tty: refused, naming the tool, the canonical root and --allow-dir.
             let s = store();
             let mut never = |_: &str, _: &Path, _: &Approval| -> bool { panic!("no tty") };
-            let out = decide(true, tool, "../a", false, &work, &s, false, &mut never);
+            let out = decide(
+                true,
+                tool,
+                "../a",
+                false,
+                Some(&work),
+                Some(&work),
+                &s,
+                false,
+                &mut never,
+            );
             assert_eq!(
                 out,
                 Some(format!(
                     "YOYO_ASK_OUTSIDE_READS=1 is active — {tool} refused '{}': it is outside \
-                     the working directory '{}', and there is no terminal to ask on. To allow \
+                     the directory yoyo was launched in '{}', and there is no terminal to ask on. To allow \
                      it, unset YOYO_ASK_OUTSIDE_READS, run yoyo from a directory that contains \
                      that directory, or name that directory with --allow-dir.",
                     root.join("a").display(),
@@ -515,11 +657,31 @@ mod tests {
             let log = std::cell::RefCell::new(Vec::new());
             let mut ask = recorder(&log, true);
             assert_eq!(
-                decide(true, tool, "../a", false, &work, &s, true, &mut ask),
+                decide(
+                    true,
+                    tool,
+                    "../a",
+                    false,
+                    Some(&work),
+                    Some(&work),
+                    &s,
+                    true,
+                    &mut ask
+                ),
                 None
             );
             assert_eq!(
-                decide(true, tool, "../a", false, &work, &s, true, &mut ask),
+                decide(
+                    true,
+                    tool,
+                    "../a",
+                    false,
+                    Some(&work),
+                    Some(&work),
+                    &s,
+                    true,
+                    &mut ask
+                ),
                 None
             );
             assert_eq!(
@@ -530,9 +692,19 @@ mod tests {
             let s2 = store();
             let mut no = |_: &str, _: &Path, _: &Approval| false;
             assert_eq!(
-                decide(true, tool, "../b", false, &work, &s2, true, &mut no),
+                decide(
+                    true,
+                    tool,
+                    "../b",
+                    false,
+                    Some(&work),
+                    Some(&work),
+                    &s2,
+                    true,
+                    &mut no
+                ),
                 Some(format!(
-                    "User denied {tool} on '{}' (outside the working directory)",
+                    "User denied {tool} on '{}' (outside the directory yoyo was launched in)",
                     root.join("b").display()
                 ))
             );
@@ -555,19 +727,49 @@ mod tests {
         for tool in ["search", "list_files"] {
             for r in &roots {
                 assert_eq!(
-                    decide(true, tool, r, false, &work, &s, false, &mut never),
+                    decide(
+                        true,
+                        tool,
+                        r,
+                        false,
+                        Some(&work),
+                        Some(&work),
+                        &s,
+                        false,
+                        &mut never
+                    ),
                     None,
                     "{tool} rooted at {r} is inside"
                 );
             }
             // A nonexistent root is not asked about: the tool reports it.
             assert_eq!(
-                decide(true, tool, "../nope", false, &work, &s, false, &mut never),
+                decide(
+                    true,
+                    tool,
+                    "../nope",
+                    false,
+                    Some(&work),
+                    Some(&work),
+                    &s,
+                    false,
+                    &mut never
+                ),
                 None
             );
             // --allow-dir already passed: consent given.
             assert_eq!(
-                decide(true, tool, "../a", true, &work, &s, false, &mut never),
+                decide(
+                    true,
+                    tool,
+                    "../a",
+                    true,
+                    Some(&work),
+                    Some(&work),
+                    &s,
+                    false,
+                    &mut never
+                ),
                 None
             );
         }
@@ -582,7 +784,17 @@ mod tests {
         let mut ask = recorder(&log, true);
         let s = store();
         assert_eq!(
-            decide(true, "search", "escape", false, &work, &s, true, &mut ask),
+            decide(
+                true,
+                "search",
+                "escape",
+                false,
+                Some(&work),
+                Some(&work),
+                &s,
+                true,
+                &mut ask
+            ),
             None
         );
         assert_eq!(
@@ -605,24 +817,56 @@ mod tests {
             "read_file",
             "../a/x",
             false,
-            &work,
+            Some(&work),
+            Some(&work),
             &s,
             true,
             &mut ask,
         );
         // ...and a search whose root is a FILE in `a` rides it (parent key)...
-        decide(true, "search", "../a/y", false, &work, &s, true, &mut ask);
+        decide(
+            true,
+            "search",
+            "../a/y",
+            false,
+            Some(&work),
+            Some(&work),
+            &s,
+            true,
+            &mut ask,
+        );
         // ...but a recursive search ROOTED at `a` is a different grant.
-        decide(true, "search", "../a", false, &work, &s, true, &mut ask);
+        decide(
+            true,
+            "search",
+            "../a",
+            false,
+            Some(&work),
+            Some(&work),
+            &s,
+            true,
+            &mut ask,
+        );
         // A Tree yes for `a` covers list_files at `a` (same key)...
-        decide(true, "list_files", "../a", false, &work, &s, true, &mut ask);
+        decide(
+            true,
+            "list_files",
+            "../a",
+            false,
+            Some(&work),
+            Some(&work),
+            &s,
+            true,
+            &mut ask,
+        );
         // ...and not a root one level down.
         decide(
             true,
             "list_files",
             "../a/deeper",
             false,
-            &work,
+            Some(&work),
+            Some(&work),
             &s,
             true,
             &mut ask,
@@ -643,5 +887,189 @@ mod tests {
             approval_for("read_file", &root.join("a")),
             Approval::Files(root.clone())
         );
+    }
+
+    /// #879: the anchor is the LAUNCH dir, not the live cwd. Two calls, as
+    /// after `/cd`: the cwd has moved to `h`, the anchor is still `l`. A file
+    /// under `h` is OUTSIDE (asked), although under the old rule (anchor ==
+    /// cwd) it was inside and nothing was asked, which is `~/.ssh` after `/cd ~`.
+    #[test]
+    fn anchor_is_the_launch_dir_not_the_cwd_after_cd() {
+        let (_tmp, root, work) = tree();
+        let (l, h) = (work.clone(), root.join("a"));
+        let s = store();
+        let log = std::cell::RefCell::new(Vec::new());
+        let mut ask = recorder(&log, false);
+        // Old rule, stated so the test names the change: cwd-anchored, inside.
+        assert_eq!(resolve_outside("x", Some(&h), Some(&h)), None);
+        // New rule: launch-anchored, outside, and it asks.
+        assert_eq!(resolve_outside("x", Some(&h), Some(&l)), Some(h.join("x")));
+        let out = decide(
+            true,
+            "read_file",
+            "x",
+            false,
+            Some(&h),
+            Some(&l),
+            &s,
+            true,
+            &mut ask,
+        );
+        assert!(out.is_some(), "a 'no' to a post-/cd read must refuse");
+        assert_eq!(
+            *log.borrow(),
+            vec![("read_file".to_string(), Approval::Files(h.clone()))]
+        );
+        // Near miss: a target under the launch dir, reached from the moved cwd
+        // by an absolute path, is still inside and never asked.
+        let inside = l.join("inside.txt");
+        let out = decide(
+            true,
+            "read_file",
+            inside.to_str().unwrap(),
+            false,
+            Some(&h),
+            Some(&l),
+            &s,
+            true,
+            &mut ask,
+        );
+        assert_eq!(out, None);
+        assert_eq!(log.borrow().len(), 1, "an inside read must not ask");
+    }
+
+    /// Users who never `/cd`: cwd == launch dir, outcome as before.
+    #[test]
+    fn never_cd_inside_is_untouched() {
+        let (_tmp, _root, work) = tree();
+        let s = store();
+        let mut never = |_: &str, _: &Path, _: &Approval| -> bool { panic!("must not ask") };
+        assert_eq!(
+            decide(
+                true,
+                "read_file",
+                "inside.txt",
+                false,
+                Some(&work),
+                Some(&work),
+                &s,
+                false,
+                &mut never
+            ),
+            None
+        );
+    }
+
+    /// An approval given before `/cd` still covers its path afterwards.
+    #[test]
+    fn approval_survives_a_cwd_move() {
+        let (_tmp, root, work) = tree();
+        let s = store();
+        let log = std::cell::RefCell::new(Vec::new());
+        let mut ask = recorder(&log, true);
+        // Before /cd: cwd == launch == work; read ../a/x, approve Files(a).
+        assert_eq!(
+            decide(
+                true,
+                "read_file",
+                "../a/x",
+                false,
+                Some(&work),
+                Some(&work),
+                &s,
+                true,
+                &mut ask
+            ),
+            None
+        );
+        // After /cd into b: the same file by a new relative path, no re-ask.
+        let b = root.join("b");
+        assert_eq!(
+            decide(
+                true,
+                "read_file",
+                "../a/y",
+                false,
+                Some(&b),
+                Some(&work),
+                &s,
+                true,
+                &mut ask
+            ),
+            None
+        );
+        assert_eq!(
+            log.borrow().len(),
+            1,
+            "an approved directory must not ask again after /cd"
+        );
+    }
+
+    /// No anchor at all (nothing recorded, cwd unreadable): ASK, never allow.
+    #[test]
+    fn no_anchor_fails_closed() {
+        let (_tmp, root, work) = tree();
+        // Anti-vacuous: the fixture really has no anchor.
+        assert_eq!(anchor_from(None, None), None);
+        let s = store();
+        let log = std::cell::RefCell::new(Vec::new());
+        let mut ask = recorder(&log, false);
+        let target = work.join("inside.txt");
+        let out = decide(
+            true,
+            "read_file",
+            target.to_str().unwrap(),
+            false,
+            None,
+            None,
+            &s,
+            true,
+            &mut ask,
+        );
+        assert!(out.is_some(), "a 'no' must refuse");
+        assert_eq!(
+            log.borrow().len(),
+            1,
+            "with no anchor, even this file must be asked about"
+        );
+        // No tty: refused, naming that the launch dir is unknown.
+        let mut never = |_: &str, _: &Path, _: &Approval| -> bool { panic!("no tty, no ask") };
+        let out = decide(
+            true,
+            "read_file",
+            target.to_str().unwrap(),
+            false,
+            None,
+            None,
+            &s,
+            false,
+            &mut never,
+        )
+        .unwrap();
+        assert!(out.contains("could not be determined"), "{out}");
+        // A relative path with no readable cwd cannot be resolved: refused, not allowed.
+        let out = decide(
+            true,
+            "read_file",
+            "inside.txt",
+            false,
+            None,
+            Some(&root),
+            &s,
+            false,
+            &mut never,
+        )
+        .unwrap();
+        assert!(out.contains("current directory cannot be read"), "{out}");
+        assert!(crate::tool_wrappers::is_deterministic_refusal(&out));
+    }
+
+    /// The recorded launch dir wins over the cwd; the cwd is only a fallback.
+    #[test]
+    fn anchor_prefers_recorded_launch_dir() {
+        let (l, c) = (Path::new("/launch"), Path::new("/cwd"));
+        assert_eq!(anchor_from(Some(l), Some(c)), Some(l.to_path_buf()));
+        assert_eq!(anchor_from(None, Some(c)), Some(c.to_path_buf()));
+        assert_eq!(anchor_from(Some(l), None), Some(l.to_path_buf()));
     }
 }

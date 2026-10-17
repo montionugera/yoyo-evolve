@@ -234,16 +234,19 @@ Files you name yourself (`@path` mentions, `/add`, `/explain`, `--image`) are fe
 resolved target is refused is not sent to the model, yoyo prints a warning naming it, and the rest of the prompt
 still goes through.
 
-### Ask before reading outside the working directory (opt-in)
+### Ask before reading outside the launch directory (opt-in)
 
-By default, `read_file`, `search` and `list_files` can reach any path. Set `YOYO_ASK_OUTSIDE_READS=1` to make them ask first when the path (`read_file`) or the root (`search`, `list_files`) resolves (symlinks followed) to somewhere outside the current directory:
+By default, `read_file`, `search` and `list_files` can reach any path. Set `YOYO_ASK_OUTSIDE_READS=1` to make them ask first when the path (`read_file`) or the root (`search`, `list_files`) resolves (symlinks followed) to somewhere outside the directory you launched yoyo in:
 
 ```bash
 YOYO_ASK_OUTSIDE_READS=1 yoyo
 ```
 
+- `/cd` does not move that anchor: launching in `~/project` and typing `/cd ~` does not make `~/.ssh` "inside". Navigating is not consent to read the new directory, so reads there ask (once per directory). Anything you already approved stays approved after `/cd`.
+- If yoyo cannot tell where it was launched (the directory was deleted and the current directory cannot be read), it asks rather than allowing, and a relative path it cannot resolve is refused with a request for an absolute one.
+
 - In a terminal, yoyo asks `y/n`. A yes covers that file's directory for the rest of the session, so three reads in `/etc` ask once. It does not cover subdirectories. A no refuses only that call, and the next call there asks again.
-- A `search` or `list_files` rooted at an outside directory asks about that directory, and a yes covers later searches and listings rooted at exactly that directory (both tools walk into subdirectories, so the prompt says so). It does not cover a root one level down, and a yes for *reading* files in a directory does not cover a recursive search of it: reading `~/.bashrc` must not quietly grant a search that reaches `~/.ssh`. A root that is a file is treated like `read_file` of that file. No root means the current directory, so nothing is asked.
+- A `search` or `list_files` rooted at an outside directory asks about that directory, and a yes covers later searches and listings rooted at exactly that directory (both tools walk into subdirectories, so the prompt says so). It does not cover a root one level down, and a yes for *reading* files in a directory does not cover a recursive search of it: reading `~/.bashrc` must not quietly grant a search that reaches `~/.ssh`. A root that is a file is treated like `read_file` of that file. No root means the current directory and is not checked, so after `/cd` a search or listing with no root walks the new directory without asking (a known gap, #879); give a root to be asked.
 - With no terminal (for example `-p` in a pipe or CI), the read is refused. The refusal names the path and tells the model how it can be allowed.
 - A path that does not exist is not asked about. `read_file` reports its own error.
 - With `--allow-dir` set, nothing is asked, because the directories you listed are your answer.

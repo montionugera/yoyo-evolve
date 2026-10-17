@@ -122,7 +122,7 @@ impl AgentTool for GuardedTool {
             {
                 return Err(yoagent::types::ToolError::Failed(reason));
             }
-            // Opt-in ask-once fence on reads outside the cwd (#879, src/outside_read.rs).
+            // Opt-in ask-once fence on reads outside the launch dir (#879, src/outside_read.rs).
             if let Some(r) = crate::outside_read::check(self.inner.name(), path, &self.restrictions)
             {
                 return Err(yoagent::types::ToolError::Failed(r));
@@ -230,7 +230,7 @@ impl AgentTool for ArcGuardedTool {
             {
                 return Err(yoagent::types::ToolError::Failed(reason));
             }
-            // Opt-in ask-once fence on reads outside the cwd (#879, src/outside_read.rs).
+            // Opt-in ask-once fence on reads outside the launch dir (#879, src/outside_read.rs).
             if let Some(r) = crate::outside_read::check(self.inner.name(), path, &self.restrictions)
             {
                 return Err(yoagent::types::ToolError::Failed(r));

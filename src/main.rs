@@ -1194,6 +1194,10 @@ async fn main() {
 
     let args: Vec<String> = std::env::args().collect();
 
+    // #879: anchor the opt-in outside-read fence on the launch dir, before any
+    // tool or `/cd` can run, so `/cd ~` does not make `~/.ssh` "inside".
+    outside_read::record_launch_dir();
+
     apply_cli_flags(&args);
 
     // Near-miss guard on the bare-word path: `yoyo tokens` / `yoyo statsu` used to
