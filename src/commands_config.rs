@@ -1033,8 +1033,8 @@ pub fn handle_effort(input: &str) {
 /// Build the `/mcp help` text. Extracted as a pure function so tests can
 /// assert on its contents (e.g. to guard against the stale "coming soon"
 /// string returning, or server-filesystem sneaking back in as the primary
-/// example — it collides with yoyo's read_file/write_file builtins and is
-/// skipped at startup).
+/// example — it collides with yoyo's read_file/write_file builtins, so it is
+/// connected under a prefix (`fs__read_file`, #1041) rather than as written).
 pub(crate) fn mcp_help_text() -> String {
     // server-fetch is the primary example because it exposes a single `fetch`
     // tool that does NOT collide with any name in BUILTIN_TOOL_NAMES. Do not
@@ -1060,10 +1060,11 @@ pub(crate) fn mcp_help_text() -> String {
     s.push_str("  Or pass via CLI:\n");
     s.push_str("  yoyo --mcp \"npx -y @modelcontextprotocol/server-fetch\"\n");
     s.push('\n');
-    s.push_str("  Note: @modelcontextprotocol/server-filesystem exposes read_file and\n");
-    s.push_str("  write_file tools which collide with yoyo's builtins — yoyo skips any\n");
-    s.push_str("  server whose tool names collide (see CLAUDE.md → \"MCP gotchas\").\n");
-    s.push_str("  Prefer server-fetch, server-memory, or server-sequential-thinking.\n");
+    s.push_str("  Note: a server whose tool names collide with yoyo's builtins (e.g.\n");
+    s.push_str("  @modelcontextprotocol/server-filesystem: read_file, write_file) is\n");
+    s.push_str("  connected under a prefix: [mcp_servers.fs] gives fs__read_file, ...;\n");
+    s.push_str("  a --mcp server gives mcp1__read_file, ... It is skipped only if even\n");
+    s.push_str("  the prefixed names collide (two servers with the same name).\n");
     s.push('\n');
     s.push_str("  Subcommands:\n");
     s.push_str("    /mcp         List configured MCP servers\n");
@@ -1082,10 +1083,10 @@ pub(crate) fn mcp_not_connected_message(total: usize) -> String {
     ));
     s.push('\n');
     s.push_str("  Common causes:\n");
-    s.push_str("    • Tool name collision with a yoyo builtin. For example,\n");
-    s.push_str("      @modelcontextprotocol/server-filesystem exposes read_file and\n");
-    s.push_str("      write_file which collide — such servers are skipped at startup.\n");
-    s.push_str("      Check stderr for a \"skipping MCP server\" warning.\n");
+    s.push_str("    • Tool name collision that a prefix could not resolve. A server whose\n");
+    s.push_str("      names collide with a builtin is connected under a prefix, but two\n");
+    s.push_str("      servers with the same name collide even prefixed, and the second is\n");
+    s.push_str("      skipped. Check stderr for a \"skipping this server\" warning.\n");
     s.push_str("    • Server failed to spawn (bad command path or args in your config).\n");
     s.push('\n');
     s.push_str("  See CLAUDE.md → \"MCP gotchas\" for the full list of reserved tool names.\n");
@@ -1547,8 +1548,21 @@ mod tests {
         assert!(
             !first_block.contains("server-filesystem"),
             "primary /mcp help example must not be server-filesystem \
-             (it collides with read_file/write_file and is skipped at startup).\nFirst block:\n{first_block}"
+             (it collides with read_file/write_file and only connects under a prefix).\nFirst block:\n{first_block}"
         );
+    }
+
+    #[test]
+    fn test_mcp_help_says_colliding_server_is_prefixed_not_skipped() {
+        // #1041: a colliding server now connects under `<prefix>__`. The help
+        // must not tell users it is skipped wholesale, which would steer them
+        // away from the flagship filesystem server for no reason.
+        let help = mcp_help_text();
+        assert!(help.contains("fs__read_file"), "{help}");
+        assert!(!help.contains("yoyo skips any"), "{help}");
+        let msg = mcp_not_connected_message(1);
+        assert!(!msg.contains("skipped at startup"), "{msg}");
+        assert!(msg.contains("prefix"), "{msg}");
     }
 
     #[test]
