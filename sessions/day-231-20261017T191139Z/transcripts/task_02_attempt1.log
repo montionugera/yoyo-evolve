@@ -1,0 +1,86 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (20ms)
+  ▶ read src/outside_read.rs  ▶ $ sed -n 90,260p src/tool_wrappers.rs ✓ (3ms)
+ ✓ (5ms)
+  ▶ read src/outside_read.rs:99..361  ▶ $ Y=~/.cargo/registry/src/index.crates.io-*/yoagent-0.25.7/src/tools; ls $Y; grep … ✓ (2ms)
+ ✓ (7ms)
+  ▶ $ Y=~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25.7/src/tool… ✓ (6ms)
+  ▶ $ Y=~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25.7/src/tool… ✓ (7ms)
+  ▶ $ cat > /tmp/patch.py <<'EOF' (217 lines) ✓ (32ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 1m 8s (8 ✓)
+
+Now update the existing tests to the new signatures, then add the new ones.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cat > /tmp/patch2.py <<'EOF' (38 lines) ✓ (11.1s)
+
+Now the new tests (search/list_files roots, keys, symlink near-miss, cross-kind isolation).
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (157 lines) ✓ (33.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All 12 pass. Positive control, done as one atomic command: drop search/list_files from FENCED_TOOLS, run the tests, restore.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/outside_read.rs /tmp/or.bak && sed -i 's/const FENCED_TOOLS: &\[&str\] = … ✓ (30.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -n -i "OUTSIDE_READS\|outside the working\|read_file" docs/src/configuratio… ✓ (4ms)
+  ▶ $ sed -n 237,252p docs/src/configuration/permissions.md ✓ (3ms)
+  ▶ $ python3 - <<'EOF' (13 lines) ✓ (179ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 43.9s (4 ✓)
+
+Now look for any other sentence this change makes false:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -rn "outside_read\|OUTSIDE_READS\|ask-once" src ARCHITECTURE.md CLAUDE.md R… ✓ (26ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The comments in tool_wrappers.rs still read "reads outside the cwd", and that stays accurate, so the file is untouched at 5684 lines. Full checks:
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cargo fmt -- --check && cargo clippy --all-targets -- -D warnings 2>&1 | tail -3… ✓ (4m 20s)
+  ▶ $ cargo test 2>&1 | grep -E "^test result" | grep -v " 0 failed" ; echo "nonzero-f… ✓ (3m 14s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 7m 47s (2 ✓)
+
+Everything is green. Committing with the census in the body:
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ git add -A && git commit -q -F - <<'EOF' && git log --onelin… (51 lines) ✓ (16ms)
+  ▶ $ gh issue view 879 --json state,title 2>&1 | head -3 ✓ (339ms)
+  ▶ $ gh issue comment 879 --body-file - <<'EOF' 2>&1 | tail -2 (14 lines) ✓ (818ms)
+  3 tools completed in 17.3s (3 ✓)
+
+With YOYO_ASK_OUTSIDE_READS=1 set, a search or list_files whose root resolves outside the working directory now asks y/n on a terminal, and is refused without one, just like read_file. Commit 796e92cf, part of #879. cargo fmt --check, cargo clippy --all-targets -- -D warnings and the full cargo test all pass.
+
+How it was done
+• Only `src/outside_read.rs` needed code changes. GuardedTool and ArcGuardedTool already pass every guarded tool's path to outside_read::check, and search and list_files already go through that guard. The fence just ignored any tool not named read_file. tool_wrappers.rs stays at 5684 lines, so the size gate is untouched.
+• Same rules as `read_file`:
+  • paths are resolved with symlinks followed;
+  • a root that doesn't exist isn't asked about;
+  • nothing is asked when --allow-dir is set;
+  • no root means the current directory, which is inside.
+• The default is unchanged. With the env var unset, all three tools behave exactly as before, and a test pins that.
+
+One decision the plan didn't specify: a yes is now remembered as one of two kinds. Both tools search subdirectories too, so a "yes" for reading ~/.bashrc must not also allow a search rooted at ~, which would reach ~/.ssh.
+• A file target (any read_file, or a root that is a file) is remembered as its parent directory, and that approval is shared with read_file.
+• A directory root is remembered as exactly that directory and everything under it. Approving /a/b does not cover a later root at /a/b/c.
+• The two kinds never cover each other, and the prompt says "(recursive)" for the directory kind.
+• read_file's prompt and refusal text are unchanged.
+
+Tests and check: four new tests cover an outside root being asked about or refused, inside roots passing (., a subdirectory, a file, a symlink pointing inside), a symlink inside the directory that points outside counting as outside, and the remembered keys staying exact and separate. To check the tests can fail, I put the fence back to read_file only, ran them, and restored it in one command. Exactly the three outside-root tests failed by name, and everything passed again after the restore.
+
+Docs and issue: docs/src/configuration/permissions.md now names the three covered tools and says plainly that bash and file writes are not covered. The commit body lists every built-in tool that takes a path and whether it's covered. I commented on #879 with the same list. Still open there: there's no CLI flag or .yoyo.toml key (the env var is the only switch), the default-on decision (item 3) hasn't been made, and bash is still uncovered.
+  watch: no files changed this turn — skipping

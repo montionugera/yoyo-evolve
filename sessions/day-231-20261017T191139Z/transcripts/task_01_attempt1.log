@@ -1,0 +1,82 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (20ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 40,90p src/commands_skill.r… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 465,640p src/dispatch_sub.r… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 582,612p src/dispatch_sub.r… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 10,32p src/commands_skill.r… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 545,560p src/commands_goal.… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 530,545p src/commands_goal.… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (45 lines) ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's|/// conditions mirror th… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 130,192p src/commands_ast_g… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (51 lines) ✓ (25ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (27 lines) ✓ (29ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1905,1940p src/commands_ski… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  13 tools completed in 1m 34s (13 ✓)
+
+Now add tests in each file.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (100 lines) ✓ (21.8s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo -- unknown_ … ✓ (42.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '"src/dispatch_sub.rs"' -B… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (9 lines) ✓ (1m 22s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (1m 22s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo 2>&1 | grep … ✓ (1m 20s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo 2>&1 | grep … ✓ (2m 41s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '"yoyo", "ast"\|"ast", "\|… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1822,1865p src/dispatch_sub… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1824,1829p src/dispatch_sub… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (21 lines) ✓ (1.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i 's|2336 -> 2450 (+114)|2336… ✓ (4m 4s)
+
+────────────────────────────────────────────────────────────────────────────────
+  12 tools completed in 12m 32s (12 ✓)
+
+All green. Now clippy, fmt, and the binary probes.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo clippy -… (2 lines) ✓ (23.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ B=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; T=$(mktemp -d); c… ✓ (96ms)
+  ▶ $ B=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo; T=$(mktemp -d); c… ✓ (99ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "exit" docs/src/usage/com… ✓ (21ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (57 lines) ✓ (35ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 56.4s (5 ✓)
+
+Typos like yoyo goal chek now exit 2 instead of 0. All four cases from #982 now exit 2, and the printed text, the stream it goes to and its bytes are unchanged. It's committed as 53a6276d ("Part of #982"). Build, cargo test, clippy with -D warnings and fmt --check all pass.
+
+Before and after, using the built binary (fresh git repo, </dev/null, stdout and stderr compared byte for byte):
+
+| command | before | after |
+|---|---|---|
+| skill nosuch | 0 | 2 |
+| goal check now | 0 | 2 |
+| goal frobnicate | 0 | 2 |
+| todo zzz | 0 | 2 |
+| ast (bare) | 0 | 2 |
+| skill list, goal, todo, todo list, ast foo --in . | 0 | 0 |
+
+Output was identical before and after in every row. The scripts/workflows check you asked for (grep -rnE "yoyo (skill\|goal\|todo\|ast)\b" scripts/ .github/) found 0 hits, so nothing in this repo's own loop relies on the old exit code.
+
+What changed, in 3 source files:
+• `skill` (src/commands_skill.rs): the unknown-subcommand branch returns 2. This file wasn't in the task's list; it's the one extra file the constraints allowed.
+• `goal` (src/commands_goal.rs): a new goal_subcommand_is_unknown check. The /goal handler and the shell's exit code both use it, so the message and the exit code can't disagree. A test checks it against every real verb.
+• `todo` and `ast` (src/dispatch_sub.rs): todo exits 2 when the verb isn't a known one; bare todo still lists and exits 0. ast exits 2 whenever the parser the command already uses rejects the input. "ast-grep not installed" still exits 0, since that isn't a usage error.
+
+Things to know:
+• `ast` covers more than bare `ast`. Every input its parser rejects now exits 2, including --lang with no value and a bare path like ast $X.unwrap() src/.
+• I edited one existing test. It checked that ast $X.unwrap() src/ gets routed, but that input now exits 2 mid-test, which would kill the test run. That case now uses the --in src/ form. The bare-path form's exit 2 is checked in the new test.
+• The file-size limit moved. In tests/module_size.rs, src/dispatch_sub.rs goes from 2336 to 2457 lines. That's 56 lines of earlier unrecorded growth plus this change; the reason is in the comment and the commit.
+• Docs: docs/src/usage/commands.md now lists the new exit codes.
+
+Still exiting 0 (listed in the commit body): usage errors that aren't unknown verbs (bare skill show, skill init, skill install, and todo list extra). Also the rest of #982 that this task didn't cover: the undo failure paths, setup/version/def (not probed), bare run (by decision), and the 1-vs-2 disagreement on tree. I didn't post a #982 comment, because the task only asked for one if the fixes didn't fit in 3 files.
+  watch: no files changed this turn — skipping
