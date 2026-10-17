@@ -236,18 +236,19 @@ still goes through.
 
 ### Ask before reading outside the working directory (opt-in)
 
-By default, `read_file` can read any path. Set `YOYO_ASK_OUTSIDE_READS=1` to make it ask first when a path resolves (symlinks followed) to somewhere outside the current directory:
+By default, `read_file`, `search` and `list_files` can reach any path. Set `YOYO_ASK_OUTSIDE_READS=1` to make them ask first when the path (`read_file`) or the root (`search`, `list_files`) resolves (symlinks followed) to somewhere outside the current directory:
 
 ```bash
 YOYO_ASK_OUTSIDE_READS=1 yoyo
 ```
 
-- In a terminal, yoyo asks `y/n`. A yes covers that file's directory for the rest of the session, so three reads in `/etc` ask once. It does not cover subdirectories. A no refuses only that read, and the next read in that directory asks again.
+- In a terminal, yoyo asks `y/n`. A yes covers that file's directory for the rest of the session, so three reads in `/etc` ask once. It does not cover subdirectories. A no refuses only that call, and the next call there asks again.
+- A `search` or `list_files` rooted at an outside directory asks about that directory, and a yes covers later searches and listings rooted at exactly that directory (both tools walk into subdirectories, so the prompt says so). It does not cover a root one level down, and a yes for *reading* files in a directory does not cover a recursive search of it: reading `~/.bashrc` must not quietly grant a search that reaches `~/.ssh`. A root that is a file is treated like `read_file` of that file. No root means the current directory, so nothing is asked.
 - With no terminal (for example `-p` in a pipe or CI), the read is refused. The refusal names the path and tells the model how it can be allowed.
 - A path that does not exist is not asked about. `read_file` reports its own error.
 - With `--allow-dir` set, nothing is asked, because the directories you listed are your answer.
 
-This fences the `read_file` tool, and it is not a sandbox. `bash` can still `cat` the same file, and `search`/`list_files` are not covered yet. For a hard boundary, use `--allow-dir` or `--restricted`. Any value other than `1` leaves the setting off.
+This fences the path argument of `read_file`, `search` and `list_files`, and it is not a sandbox. `bash` can still `cat` the same file, and writes (`write_file`, `edit_file`, `rename_symbol`) are not covered by it. For a hard boundary, use `--allow-dir` or `--restricted`. Any value other than `1` leaves the setting off.
 
 ### Rules
 

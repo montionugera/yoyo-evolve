@@ -1,5 +1,5 @@
-//! Opt-in ask-once fence for `read_file` outside the working directory
-//! (part of #879).
+//! Opt-in ask-once fence for `read_file`, `search` and `list_files` outside
+//! the working directory (part of #879).
 //!
 //! **Off by default, and off means byte-identical.** The fence is active only
 //! when the environment variable `YOYO_ASK_OUTSIDE_READS` is exactly `1`, read
@@ -17,11 +17,27 @@
 //! resolved (it does not exist) is not asked about: `read_file` reports its
 //! own error, and there is nothing to read.
 //!
-//! **Ask once per directory.** A yes is remembered for the rest of the session
-//! for the target's parent directory, exactly, so three files in `/etc` ask
-//! once. It does not cover subdirectories: a yes for your home directory must
-//! not quietly grant `~/.ssh`. A no refuses this read only and is not
-//! remembered, so the next read in that directory asks again.
+//! **Which tools, and which argument.** `read_file`'s `path`, and the ROOT
+//! (`path`) of `search` and `list_files`. A missing root means the tool's
+//! default, the current directory, which is inside, so nothing is asked (the
+//! wrapper only calls [`check`] when `path` is present).
+//!
+//! **Ask once per directory, and the remembered key.** A yes is remembered for
+//! the rest of the session as an [`Approval`]:
+//! - a FILE target (any `read_file`, or a `search`/`list_files` root that is a
+//!   file) is remembered as `Files(parent)`, the canonical parent directory,
+//!   exactly, so three files in `/etc` ask once, and `search` on one of them
+//!   rides the same yes;
+//! - a DIRECTORY root of `search`/`list_files` is remembered as `Tree(dir)`,
+//!   the canonical directory itself, exactly. Asking about `/a/b` does not
+//!   cover a later root at `/a/b/c` (that asks again), the same exact-directory
+//!   rule `read_file` uses.
+//!
+//! The two kinds never cover each other, because both tools walk recursively:
+//! a yes to reading `~/.bashrc` (`Files(~)`) must not quietly grant a search
+//! rooted at `~`, which would reach `~/.ssh`. Neither kind covers
+//! subdirectories. A no refuses this call only and is not remembered, so the
+//! next call there asks again.
 //!
 //! **No terminal, no prompt.** When stdin is not a terminal (`-p` in a pipe,
 //! CI) the read is refused, and the refusal names the path and the ways to
@@ -33,9 +49,11 @@
 //! path has already passed it by the time this runs, so the user named that
 //! directory and nothing is asked.
 //!
-//! **Not a sandbox.** This fences the `read_file` tool only. `bash` can still
-//! `cat` the same file, and `search`/`list_files` are not covered yet (residue
-//! on #879). `--restricted` and `--allow-dir` remain the hard fences.
+//! **Not a sandbox.** This fences the three read tools' path argument only.
+//! `bash` can still `cat` the same file, writes (`write_file`, `edit_file`,
+//! `rename_symbol`) are a different fence, and a search rooted inside the cwd
+//! still follows whatever its own walker follows. `--restricted` and
+//! `--allow-dir` remain the hard fences.
 //!
 //! **Why not `confirm_file_operation`.** That helper's `a`/always answer flips a
 //! session-wide auto-approve flag and offers to write a `[permissions] allow`
@@ -52,14 +70,30 @@ use crate::format::{GREEN, RED, RESET, YELLOW};
 /// The opt-in switch.
 pub(crate) const ENV_VAR: &str = "YOYO_ASK_OUTSIDE_READS";
 
-/// The one tool this slice fences.
-const FENCED_TOOL: &str = "read_file";
+/// The tools whose `path` argument this fence reads.
+const FENCED_TOOLS: &[&str] = &["read_file", "search", "list_files"];
 
 static ENABLED: OnceLock<bool> = OnceLock::new();
 
-/// Directories approved this session (canonical parent directories).
-static APPROVED_DIRS: LazyLock<Mutex<HashSet<PathBuf>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
+/// What a yes covers for the rest of the session (see the module docs).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum Approval {
+    /// Files directly in this canonical directory (a file target's parent).
+    Files(PathBuf),
+    /// A recursive `search`/`list_files` rooted at exactly this canonical directory.
+    Tree(PathBuf),
+}
+
+impl Approval {
+    fn dir(&self) -> &Path {
+        match self {
+            Approval::Files(d) | Approval::Tree(d) => d,
+        }
+    }
+}
+
+/// Approvals granted this session.
+static APPROVED: LazyLock<Mutex<HashSet<Approval>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// Only the exact value `1` turns the fence on.
 fn enabled_from(value: Option<&str>) -> bool {
@@ -88,20 +122,31 @@ fn resolve_outside(path: &str, cwd: &Path) -> Option<PathBuf> {
     }
 }
 
-/// The directory an approval is remembered for.
-fn approval_dir(target: &Path) -> PathBuf {
-    target
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| target.to_path_buf())
+/// What a yes for `tool` on the canonical `target` is remembered as.
+/// `read_file` is always a file read; a `search`/`list_files` root is a
+/// `Tree` when it is a directory and a file read otherwise.
+fn approval_for(tool: &str, target: &Path) -> Approval {
+    if tool != "read_file" && target.is_dir() {
+        return Approval::Tree(target.to_path_buf());
+    }
+    Approval::Files(
+        target
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| target.to_path_buf()),
+    )
 }
 
 /// The refusal a non-interactive run gets.
-fn no_tty_refusal(target: &Path, cwd: &Path) -> String {
+fn no_tty_refusal(tool: &str, target: &Path, cwd: &Path, approval: &Approval) -> String {
+    let (holder, named) = match approval {
+        Approval::Files(_) => ("the file", "its directory"),
+        Approval::Tree(_) => ("that directory", "that directory"),
+    };
     format!(
-        "{ENV_VAR}=1{stem}read_file refused '{}': it is outside the working directory '{}', \
+        "{ENV_VAR}=1{stem}{tool} refused '{}': it is outside the working directory '{}', \
          and there is no terminal to ask on. To allow it, unset {ENV_VAR}, run yoyo from a \
-         directory that contains the file, or name its directory with --allow-dir.",
+         directory that contains {holder}, or name {named} with --allow-dir.",
         target.display(),
         cwd.display(),
         stem = crate::tool_wrappers::REFUSAL_STEM_MODE_ACTIVE,
@@ -109,9 +154,9 @@ fn no_tty_refusal(target: &Path, cwd: &Path) -> String {
 }
 
 /// The refusal an interactive "no" gets.
-fn declined_refusal(target: &Path) -> String {
+fn declined_refusal(tool: &str, target: &Path) -> String {
     format!(
-        "{}read_file on '{}' (outside the working directory)",
+        "{}{tool} on '{}' (outside the working directory)",
         crate::tool_wrappers::REFUSAL_STEM_PATH_DENIED,
         target.display()
     )
@@ -125,37 +170,41 @@ fn decide(
     path: &str,
     explicit_allow: bool,
     cwd: &Path,
-    store: &Mutex<HashSet<PathBuf>>,
+    store: &Mutex<HashSet<Approval>>,
     is_tty: bool,
-    ask: &mut dyn FnMut(&Path, &Path) -> bool,
+    ask: &mut dyn FnMut(&str, &Path, &Approval) -> bool,
 ) -> Option<String> {
-    if !enabled || tool != FENCED_TOOL || explicit_allow {
+    if !enabled || !FENCED_TOOLS.contains(&tool) || explicit_allow {
         return None;
     }
     let target = resolve_outside(path, cwd)?;
-    let dir = approval_dir(&target);
-    // Held across the prompt so two parallel reads cannot both ask.
+    let approval = approval_for(tool, &target);
+    // Held across the prompt so two parallel calls cannot both ask.
     let mut approved = crate::sync_util::lock_or_recover(store);
-    if approved.contains(&dir) {
+    if approved.contains(&approval) {
         return None;
     }
     if !is_tty {
-        return Some(no_tty_refusal(&target, cwd));
+        return Some(no_tty_refusal(tool, &target, cwd, &approval));
     }
-    if ask(&target, &dir) {
-        approved.insert(dir);
+    if ask(tool, &target, &approval) {
+        approved.insert(approval);
         None
     } else {
-        Some(declined_refusal(&target))
+        Some(declined_refusal(tool, &target))
     }
 }
 
 /// Ask on stderr, read one line from stdin.
-fn ask_on_terminal(target: &Path, dir: &Path) -> bool {
+fn ask_on_terminal(tool: &str, target: &Path, approval: &Approval) -> bool {
     let target = crate::cli::sanitize_for_display(&target.display().to_string());
-    let dir = crate::cli::sanitize_for_display(&dir.display().to_string());
+    let dir = crate::cli::sanitize_for_display(&approval.dir().display().to_string());
+    let scope = match approval {
+        Approval::Files(_) => format!("reads in {dir}"),
+        Approval::Tree(_) => format!("{tool} over all of {dir} (recursive)"),
+    };
     eprint!(
-        "{YELLOW}  ⚠ read_file wants '{target}', outside the working directory. Allow reads in {dir} this session? {RESET}({GREEN}y{RESET}/{RED}n{RESET}) "
+        "{YELLOW}  ⚠ {tool} wants '{target}', outside the working directory. Allow {scope} this session? {RESET}({GREEN}y{RESET}/{RED}n{RESET}) "
     );
     io::stderr().flush().ok();
     let mut response = String::new();
@@ -182,7 +231,7 @@ pub(crate) fn check(
         path,
         !restrictions.allow.is_empty(),
         &cwd,
-        &APPROVED_DIRS,
+        &APPROVED,
         io::stdin().is_terminal(),
         &mut ask_on_terminal,
     )
@@ -209,7 +258,7 @@ mod tests {
         (tmp, root, work)
     }
 
-    fn store() -> Mutex<HashSet<PathBuf>> {
+    fn store() -> Mutex<HashSet<Approval>> {
         Mutex::new(HashSet::new())
     }
 
@@ -249,7 +298,7 @@ mod tests {
     fn nonexistent_path_is_not_asked() {
         let (_tmp, _root, work) = tree();
         let asked = Cell::new(0);
-        let mut ask = |_: &Path, _: &Path| {
+        let mut ask = |_: &str, _: &Path, _: &Approval| {
             asked.set(asked.get() + 1);
             true
         };
@@ -273,8 +322,8 @@ mod tests {
         let (_tmp, root, work) = tree();
         let s = store();
         let asked = std::cell::RefCell::new(Vec::new());
-        let mut ask = |_: &Path, dir: &Path| {
-            asked.borrow_mut().push(dir.to_path_buf());
+        let mut ask = |_: &str, _: &Path, a: &Approval| {
+            asked.borrow_mut().push(a.dir().to_path_buf());
             true
         };
         for p in ["../a/x", "../a/y", "../b/z"] {
@@ -291,7 +340,7 @@ mod tests {
         let (_tmp, root, work) = tree();
         let s = store();
         let asked = Cell::new(0);
-        let mut no = |_: &Path, _: &Path| {
+        let mut no = |_: &str, _: &Path, _: &Approval| {
             asked.set(asked.get() + 1);
             false
         };
@@ -313,7 +362,12 @@ mod tests {
     #[test]
     fn non_interactive_refusal_full_text_and_no_ansi() {
         let cwd = Path::new("/work/proj");
-        let msg = no_tty_refusal(Path::new("/etc/hosts"), cwd);
+        let msg = no_tty_refusal(
+            "read_file",
+            Path::new("/etc/hosts"),
+            cwd,
+            &Approval::Files(PathBuf::from("/etc")),
+        );
         assert_eq!(
             msg,
             "YOYO_ASK_OUTSIDE_READS=1 is active — read_file refused '/etc/hosts': it is outside \
@@ -329,7 +383,8 @@ mod tests {
     fn non_interactive_refuses_without_asking() {
         let (_tmp, root, work) = tree();
         let s = store();
-        let mut ask = |_: &Path, _: &Path| -> bool { panic!("must not prompt without a tty") };
+        let mut ask =
+            |_: &str, _: &Path, _: &Approval| -> bool { panic!("must not prompt without a tty") };
         let out = decide(
             true,
             "read_file",
@@ -340,7 +395,15 @@ mod tests {
             false,
             &mut ask,
         );
-        assert_eq!(out, Some(no_tty_refusal(&root.join("outside.txt"), &work)));
+        assert_eq!(
+            out,
+            Some(no_tty_refusal(
+                "read_file",
+                &root.join("outside.txt"),
+                &work,
+                &Approval::Files(root.clone())
+            ))
+        );
         // An inside read is untouched even with no tty.
         assert_eq!(
             decide(
@@ -361,7 +424,7 @@ mod tests {
     fn disabled_other_tools_and_allow_dir_are_untouched() {
         let (_tmp, _root, work) = tree();
         let s = store();
-        let mut ask = |_: &Path, _: &Path| -> bool { panic!("must not prompt") };
+        let mut ask = |_: &str, _: &Path, _: &Approval| -> bool { panic!("must not prompt") };
         // Disabled: the regression surface, every user who has not opted in.
         assert_eq!(
             decide(
@@ -376,8 +439,15 @@ mod tests {
             ),
             None
         );
-        // Other tools are out of this slice.
-        for tool in ["write_file", "list_files", "search"] {
+        // Disabled is a passthrough for the two root-taking tools too.
+        for tool in ["search", "list_files"] {
+            assert_eq!(
+                decide(false, tool, "../a", false, &work, &s, false, &mut ask),
+                None
+            );
+        }
+        // Writes and anything unnamed are a different fence.
+        for tool in ["write_file", "edit_file", "rename_symbol", "bash"] {
             assert_eq!(
                 decide(
                     true,
@@ -405,6 +475,173 @@ mod tests {
                 &mut ask
             ),
             None
+        );
+    }
+
+    /// Records every prompt as (tool, approval) and answers `yes`.
+    fn recorder(
+        log: &std::cell::RefCell<Vec<(String, Approval)>>,
+        yes: bool,
+    ) -> impl FnMut(&str, &Path, &Approval) -> bool + '_ {
+        move |tool: &str, _: &Path, a: &Approval| {
+            log.borrow_mut().push((tool.to_string(), a.clone()));
+            yes
+        }
+    }
+
+    #[test]
+    fn search_and_list_files_outside_roots_ask_or_refuse() {
+        let (_tmp, root, work) = tree();
+        for tool in ["search", "list_files"] {
+            // No tty: refused, naming the tool, the canonical root and --allow-dir.
+            let s = store();
+            let mut never = |_: &str, _: &Path, _: &Approval| -> bool { panic!("no tty") };
+            let out = decide(true, tool, "../a", false, &work, &s, false, &mut never);
+            assert_eq!(
+                out,
+                Some(format!(
+                    "YOYO_ASK_OUTSIDE_READS=1 is active — {tool} refused '{}': it is outside \
+                     the working directory '{}', and there is no terminal to ask on. To allow \
+                     it, unset YOYO_ASK_OUTSIDE_READS, run yoyo from a directory that contains \
+                     that directory, or name that directory with --allow-dir.",
+                    root.join("a").display(),
+                    work.display()
+                ))
+            );
+            assert!(crate::tool_wrappers::is_deterministic_refusal(
+                out.as_deref().unwrap()
+            ));
+            // Tty: asked once, keyed on the directory itself, as a Tree.
+            let log = std::cell::RefCell::new(Vec::new());
+            let mut ask = recorder(&log, true);
+            assert_eq!(
+                decide(true, tool, "../a", false, &work, &s, true, &mut ask),
+                None
+            );
+            assert_eq!(
+                decide(true, tool, "../a", false, &work, &s, true, &mut ask),
+                None
+            );
+            assert_eq!(
+                *log.borrow(),
+                vec![(tool.to_string(), Approval::Tree(root.join("a")))]
+            );
+            // A no names the tool and is not remembered.
+            let s2 = store();
+            let mut no = |_: &str, _: &Path, _: &Approval| false;
+            assert_eq!(
+                decide(true, tool, "../b", false, &work, &s2, true, &mut no),
+                Some(format!(
+                    "User denied {tool} on '{}' (outside the working directory)",
+                    root.join("b").display()
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn inside_roots_pass_untouched() {
+        let (_tmp, _root, work) = tree();
+        std::fs::create_dir_all(work.join("sub")).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(work.join("sub"), work.join("inlink")).unwrap();
+        let s = store();
+        let mut never = |_: &str, _: &Path, _: &Approval| -> bool { panic!("inside: no prompt") };
+        // `.` is also what a missing root means (the tools default to the cwd).
+        let mut roots = vec![".", "sub", "inside.txt"];
+        if cfg!(unix) {
+            roots.push("inlink");
+        }
+        for tool in ["search", "list_files"] {
+            for r in &roots {
+                assert_eq!(
+                    decide(true, tool, r, false, &work, &s, false, &mut never),
+                    None,
+                    "{tool} rooted at {r} is inside"
+                );
+            }
+            // A nonexistent root is not asked about: the tool reports it.
+            assert_eq!(
+                decide(true, tool, "../nope", false, &work, &s, false, &mut never),
+                None
+            );
+            // --allow-dir already passed: consent given.
+            assert_eq!(
+                decide(true, tool, "../a", true, &work, &s, false, &mut never),
+                None
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn root_symlink_inside_pointing_outside_is_outside() {
+        let (_tmp, root, work) = tree();
+        std::os::unix::fs::symlink(root.join("a"), work.join("escape")).unwrap();
+        let log = std::cell::RefCell::new(Vec::new());
+        let mut ask = recorder(&log, true);
+        let s = store();
+        assert_eq!(
+            decide(true, "search", "escape", false, &work, &s, true, &mut ask),
+            None
+        );
+        assert_eq!(
+            *log.borrow(),
+            vec![("search".to_string(), Approval::Tree(root.join("a")))],
+            "canonicalized: the prompt and the key name the real directory"
+        );
+    }
+
+    #[test]
+    fn remembered_keys_are_exact_and_kinds_do_not_cover_each_other() {
+        let (_tmp, root, work) = tree();
+        std::fs::create_dir_all(root.join("a/deeper")).unwrap();
+        let s = store();
+        let log = std::cell::RefCell::new(Vec::new());
+        let mut ask = recorder(&log, true);
+        // A read of a file in `a` approves Files(a)...
+        decide(
+            true,
+            "read_file",
+            "../a/x",
+            false,
+            &work,
+            &s,
+            true,
+            &mut ask,
+        );
+        // ...and a search whose root is a FILE in `a` rides it (parent key)...
+        decide(true, "search", "../a/y", false, &work, &s, true, &mut ask);
+        // ...but a recursive search ROOTED at `a` is a different grant.
+        decide(true, "search", "../a", false, &work, &s, true, &mut ask);
+        // A Tree yes for `a` covers list_files at `a` (same key)...
+        decide(true, "list_files", "../a", false, &work, &s, true, &mut ask);
+        // ...and not a root one level down.
+        decide(
+            true,
+            "list_files",
+            "../a/deeper",
+            false,
+            &work,
+            &s,
+            true,
+            &mut ask,
+        );
+        assert_eq!(
+            *log.borrow(),
+            vec![
+                ("read_file".to_string(), Approval::Files(root.join("a"))),
+                ("search".to_string(), Approval::Tree(root.join("a"))),
+                (
+                    "list_files".to_string(),
+                    Approval::Tree(root.join("a/deeper"))
+                ),
+            ]
+        );
+        // read_file is a file read even when handed a directory.
+        assert_eq!(
+            approval_for("read_file", &root.join("a")),
+            Approval::Files(root.clone())
         );
     }
 }
