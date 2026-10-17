@@ -166,12 +166,12 @@ pub(crate) fn cd_config_note(
             }
             let tail = if sections.is_empty() {
                 "Its [permissions] allow, hooks and MCP servers would still not be reloaded on \
-                 /cd (#869)."
+                 /cd (#1040)."
                     .to_string()
             } else {
                 format!(
                     "It also sets {} and they are NOT applied{sep} the launch directory's \
-                     settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use them (#869).",
+                     settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use them (#1040).",
                     sections.join(", ")
                 )
             };
@@ -180,12 +180,12 @@ pub(crate) fn cd_config_note(
         CdConfigReading::Sets(sections, _, _, _) if sections.is_empty() => None,
         CdConfigReading::Sets(sections, _, _, _) => Some(format!(
             "  {dir}/.yoyo.toml sets {} and they are NOT applied in this session{sep} \
-             the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use them (#869).",
+             the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use them (#1040).",
             sections.join(", ")
         )),
         CdConfigReading::Unreadable => Some(format!(
             "  {dir}/.yoyo.toml exists but could not be read, and NONE of it is applied in this \
-             session{sep} the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use it (#869)."
+             session{sep} the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use it (#1040)."
         )),
     }
 }
@@ -580,7 +580,7 @@ mod tests {
             "  /repo/.yoyo.toml: its 1 [permissions] deny pattern is now enforced on bash \
              commands for the rest of this session (another /cd does not remove it; file tools \
              never read this list). Its [permissions] allow, hooks and MCP servers would still \
-             not be reloaded on /cd (#869)."
+             not be reloaded on /cd (#1040)."
         );
     }
 
@@ -597,7 +597,7 @@ mod tests {
              commands for the rest of this session (another /cd does not remove them; file tools \
              never read this list). It also sets [permissions] allow, hooks and they are NOT \
              applied: the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use \
-             them (#869)."
+             them (#1040)."
         );
     }
 
@@ -610,7 +610,7 @@ mod tests {
             cd_config_note("/repo", &reading, false).unwrap(),
             "  /repo/.yoyo.toml sets [permissions] allow and they are NOT applied in this \
              session — the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here to use \
-             them (#869)."
+             them (#1040)."
         );
     }
 
@@ -681,7 +681,7 @@ mod tests {
             "  /tmp/B/.yoyo.toml sets [permissions] allow, hooks, MCP servers and they are NOT \
              applied in this session — the launch directory's settings stay in force, except \
              that its own [permissions] allow and hooks pause outside its tree. Restart yoyo \
-             here to use them (#869)."
+             here to use them (#1040)."
         );
     }
 
@@ -820,14 +820,14 @@ mod tests {
             render_cd_config_note(&note, note_volume(&reading), false),
             "\x1b[2m  /repo/.yoyo.toml exists but could not be read, and NONE of it is applied \
              in this session — the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here \
-             to use it (#869).\x1b[0m"
+             to use it (#1040).\x1b[0m"
         );
         let plain = cd_config_note("/repo", &reading, true).unwrap();
         assert_eq!(
             render_cd_config_note(&plain, note_volume(&reading), true),
             "\x1b[2m  /repo/.yoyo.toml exists but could not be read, and NONE of it is applied \
              in this session: the launch directory's settings stay in force, except that its own [permissions] allow and hooks pause outside its tree. Restart yoyo here \
-             to use it (#869).\x1b[0m"
+             to use it (#1040).\x1b[0m"
         );
     }
 
@@ -924,7 +924,7 @@ mod tests {
         let expected = format!(
             "  {}/.yoyo.toml sets hooks and they are NOT applied in this session: the launch \
              directory's settings stay in force, except that its own [permissions] allow and \
-             hooks pause outside its tree. Restart yoyo here to use them (#869).",
+             hooks pause outside its tree. Restart yoyo here to use them (#1040).",
             b.display()
         );
         assert_eq!(
@@ -999,7 +999,7 @@ mod tests {
             "  {}/.yoyo.toml: its 1 [permissions] deny pattern is now enforced on bash commands \
              for the rest of this session (another /cd does not remove it; file tools never read \
              this list). Its [permissions] allow, hooks and MCP servers would still not be \
-             reloaded on /cd (#869).",
+             reloaded on /cd (#1040).",
             dir.display()
         )
     }
@@ -1068,7 +1068,7 @@ mod tests {
              commands for the rest of this session (another /cd does not remove it; file tools \
              never read this list). It also sets hooks and they are NOT applied: the launch \
              directory's settings stay in force, except that its own [permissions] allow and \
-             hooks pause outside its tree. Restart yoyo here to use them (#869).",
+             hooks pause outside its tree. Restart yoyo here to use them (#1040).",
             b.display()
         );
         assert_eq!(rendered_cd(&b, false, &st), Some(want));
@@ -1150,7 +1150,7 @@ mod tests {
             "  /repo/.yoyo.toml: its 2 [directories] deny entries are now enforced on the file \
              tools for the rest of this session (another /cd does not remove them; bash never \
              reads this list). Its [permissions] allow, hooks and MCP servers would still not be \
-             reloaded on /cd (#869)."
+             reloaded on /cd (#1040)."
         );
         // Both deny lists at once: each named, each with its own executor.
         let both = sets("[permissions]\ndeny = [\"rm *\"]\n[directories]\ndeny = [\"s\"]\n");
@@ -1161,7 +1161,7 @@ mod tests {
              this list); its 1 [directories] deny entry is now enforced on the file tools for the \
              rest of this session (another /cd does not remove it; bash never reads this list). \
              Its [permissions] allow, hooks and MCP servers would still not be reloaded on /cd \
-             (#869)."
+             (#1040)."
         );
     }
 
@@ -1292,7 +1292,7 @@ mod tests {
             "  /r/.yoyo.toml: its 1 [directories] allow entry now also fence the file tools: a \
              path outside it is refused until the next /cd replaces this list (the launch allow \
              list still applies too; bash never reads this list). Its [permissions] allow, hooks \
-             and MCP servers would still not be reloaded on /cd (#869)."
+             and MCP servers would still not be reloaded on /cd (#1040)."
         );
         assert!(!cd_dir_fence_is_empty_with(&deny, &allow));
     }
@@ -1388,11 +1388,11 @@ mod tests {
     const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
         (
             "src/context.rs",
-            "#869: instruction-file loaders run at startup, before any /cd",
+            "#869 residue, now #1042: the startup loader runs before any /cd, but /spawn reloads instruction files after one",
         ),
         (
             "src/skill_fence.rs",
-            "#869: skills are loaded at startup; skills reload after /cd is a separate #869 half",
+            "#869 residue, now #1040: skills are loaded at startup; reloading them after /cd is #1040",
         ),
     ];
 
