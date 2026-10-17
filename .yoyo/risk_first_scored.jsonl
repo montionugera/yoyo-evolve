@@ -144,3 +144,4 @@
 {"day":230,"git_hash":"3d303418","path":"src/config_syntax.rs","ts":"2026-10-16T10:22:47Z"}
 {"day":231,"git_hash":"0cdf6f26","path":"src/mcp_prefix.rs","ts":"2026-10-17T11:23:27Z"}
 {"day":231,"git_hash":"e4109243","path":"src/outside_read.rs","ts":"2026-10-17T14:08:07Z"}
+{"day":231,"git_hash":"a740f920","path":"src/non_regular_read.rs","ts":"2026-10-17T23:05:08Z"}
