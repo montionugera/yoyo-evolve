@@ -1,0 +1,115 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n '140,300p' src/fence_result…  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src; ls tools; grep -n "matches)\|file… ✓ (5ms)
+ ✓ (4ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src; sed -n '230,295p' tools/search.rs… ✓ (5ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src; sed -n '120,190p' tools/list.rs ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n '300,549p' src/fence_result… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n '410,549p' src/fence_result… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (193 lines) ✓ (26ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 1m 22s (8 ✓)
+
+Now wire fence_tool_result to the details JSON:
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (39 lines) ✓ (10.8s)
+
+Now the tests (emission point, full strings):
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (119 lines) ✓ (32.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All 17 green. Add an end-to-end assertion through the real yoagent tools, and fix the module doc's now-false "Limits" sentence:
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (35 lines) ✓ (30.8s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+17 both times is suspicious — let me confirm the new tests actually run.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo fence_result… ✓ (118ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo fence_result… ✓ (29.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 34.2s (2 ✓)
+
+13 → 17, the four new tests run. Now the positive control, as one atomic mutate→test→restore command:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "kept.push(new)" src/fence… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/fence_result_filter.rs /tmp… ✓ (59.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "RIPGREP_CONFIG_PATH\|rip… ✓ (21ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rln "yoagent-version-claim" … ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "docs\|fn \|walk\|\.md" te… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (23 lines) ✓ (22ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 1m 20s (6 ✓)
+
+Verifying the doc's claims against yoagent 0.25.7 rather than trusting the module comment:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src; grep -n "no-config\|RIPGREP_CONFI… ✓ (5ms)
+
+Claims confirmed. Full gate:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (3m 33s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (3m 12s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6m 49s (2 ✓)
+
+All green (0 suites with failures). Checking whether ARCHITECTURE.md's entry for this file now says something false:
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "footer\|details\|matches)… ✓ (7ms)
+
+Line 1360 now states a fixed item as open. Correcting it in place (marked, not erased):
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (23 lines) ✓ (285ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view … (5 lines) ✓ (1.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 20.7s (2 ✓)
+
+I fixed both falsehoods from #1023 and committed them as db4dd245, titled "Part of #1023". Build, all tests, clippy with -D warnings and the fmt check pass.
+
+1. The match count now agrees with what the model sees (src/fence_result_filter.rs)
+• When the fence hides lines, the tool's own count is redone to the number of results actually shown. That covers (N matches), (N files) and the two "showing the first…" forms. I copied those exact strings from yoagent 0.25.7's source rather than guessing them.
+• The count in the details JSON (matches for search, total for list_files) could be reached from the same function, so I fixed it too and lowered it by the same amount.
+• I count the lines that are actually shown instead of subtracting the hidden ones from the old number. An existing test had 3 result lines under (2 matches), and subtracting would have printed (0 matches) with a line still visible. That test's expected text changed from (2 matches) to (1 matches). It's still an exact full-string check.
+• New tests (all compare the full output string):
+  • 3 matches with 1 hidden: the count says 2, the hidden-results note says 1, and details says 2.
+  • The longer "showing the first…" forms of the count line are redone the same way.
+  • Nothing hidden: the text and details are byte-identical.
+  • A missing or unrecognised count line is left alone.
+  • The end-to-end test through the real search and list tools now also checks (1 matches) and (1 files).
+• Sabotage check (break the rewrite, run the tests, restore, all in one command): with the count rewrite disabled, 4 tests failed, including search_footer_counts_only_the_lines_the_fence_let_through. The "nothing hidden" and "no count line" tests stayed green. After restoring, all 17 pass and no NEUTERED marker is left in the file.
+
+2. Doc (docs/src/configuration/permissions.md)
+• The "unset RIPGREP_CONFIG_PATH" advice is gone. The paragraph now says that search runs rg --no-config with RIPGREP_CONFIG_PATH and GREP_OPTIONS cleared (yoagent 0.25.5 and later). I checked this in 0.25.7's tools/search.rs.
+• The rule that drops lines the fence can't attribute to a file stays, described as a second line of defence.
+• grep -rn "unset .RIPGREP_CONFIG_PATH" docs/ now finds nothing, and no other file in docs/ or src/ gives that advice.
+
+Beyond the listed files: ARCHITECTURE.md still said the stale count was an open problem in #1023. I corrected that sentence in place and labelled the old version as superseded, so the doc isn't left wrong.
+
+Comment posted on #1023:
+• Item 1 is closed by yoagent 0.25.5's --no-config.
+• Item 2 is fixed in db4dd245, including the details JSON.
+• Item 3 is still open: warning lines from find/rg printed after the count can still name a denied path.
+• The doc's "0.25.5 and later" has no version marker, because tests/doc_version_claims.rs doesn't scan docs/. A marker there would look checked without being checked.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,20 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for n in 1040 1042 869; do gh issu… ✓ (1.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p sessi… (9 lines) ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 18.4s (2 ✓)
+
+Verdict: PASS. It's written to session_plan/eval_task_2.md.
+
+• The measurement was actually run. The comment on #869 has the raw output from the built binary through a pty. The launch project's MCP server process (PID 58879) was still running after /cd ../B and again after /cd ../A. Its tool, probe869_tool, was still in the tool list sent with the next prompt in both directories. The comment says plainly that it did not test the model actually calling the tool.
+• The doc change matches the task. The new paragraph is in the "After /cd" section of permissions.md. It says the launch project's servers stay connected by decision, gives the reasons the task asked for, notes that launch hooks and allow patterns pause outside the launch tree, and points to #1040 for the new directory's own servers.
+• Issues cited are open. gh shows #1040 and #1042 are both open. #869 is still open only because the commit hasn't been pushed yet; the "Fixes #869" in the title closes it on push.
+• The code change is just issue numbers. In cd_config_note.rs, the /cd messages now point to #1040 instead of #869, so they won't point at a closed ticket. Every full-string assert_eq! test was updated to match, and nothing new was defined, so there are no missing call sites.
+• No product settings changed. No defaults, flags, setup wizard or startup behaviour were touched.
+
+One small thing: the diff also adds a sentence about /spawn re-reading instruction files after /cd (#1042). The task didn't ask for it, but it's in the same section, correct, and cites an open issue, so I didn't count it against the work.
+  watch: no files changed this turn — skipping

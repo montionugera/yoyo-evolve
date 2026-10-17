@@ -1,0 +1,83 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; grep … ✓ (689ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue view 1040 --json state,… ✓ (1.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn '"/mcp"' src/*.rs | hea… ✓ (158ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1100,1180p src/commands_c… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && (cargo build 2>&1 | tail -2) && … ✓ (137ms)
+  ▶ $ mkdir -p /tmp/m869 && cd /tmp/m869 && rm -rf A B && mkdir A … (49 lines) ✓ (9ms)
+  ▶ $ cd /tmp/m869 && cat > drive.py <<'EOF' (42 lines) ✓ (44.9s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n -i "mcp" src/cd_config_n… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1,12p src/cd_config_note.… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "#869" src/ docs/ | gre… ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "(#869)\|#869" src/cd_c… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "#869" src/cd_config_not… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1375,1400p src/cd_config_…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue list --state open --sea… ✓ (6ms)
+ ✓ (1.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "check_path" src/context… ✓ (20ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 495,520p src/commands_spa… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue vie… (17 lines) ✓ (1.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  17 tools completed in 2m 54s (17 ✓)
+
+Now update the register reason (keeps "#869" so the guard's assertion is untouched) and retarget the user-facing (#869) pointers to the open #1040.
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (13 lines) ✓ (22ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn '#869' src/ | grep -v "… ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 12.4s (2 ✓)
+
+Only comments elsewhere. Now the docs paragraph — replacing the unmeasured sentence with the measured one, and fixing the (#869) pointer at line 561.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (20 lines) ✓ (22ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Also point the docs' remaining-readers sentence at the new tracker.
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (7 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 590 sh -c 'cargo clippy … ✓ (285ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 590 cargo test 2>&1 | gr… ✓ (3m 21s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 590 cargo test 2>&1 | gr… ✓ (3m 2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 8m 46s (3 ✓, 1 ✗)
+
+All green: 6640 passed, 0 failed; clippy and fmt clean. Committing.
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git diff --s… (14 lines) ✓ (15ms)
+  ▶ $ cd /tmp/m869 && cat > comment.md <<'EOF' (29 lines) ✓ (65ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue comment 869 --body-file… ✓ (896ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "use them (#869)\|use it… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 25.2s (4 ✓)
+
+I measured the claim and it holds: after /cd, the launch project's MCP servers stay connected. That's now written in the docs as a deliberate decision. I committed it as 912057d0, which hasn't been pushed yet; the push will close #869.
+
+How I measured it: I ran the built binary through a pty against a stub OpenAI-compatible server. Launch dir A had a small stdio MCP server that writes its PID to a file and offers one tool, probe869_tool, and I started with --trust-project.
+• The server process (PID 58879) was still alive after /cd ../B, where trust switched OFF, and again after /cd ../A.
+• /mcp showed "1 connected" every time.
+• The tool list sent with each prompt, in A and then in B, still included probe869_tool.
+• I didn't check whether the model can actually call the tool after /cd. I've said so in the #869 comment.
+
+What changed:
+• `docs/src/configuration/permissions.md`: the old sentence came from reading the code, not from a run. I replaced it with a paragraph giving the decision and its reason: you approved these servers at startup, their tools are already in the tool list, and dropping one mid-session would mean rebuilding the agent, which drops them all (#842). It also explains why this differs from the launch project's allow patterns and hooks, which pause outside its tree, and points to #1040 for a new directory's own servers.
+• `src/cd_config_note.rs`: closing #869 would have left the /cd note telling users "Restart yoyo here to use them (#869)", pointing at a closed ticket. I changed 4 user-facing strings and their 12 test expectations to cite #1040, which I checked is open and covers that gap.
+• New issue #1042: a check-path register in the tests listed the instruction-file loader with the reason "runs at startup, before any /cd". That's false for /spawn: src/commands_spawn.rs:510 reloads instruction files from the current directory when you run it, and only checks the startup [directories] fence. I found this by reading the code and haven't reproduced it in a run. I filed it so closing #869 doesn't leave it untracked, and named it in the register and the docs. The test that requires each reason to mention "#869" is unchanged.
+
+Build, clippy, fmt and cargo test (6640 passed, 0 failed) all pass. I've commented on #869 with the raw output and a status for each item.
+  watch: no files changed this turn — skipping
