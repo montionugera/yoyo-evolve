@@ -208,11 +208,14 @@ yoyo --allow-dir ./src --allow-dir ./tests --deny-dir ~/.ssh
 
 This affects `read_file`, `write_file`, `edit_file`, `list_files`, and `search`. For `search` and `list_files` the
 fence covers the results as well as the path you pass: searching or listing an allowed root still withholds every
-match or file inside a refused directory, and the result ends with a line saying how many were withheld.
-While a fence is active, a ripgrep config (`RIPGREP_CONFIG_PATH`) cannot change what a fenced `search` returns:
-any result line that does not name a file under the searched path in the usual `path:line:` form (for example
-because the config adds `--no-filename`, `--null`, `--json` or `--path-separator`) is dropped and counted in its own
-note. With such a config, allowed matches are dropped too; unset `RIPGREP_CONFIG_PATH` to get them back.
+match or file inside a refused directory, and the result ends with a line saying how many were withheld. The
+tool's own count (`(N matches)` / `(N files)`) is then re-counted to the results actually shown, so it agrees with
+that line.
+Your ripgrep config cannot reshape a fenced `search`: yoyo's `search` runs `rg` with `--no-config` and with
+`RIPGREP_CONFIG_PATH` (and `GREP_OPTIONS`) removed from its environment (yoagent 0.25.5 and later), so there is
+nothing to unset. As a second line of defence, while a fence is active any result line that does not name a file
+under the searched path in the usual `path:line:` form (for example from an `rg` or `grep` wrapper on your `PATH`
+that adds `--no-filename`, `--null`, `--json` or `--path-separator`) is dropped and counted in its own note.
 
 The same fence applies to project instruction files (`YOYO.md`, `CLAUDE.md`, `AGENTS.md`, …) loaded into the
 system prompt: a `CLAUDE.md` whose resolved target is denied (or outside every allowed directory) is not loaded,

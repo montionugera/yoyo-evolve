@@ -38,10 +38,14 @@
 //! denied file's line as "not a result line"); those fixtures stay in the tests
 //! below because a wrapper on `PATH` can still produce them.
 //!
-//! Limits, stated rather than implied: the tool's own `(N matches)` /
-//! `(N files)` footer and its `details` JSON are not rewritten (the withheld
-//! line carries the truth); `find` and `rg` warning lines after the footer are
-//! kept verbatim even if they name a denied path. A single-FILE root is not put
+//! **The tool's own count agrees with what is shown (#1023).** When anything is
+//! withheld, yoagent's `(N matches)` / `(N files)` footer (and its truncated
+//! forms) is re-counted to the result lines actually kept, and `details`'
+//! `matches` / `total` is lowered by the same amount. A footer this module
+//! does not recognise is left alone, never invented.
+//!
+//! Limits, stated rather than implied: `find` and `rg` warning lines after the
+//! footer are kept verbatim even if they name a denied path. A single-FILE root is not put
 //! in fail-closed mode: `rg` prints that file's lines without a path, and the
 //! root itself already passed the argument check.
 
@@ -93,14 +97,66 @@ fn attributable_to_root(line: &str, root: &str) -> bool {
 /// `Warnings:` block); picking the last one means a footer-shaped line earlier
 /// in the output can only cause more dropping, never less.
 fn is_search_footer(line: &str) -> bool {
-    if let Some(n) = line
-        .strip_prefix('(')
-        .and_then(|r| r.strip_suffix(" matches)"))
-    {
-        return !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit());
+    recount_footer("search", line, 0).is_some()
+}
+
+/// A non-empty run of ASCII digits, as a count.
+fn parse_count(s: &str) -> Option<usize> {
+    if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
     }
-    line.starts_with("... (showing the first ")
-        && line.ends_with(" matches; there are more. Narrow the pattern, path or include.)")
+    s.parse().ok()
+}
+
+/// yoagent's truncated-`search` footer, split around its count.
+const SEARCH_MORE_PREFIX: &str = "... (showing the first ";
+const SEARCH_MORE_SUFFIX: &str = " matches; there are more. Narrow the pattern, path or include.)";
+
+/// If `line` is the count footer yoagent's `tool` appends (spellings copied
+/// from yoagent 0.25.7's `tools/search.rs` and `tools/list.rs`
+/// <!-- yoagent-version-claim: 0.25 -->), return it re-counted to `shown`
+/// result lines, plus the count the original claimed for its shown lines.
+/// `None` for anything else, so an unknown footer is left alone, never
+/// invented. For a truncated `list_files` footer (`T files, showing first M`)
+/// the total drops by exactly the shown entries that were withheld; entries
+/// past the cap were never in the output and were not checked.
+fn recount_footer(tool: &str, line: &str, shown: usize) -> Option<(String, usize)> {
+    match tool {
+        "search" => {
+            if let Some(n) = line
+                .strip_prefix('(')
+                .and_then(|r| r.strip_suffix(" matches)"))
+                .and_then(parse_count)
+            {
+                return Some((format!("({shown} matches)"), n));
+            }
+            let n = line
+                .strip_prefix(SEARCH_MORE_PREFIX)
+                .and_then(|r| r.strip_suffix(SEARCH_MORE_SUFFIX))
+                .and_then(parse_count)?;
+            Some((
+                format!("{SEARCH_MORE_PREFIX}{shown}{SEARCH_MORE_SUFFIX}"),
+                n,
+            ))
+        }
+        "list_files" => {
+            if let Some(n) = line
+                .strip_prefix('(')
+                .and_then(|r| r.strip_suffix(" files)"))
+                .and_then(parse_count)
+            {
+                return Some((format!("({shown} files)"), n));
+            }
+            let (t, m) = line
+                .strip_prefix("... (")
+                .and_then(|r| r.strip_suffix(')'))
+                .and_then(|r| r.split_once(" files, showing first "))?;
+            let (t, m) = (parse_count(t)?, parse_count(m)?);
+            let total = t.saturating_sub(m.saturating_sub(shown));
+            Some((format!("... ({total} files, showing first {shown})"), m))
+        }
+        _ => None,
+    }
 }
 
 /// The in-band note appended when `count > 0`. Glyph-free on purpose.
@@ -126,14 +182,38 @@ fn unattributed_note(count: usize) -> String {
 /// walked the directory `root`: then a line before the tool's footer that is
 /// not [`attributable_to_root`] is dropped too (#1023). `None` keeps the
 /// pre-#1023 behaviour exactly.
+#[cfg(test)]
 fn filter_fenced_lines(
     tool: &str,
     output: &str,
     refused: &dyn Fn(&str) -> bool,
     strict_root: Option<&str>,
 ) -> (String, usize) {
+    let f = filter_fenced(tool, output, refused, strict_root);
+    (f.text, f.withheld)
+}
+
+/// What [`filter_fenced`] produced: the text, how many lines it withheld, and
+/// how far it lowered the footer's count (`0` when it found no footer).
+struct Filtered {
+    text: String,
+    withheld: usize,
+    recounted_by: usize,
+}
+
+/// The filter itself; see [`filter_fenced_lines`] for the contract.
+fn filter_fenced(
+    tool: &str,
+    output: &str,
+    refused: &dyn Fn(&str) -> bool,
+    strict_root: Option<&str>,
+) -> Filtered {
     if !RECURSIVE_READERS.contains(&tool) {
-        return (output.to_string(), 0);
+        return Filtered {
+            text: output.to_string(),
+            withheld: 0,
+            recounted_by: 0,
+        };
     }
     let lines: Vec<&str> = output.split('\n').collect();
     // Lines at or after `tail_start` are yoagent's own; only the body before it
@@ -147,7 +227,7 @@ fn filter_fenced_lines(
         .iter()
         .rposition(|l| is_search_footer(l))
         .unwrap_or(lines.len());
-    let mut kept: Vec<&str> = Vec::new();
+    let mut keep = vec![false; lines.len()];
     let mut denied = 0usize;
     let mut unattributed = 0usize;
     for (idx, line) in lines.iter().enumerate() {
@@ -165,12 +245,36 @@ fn filter_fenced_lines(
         {
             unattributed += 1;
         } else {
-            kept.push(line);
+            keep[idx] = true;
         }
     }
     let withheld = denied + unattributed;
     if withheld == 0 {
-        return (output.to_string(), 0);
+        return Filtered {
+            text: output.to_string(),
+            withheld: 0,
+            recounted_by: 0,
+        };
+    }
+    // Re-count yoagent's footer to the result lines actually shown, so the
+    // model is not handed a count that includes what was withheld (#1023).
+    let footer = lines
+        .iter()
+        .rposition(|l| recount_footer(tool, l, 0).is_some())
+        .and_then(|f| {
+            let shown = (0..f)
+                .filter(|&i| keep[i] && !lines[i].trim_end_matches('\r').is_empty())
+                .count();
+            recount_footer(tool, lines[f], shown).map(|(new, old)| (f, new, old - old.min(shown)))
+        });
+    let recounted_by = footer.as_ref().map_or(0, |(_, _, by)| *by);
+    let mut kept: Vec<&str> = Vec::new();
+    for (idx, line) in lines.iter().enumerate() {
+        match &footer {
+            Some((f, new, _)) if *f == idx => kept.push(new),
+            _ if keep[idx] => kept.push(line),
+            _ => {}
+        }
     }
     let mut text = kept.join("\n");
     for note in [
@@ -185,7 +289,11 @@ fn filter_fenced_lines(
         }
         text.push_str(&note);
     }
-    (text, withheld)
+    Filtered {
+        text,
+        withheld,
+        recounted_by,
+    }
 }
 
 /// Apply the filter to every text block of a successful tool result. Non-text
@@ -208,12 +316,23 @@ pub(crate) fn fence_tool_result(
         return result;
     }
     let strict_root = (fence_active && !std::path::Path::new(root).is_file()).then_some(root);
+    let mut recounted_by = 0usize;
     for block in result.content.iter_mut() {
         if let yoagent::types::Content::Text { text } = block {
-            let (filtered, n) = filter_fenced_lines(tool, text, refused, strict_root);
-            if n > 0 {
-                *text = filtered;
+            let f = filter_fenced(tool, text, refused, strict_root);
+            if f.withheld > 0 {
+                *text = f.text;
+                recounted_by += f.recounted_by;
             }
+        }
+    }
+    // The same count lives in `details` (`matches` for search, `total` for
+    // list_files); lower it by exactly what the footer was lowered by, so the
+    // two never disagree. A missing or non-numeric field is left alone.
+    let key = if tool == "search" { "matches" } else { "total" };
+    if recounted_by > 0 {
+        if let Some(n) = result.details.get(key).and_then(|v| v.as_u64()) {
+            result.details[key] = serde_json::json!(n.saturating_sub(recounted_by as u64));
         }
     }
     result
@@ -463,6 +582,12 @@ mod tests {
         assert!(!out.contains("token="), "canary leaked via search: {out}");
         assert!(out.contains("src/a.txt"), "allowed hit lost: {out}");
         assert!(out.contains("[1 result withheld:"), "{out}");
+        // The REAL footer is recounted: 2 hits on disk, 1 shown (#1023).
+        assert!(
+            out.contains("\n(1 matches)\n"),
+            "footer not recounted: {out}"
+        );
+        assert_eq!(res.details["matches"], serde_json::json!(1), "{out}");
         // The fence is active here, so fail-closed mode is on: yoagent's own
         // footer must still be recognised, or this note would appear (#1023).
         assert!(
@@ -492,6 +617,8 @@ mod tests {
         );
         assert!(out.contains("src/a.txt"), "{out}");
         assert!(out.contains("[1 result withheld:"), "{out}");
+        assert!(out.contains("\n(1 files)\n"), "footer not recounted: {out}");
+        assert_eq!(res.details["total"], serde_json::json!(1), "{out}");
     }
 
     #[test]
@@ -535,7 +662,7 @@ mod tests {
         assert_eq!(
             out,
             format!(
-                "{root}/src/a.txt:1:ok {CANARY}\n(2 matches)\n[2 lines withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
+                "{root}/src/a.txt:1:ok {CANARY}\n(1 matches)\n[2 lines withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
             )
         );
         for stale in ["RIPGREP_CONFIG_PATH", "ripgrep config"] {
@@ -545,5 +672,111 @@ mod tests {
             unattributed_note(1),
             "[1 line withheld: a directory fence is active and the line does not name a file under the searched path in the usual path:line: form, so the fence could not check it and dropped it rather than risk a leak]"
         );
+    }
+
+    /// #1023 item 2, at the emission point: the footer the MODEL receives
+    /// counts only the result lines it can see, and `details` agrees.
+    #[test]
+    fn search_footer_counts_only_the_lines_the_fence_let_through() {
+        let (_dir, root, r) = fixture();
+        let refused = |p: &str| r.check_path(p).is_err();
+        let text = format!(
+            "{root}/secrets/key.txt:1:token={CANARY}\n{root}/src/a.txt:1:ok {CANARY}\n{root}/src/b.txt:2:ok\n(3 matches)"
+        );
+        // Anti-vacuous: the fixture carries the footer spelling yoagent emits
+        // (`format!("{}\n({} matches)", ...)` in yoagent's tools/search.rs).
+        assert!(text.ends_with("\n(3 matches)"));
+        assert!(is_search_footer("(3 matches)"));
+        let res = yoagent::types::ToolResult {
+            content: vec![yoagent::types::Content::Text { text }],
+            details: serde_json::json!({"matches": 3, "truncated": false}),
+        };
+        let out = fence_tool_result("search", res, &refused, true, &root);
+        assert_eq!(
+            text_of(&out),
+            format!(
+                "{root}/src/a.txt:1:ok {CANARY}\n{root}/src/b.txt:2:ok\n(2 matches)\n{}",
+                withheld_note(1)
+            )
+        );
+        assert_eq!(
+            out.details,
+            serde_json::json!({"matches": 2, "truncated": false})
+        );
+    }
+
+    #[test]
+    fn truncated_search_and_list_footers_are_recounted() {
+        let (_dir, root, r) = fixture();
+        let refused = |p: &str| r.check_path(p).is_err();
+        let more = format!(
+            "{root}/secrets/key.txt:1:x\n{root}/src/a.txt:1:y\n... (showing the first 2 matches; there are more. Narrow the pattern, path or include.)"
+        );
+        let (out, n) = filter_fenced_lines("search", &more, &refused, None);
+        assert_eq!(n, 1);
+        assert_eq!(
+            out,
+            format!(
+                "{root}/src/a.txt:1:y\n... (showing the first 1 matches; there are more. Narrow the pattern, path or include.)\n{}",
+                withheld_note(1)
+            )
+        );
+        let list = format!("{root}/secrets/key.txt\n{root}/src/a.txt\n\n(2 files)");
+        let res = yoagent::types::ToolResult {
+            content: vec![yoagent::types::Content::Text { text: list }],
+            details: serde_json::json!({"total": 2}),
+        };
+        let out = fence_tool_result("list_files", res, &refused, true, &root);
+        assert_eq!(
+            text_of(&out),
+            format!("{root}/src/a.txt\n\n(1 files)\n{}", withheld_note(1))
+        );
+        assert_eq!(out.details, serde_json::json!({"total": 1}));
+        let capped =
+            format!("{root}/secrets/key.txt\n{root}/src/a.txt\n\n... (9 files, showing first 2)");
+        let (out, _) = filter_fenced_lines("list_files", &capped, &refused, None);
+        assert_eq!(
+            out,
+            format!(
+                "{root}/src/a.txt\n\n... (8 files, showing first 1)\n{}",
+                withheld_note(1)
+            )
+        );
+    }
+
+    /// Near-miss: nothing withheld -> text AND details byte-identical.
+    #[test]
+    fn footer_and_details_untouched_when_nothing_is_withheld() {
+        let (_dir, root, r) = fixture();
+        let refused = |p: &str| r.check_path(p).is_err();
+        let text = format!("{root}/src/a.txt:1:ok\n{root}/src/b.txt:2:ok\n(2 matches)");
+        let details = serde_json::json!({"matches": 2, "truncated": false});
+        let res = yoagent::types::ToolResult {
+            content: vec![yoagent::types::Content::Text { text: text.clone() }],
+            details: details.clone(),
+        };
+        let out = fence_tool_result("search", res, &refused, true, &root);
+        assert_eq!(text_of(&out), text);
+        assert_eq!(out.details, details);
+    }
+
+    /// No recognisable footer -> none is invented, and details stay put.
+    #[test]
+    fn an_absent_or_unparseable_footer_is_left_alone() {
+        let (_dir, root, r) = fixture();
+        let refused = |p: &str| r.check_path(p).is_err();
+        for tail in ["", "\n(many matches)", "\n(3 hits)"] {
+            let text = format!("{root}/secrets/key.txt:1:x\n{root}/src/a.txt:1:y{tail}");
+            let res = yoagent::types::ToolResult {
+                content: vec![yoagent::types::Content::Text { text }],
+                details: serde_json::json!({"matches": 2}),
+            };
+            let out = fence_tool_result("search", res, &refused, false, &root);
+            assert_eq!(
+                text_of(&out),
+                format!("{root}/src/a.txt:1:y{tail}\n{}", withheld_note(1))
+            );
+            assert_eq!(out.details, serde_json::json!({"matches": 2}));
+        }
     }
 }
