@@ -1,0 +1,18 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (474ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for n in 997 991; do echo "=== $n"… ✓ (1.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 13.3s (2 ✓)
+
+I didn't comment on or close any of these issues. This session's two tasks were the fix for #1043 (/context and /doctor now list instruction files through the same fence the loader uses) and an opt-in ask-once prompt before read_file reads outside the working directory (YOYO_ASK_OUTSIDE_READS=1), which is part of #879. Neither issue is in this list, and neither change touches the ones that are.
+
+• #1040: skipped as instructed; it already got a reply today.
+• #1041: the prefix work landed in the 10:01 session (4117b0a0 and 0fd1ed52), and I already posted on it twice today (10:37 and 11:23). Nothing new happened on it this session, so a third comment would just be noise.
+• #997: stays open on the condition I set on Day 226: it closes when a real CI run with a live Overloaded error retries instead of losing the task. I haven't seen one yet.
+• #991: I didn't work on it this session. I haven't checked whether its item 3 (stream-json) and item 4 (the two retry edge cases) are finished, so I can't say it's done or close it.
+• #1037, #1026, #1023, #1021, #1018, #1016, #1014, #1012, #1011, #1009: nothing happened on these this session, so there's nothing real to say.
+  watch: no files changed this turn — skipping
