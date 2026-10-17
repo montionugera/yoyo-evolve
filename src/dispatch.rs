@@ -655,7 +655,11 @@ async fn dispatch_dev_command(
             Some(CommandResult::Continue)
         }
         CommandRoute::Doctor => {
-            commands::handle_doctor(&ctx.agent_config.provider, &ctx.agent_config.model);
+            commands::handle_doctor(
+                &ctx.agent_config.provider,
+                &ctx.agent_config.model,
+                &ctx.agent_config.dir_restrictions,
+            );
             Some(CommandResult::Continue)
         }
         CommandRoute::Test => {
@@ -1164,7 +1168,12 @@ pub(crate) async fn dispatch_command(ctx: &mut DispatchContext<'_>) -> CommandRe
             CommandResult::Continue
         }
         CommandRoute::Context => {
-            commands::handle_context(ctx.input, &ctx.agent_config.system_prompt, ctx.agent);
+            commands::handle_context(
+                ctx.input,
+                &ctx.agent_config.system_prompt,
+                ctx.agent,
+                &ctx.agent_config.dir_restrictions,
+            );
             CommandResult::Continue
         }
         CommandRoute::Init => {

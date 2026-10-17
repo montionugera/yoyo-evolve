@@ -24,7 +24,12 @@ pub fn context_subcommands() -> &'static [&'static str] {
     CONTEXT_SUBCOMMANDS
 }
 
-pub fn handle_context(input: &str, system_prompt: &str, agent: &Agent) {
+pub fn handle_context(
+    input: &str,
+    system_prompt: &str,
+    agent: &Agent,
+    restrictions: &DirectoryRestrictions,
+) {
     let args = input.strip_prefix("/context").unwrap_or("").trim();
 
     if args.starts_with("system") {
@@ -37,7 +42,7 @@ pub fn handle_context(input: &str, system_prompt: &str, agent: &Agent) {
         let query = args.strip_prefix("relevant").unwrap_or("").trim();
         handle_context_relevant(query);
     } else {
-        show_project_context_files();
+        show_project_context_files(restrictions);
     }
 }
 
@@ -207,9 +212,9 @@ fn show_context_tokens(system_prompt: &str, agent: &Agent) {
     println!("{RESET}");
 }
 
-fn show_project_context_files() {
-    let files = cli::list_project_context_files();
-    if files.is_empty() {
+fn show_project_context_files(restrictions: &DirectoryRestrictions) {
+    let (files, refused) = cli::list_project_context_files(restrictions);
+    if files.is_empty() && refused.is_empty() {
         println!("{DIM}  No project context files found.");
         println!("  Create a YOYO.md to give yoyo project context.");
         println!("  Also supports: CLAUDE.md (compatibility alias), .yoyo/instructions.md");
@@ -220,8 +225,20 @@ fn show_project_context_files() {
             let word = crate::format::pluralize(*lines, "line", "lines");
             println!("    {name} ({lines} {word})");
         }
+        // #1043: a file the loader refuses is shown as refused, never as loaded.
+        for (name, reason) in &refused {
+            println!("    {}", refused_context_file_line(name, reason));
+        }
         println!("{RESET}");
     }
+}
+
+/// The `/context` row for an instruction file the directory fence refuses
+/// (#1043). `reason` names repository-authored paths, so it is sanitized; the
+/// row carries no glyph, so it is the same under plain output.
+pub(crate) fn refused_context_file_line(name: &str, reason: &str) -> String {
+    let reason = crate::cli::sanitize_for_display(reason);
+    format!("{name} (refused by the directory fence: {reason})")
 }
 
 /// A section parsed from a system prompt (split by markdown headers).
@@ -2166,7 +2183,7 @@ mod tests {
         )
         .with_system_prompt("test")
         .with_api_key("test-key");
-        handle_context("/context", "", &agent);
+        handle_context("/context", "", &agent, &DirectoryRestrictions::default());
     }
 
     #[test]
@@ -2178,7 +2195,12 @@ mod tests {
         )
         .with_system_prompt("test")
         .with_api_key("test-key");
-        handle_context("/context system", "# Test\nHello world.\n", &agent);
+        handle_context(
+            "/context system",
+            "# Test\nHello world.\n",
+            &agent,
+            &DirectoryRestrictions::default(),
+        );
     }
 
     #[test]
@@ -2197,7 +2219,12 @@ mod tests {
         )
         .with_system_prompt("You are a test assistant.")
         .with_api_key("test-key");
-        handle_context("/context tokens", "You are a test assistant.", &agent);
+        handle_context(
+            "/context tokens",
+            "You are a test assistant.",
+            &agent,
+            &DirectoryRestrictions::default(),
+        );
     }
 
     #[test]
@@ -2213,7 +2240,12 @@ mod tests {
         .with_system_prompt(prompt)
         .with_api_key("test-key");
         // Should not panic and should exercise the section breakdown path
-        handle_context("/context tokens", prompt, &agent);
+        handle_context(
+            "/context tokens",
+            prompt,
+            &agent,
+            &DirectoryRestrictions::default(),
+        );
     }
 
     #[test]
@@ -2226,7 +2258,12 @@ mod tests {
         )
         .with_system_prompt(prompt)
         .with_api_key("test-key");
-        handle_context("/context tokens", prompt, &agent);
+        handle_context(
+            "/context tokens",
+            prompt,
+            &agent,
+            &DirectoryRestrictions::default(),
+        );
     }
 
     #[test]
@@ -2674,7 +2711,12 @@ mod tests {
         )
         .with_system_prompt("test")
         .with_api_key("test-key");
-        handle_context("/context files", "", &agent);
+        handle_context(
+            "/context files",
+            "",
+            &agent,
+            &DirectoryRestrictions::default(),
+        );
     }
 
     #[test]

@@ -8,8 +8,8 @@
 
 use crate::config::DirectoryRestrictions;
 use crate::context::{
-    instruction_file_refused_warning, load_project_context_fenced, load_project_context_from,
-    load_project_context_restricted,
+    instruction_file_refused_warning, list_project_context_files_fenced,
+    load_project_context_fenced, load_project_context_from, load_project_context_restricted,
 };
 use std::os::unix::fs::symlink;
 
@@ -310,4 +310,96 @@ fn cd_deny_of_a_different_dir_leaves_file_loaded() {
     );
     assert_eq!(ctx, before);
     assert!(refused.is_empty());
+}
+
+// #1043: `/context` and `/doctor` list instruction files through the same
+// fence the loader uses, so the display cannot list a file the loader refuses.
+
+#[test]
+fn cd_denied_file_is_refused_by_both_loader_and_lister() {
+    let (_root, proj, _other) = cd_fixture();
+    let (deny, allow) = (handle(&[&proj]), handle(&[]));
+    let none = DirectoryRestrictions::default();
+    let (ctx, loader_refused) = load_project_context_fenced(&proj, &none, &deny, &allow);
+    assert!(!ctx.unwrap_or_default().contains("CD_CANARY_JX4"));
+    assert!(loader_refused.iter().any(|(n, _)| *n == "CLAUDE.md"));
+
+    let (listed, refused) = list_project_context_files_fenced(&proj, &none, &deny, &allow);
+    assert!(
+        !listed.iter().any(|(n, _)| *n == "CLAUDE.md"),
+        "lister shows a file the loader refuses: {listed:?}"
+    );
+    let names: Vec<&str> = refused.iter().map(|(n, _)| *n).collect();
+    assert_eq!(names, vec!["CLAUDE.md"], "lister and loader disagree");
+    assert!(!refused[0].1.is_empty(), "refusal carries no reason");
+}
+
+#[test]
+fn file_outside_the_cd_denied_dir_is_still_listed_with_its_lines() {
+    let (_root, proj, other) = cd_fixture();
+    std::fs::write(proj.join("AGENTS.md"), "one\ntwo\nthree\n").unwrap();
+    let (listed, refused) = list_project_context_files_fenced(
+        &proj,
+        &DirectoryRestrictions::default(),
+        &handle(&[&other]),
+        &handle(&[]),
+    );
+    assert_eq!(listed, vec![("CLAUDE.md", 1), ("AGENTS.md", 3)]);
+    assert!(refused.is_empty());
+}
+
+#[test]
+fn startup_deny_refuses_in_the_lister_too() {
+    let (_root, proj, _other) = cd_fixture();
+    let (listed, refused) =
+        list_project_context_files_fenced(&proj, &deny(&proj), &handle(&[]), &handle(&[]));
+    assert!(listed.is_empty(), "{listed:?}");
+    assert_eq!(refused.len(), 1);
+    assert_eq!(refused[0].0, "CLAUDE.md");
+}
+
+#[test]
+fn no_fence_lists_exactly_what_the_unfenced_read_finds() {
+    let (_root, proj, _other) = cd_fixture();
+    std::fs::write(proj.join("AGENTS.md"), "a\nb\n").unwrap();
+    std::fs::write(proj.join(".cursorrules"), "   \n").unwrap(); // blank: not listed
+                                                                 // The pre-#1043 loop, verbatim but over `proj`: a bare read of every name.
+    let mut before = Vec::new();
+    for name in crate::context::PROJECT_CONTEXT_FILES {
+        if let Ok(content) = std::fs::read_to_string(proj.join(name)) {
+            let content = content.trim();
+            if !content.is_empty() {
+                before.push((*name, content.lines().count()));
+            }
+        }
+    }
+    assert_eq!(
+        before.len(),
+        2,
+        "anti-vacuous: fixture has two non-blank files"
+    );
+    let (listed, refused) = list_project_context_files_fenced(
+        &proj,
+        &DirectoryRestrictions::default(),
+        &handle(&[]),
+        &handle(&[]),
+    );
+    assert_eq!(listed, before);
+    assert!(refused.is_empty());
+}
+
+#[test]
+fn refused_context_row_names_file_sanitizes_reason_and_has_no_glyph() {
+    let row = crate::commands_project::refused_context_file_line("CLAUDE.md", "denied: /x\x1b[31m");
+    assert!(
+        !row.as_bytes().contains(&0x1b),
+        "raw ESC reached the row: {row:?}"
+    );
+    assert!(row.starts_with("CLAUDE.md (refused by the directory fence: denied: /x"));
+    assert!(row.is_ascii(), "row carries a glyph: {row:?}");
+    let plain = crate::commands_project::refused_context_file_line("AGENTS.md", "outside allow");
+    assert_eq!(
+        plain,
+        "AGENTS.md (refused by the directory fence: outside allow)"
+    );
 }

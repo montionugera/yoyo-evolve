@@ -325,7 +325,9 @@ pub(crate) fn try_dispatch_subcommand_in(
                 let model = flag_value(args, &["--model"])
                     .or_else(|| file_config.get("model").cloned())
                     .unwrap_or_else(|| default_model_for_provider(&provider));
-                crate::commands_dev::handle_doctor(&provider, &model);
+                // No session, so no startup fence is built here (#1043 residue).
+                let no_fence = crate::config::DirectoryRestrictions::default();
+                crate::commands_dev::handle_doctor(&provider, &model, &no_fence);
                 return Some(None);
             }
             "health" => {

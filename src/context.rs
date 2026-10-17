@@ -554,20 +554,40 @@ pub(crate) fn project_instruction_note(loaded: &[(&str, usize)], plain: bool) ->
     })
 }
 
-/// List which project context files exist and their sizes.
-/// Returns a vec of (filename, line_count) for display by /context.
-pub fn list_project_context_files() -> Vec<(&'static str, usize)> {
-    let mut result = Vec::new();
+/// Listed `(name, lines)` and fence-refused `(name, reason)` instruction files.
+pub type ContextFileListing = (Vec<(&'static str, usize)>, Vec<(&'static str, String)>);
+
+/// Project context files for `/context` and `/doctor`, behind the session's
+/// fence and the `/cd` lists: the same fence the loader uses (#1043).
+pub fn list_project_context_files(r: &crate::config::DirectoryRestrictions) -> ContextFileListing {
+    use crate::cd_config_note::{cd_allowed_dirs_handle as allow, cd_denied_dirs_handle as deny};
+    list_project_context_files_fenced(std::path::Path::new("."), r, &deny(), &allow())
+}
+
+/// [`list_project_context_files`] over explicit `/cd` handles. Asks the
+/// loader's predicate, existing files only, before reading; prints nothing.
+pub(crate) fn list_project_context_files_fenced(
+    dir: &std::path::Path,
+    restrictions: &crate::config::DirectoryRestrictions,
+    cd_deny: &crate::cd_deny::DenyAdditions,
+    cd_allow: &crate::cd_deny::DenyAdditions,
+) -> ContextFileListing {
+    let (mut listed, mut refused) = (Vec::new(), Vec::new());
     for name in PROJECT_CONTEXT_FILES {
-        if let Ok(content) = std::fs::read_to_string(name) {
+        let path = dir.join(name);
+        let p = path.to_string_lossy().into_owned();
+        let check =
+            || crate::cd_config_note::path_guard_refusal_lists(cd_deny, cd_allow, restrictions, &p);
+        if let Some(reason) = path.exists().then(check).flatten() {
+            refused.push((*name, reason));
+        } else if let Ok(content) = std::fs::read_to_string(&path) {
             let content = content.trim();
             if !content.is_empty() {
-                let lines = content.lines().count();
-                result.push((*name, lines));
+                listed.push((*name, content.lines().count()));
             }
         }
     }
-    result
+    (listed, refused)
 }
 
 #[cfg(test)]
@@ -726,7 +746,7 @@ mod tests {
     fn test_list_project_context_files_returns_vec() {
         // This test verifies the function runs without panicking.
         // In CI the project may or may not have YOYO.md present.
-        let files = list_project_context_files();
+        let (files, _) = list_project_context_files(&Default::default());
         for (name, lines) in &files {
             assert!(!name.is_empty());
             assert!(*lines > 0);

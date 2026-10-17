@@ -32,7 +32,13 @@ pub struct DoctorCheck {
 /// Run all environment diagnostic checks and return structured results.
 ///
 /// This is separated from the display logic so it can be tested.
-pub fn run_doctor_checks(provider: &str, model: &str) -> Vec<DoctorCheck> {
+/// `restrictions` is the session's startup directory fence: the project
+/// context row lists only files the loader would admit (#1043).
+pub fn run_doctor_checks(
+    provider: &str,
+    model: &str,
+    restrictions: &crate::config::DirectoryRestrictions,
+) -> Vec<DoctorCheck> {
     let mut checks = Vec::new();
 
     // 1. Version
@@ -155,7 +161,7 @@ pub fn run_doctor_checks(provider: &str, model: &str) -> Vec<DoctorCheck> {
     }
 
     // 8. Project context
-    let context_files = cli::list_project_context_files();
+    let (context_files, _) = cli::list_project_context_files(restrictions);
     if context_files.is_empty() {
         checks.push(DoctorCheck {
             name: "Project context".to_string(),
@@ -511,8 +517,12 @@ fn doctor_handoff_hint_from_count(issues: usize) -> Option<String> {
 }
 
 /// Handle the `/doctor` command.
-pub fn handle_doctor(provider: &str, model: &str) {
-    let checks = run_doctor_checks(provider, model);
+pub fn handle_doctor(
+    provider: &str,
+    model: &str,
+    restrictions: &crate::config::DirectoryRestrictions,
+) {
+    let checks = run_doctor_checks(provider, model, restrictions);
     print_doctor_report(&checks);
     // Contextual guidance beats reference guidance: after naming the fix
     // command in the handoff hint, take the last step Claude Code takes — offer
@@ -1133,7 +1143,7 @@ mod tests {
 
     #[test]
     fn doctor_checks_include_rtk() {
-        let checks = run_doctor_checks("anthropic", "test-model");
+        let checks = run_doctor_checks("anthropic", "test-model", &Default::default());
         assert!(
             checks.iter().any(|c| c.name == "RTK"),
             "doctor checks should include an RTK entry"
@@ -1460,7 +1470,7 @@ mod tests {
 
     #[test]
     fn test_run_doctor_checks_structure() {
-        let checks = run_doctor_checks("anthropic", "test-model");
+        let checks = run_doctor_checks("anthropic", "test-model", &Default::default());
         // Should always have Version, Git, Git repo, Provider, API key, Model at minimum
         let names: Vec<&str> = checks.iter().map(|c| c.name.as_str()).collect();
         assert!(names.contains(&"Version"), "Should check version");
