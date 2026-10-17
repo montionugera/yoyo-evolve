@@ -1,0 +1,24 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src && grep -n "fn with_tool_source\|t… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat > /tmp/f… (17 lines) ✓ (1.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && mkdir -p ses… (9 lines) ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 24.5s (3 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_1.md.
+
+• It works when run: I ran the debug binary with two copies of a small fake MCP server, both exposing read_file. Each connected under its own prefix (mcp1, then mcp2) and printed the message naming the prefix. I used a dummy API key, so I did not confirm that the prefixed tools actually reach the model on a real turn.
+• It matches the task: both collision checks (the --mcp loop and the [mcp_servers.*] loop) now choose between three outcomes:
+  • No collision: the server connects exactly as before.
+  • Collision: the server connects under a prefix.
+  • Still colliding after prefixing: the server is skipped with the existing message.
+
+  A failed prefixed connect is recorded for the model like other connect failures and doesn't drop earlier connections. The new tests cover the filesystem server, a server with no collisions, two servers with the same prefix, name cleanup with multibyte input, and the plain-output and escape-byte checks on the message.
+• Nothing left unconnected: every new definition is used in the diff, and both call sites handle all three outcomes. I checked yoagent 0.25.7's source and with_tool_source adds to the agent's tools rather than replacing them, so several prefixed servers add up. The list of registered names is cleared in both rebuild paths, the module-size limit is updated, and no NEUTERED marker is left in the changed files.
+• Docs are updated: CLAUDE.md (with the old sentence kept as a superseded claim), docs/src/configuration/skills.md, the /mcp help and not-connected messages (with a new test), and a new ARCHITECTURE.md entry.
+• User-facing change: only servers that used to be skipped behave differently. Defaults and flags are unchanged.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,72 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 160,240p src/context.rs; gr…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn path_guard_refusal\|fn… ✓ (3ms)
+ ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 360,425p src/cd_config_note…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,60p src/context_fence_tes… ✓ (7ms)
+ ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "pub.*type DenyAdditions\|… ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "apply_cd_dir_fence(\|CD_D… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 326,360p src/cd_config_note… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 20.4s (8 ✓)
+
+Now the edit in context.rs.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 192,202p src/context.rs ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (67 lines) ✓ (24ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "check… (102 lines) ✓ (37.6s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo -- context_f… ✓ (219ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "path_… (9 lines) ✓ (1m 3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff src/cd_config_note.rs; gr… ✓ (13ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 2m 18s (6 ✓)
+
+Update that doc sentence.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (10 lines) ✓ (33ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "^- \`context.rs\`\|^- \`c… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 459p ARCHITECTURE.md | tail… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1400,1470p ARCHITECTURE.md … ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (20 lines) ✓ (35ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo buil… ✓ (3m 46s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "FAILED|… ✓ (3m 15s)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 7m 28s (7 ✓)
+
+All green, with no failures. Committing.
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (28 lines) ✓ (51ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+#1042 is fixed and committed as ff1ed5c9. After a /cd, /spawn now leaves out any instruction file that the new directory's [directories] deny or allow list refuses, and prints a warning. Build, all tests, clippy with -D warnings and the format check all pass.
+
+The fix: in src/context.rs, the per-file check in the instruction-file loader used check_path, which only knows the startup fence. It now goes through cd_config_note::path_guard_refusal_lists, the same guard the file tools use: startup fence first, then the /cd lists. Both the startup load and /spawn use it. At startup no /cd has run, so the output there is byte-for-byte the same as before. .yoyo/memory.json goes through the same check, so it is fenced the same way.
+
+Tests (src/context_fence_tests.rs, 4 new). They pass the /cd lists in directly and never touch the process-wide lists:
+• A /cd deny over the directory keeps the canary in CLAUDE.md out of the loaded context, and the refusal is reported. A check confirms the fixture really contains the canary.
+• A /cd allow list that doesn't cover the directory also keeps it out.
+• Two near-miss cases: empty /cd lists, and a deny over a different directory. Both produce exactly the same output as the unfenced loader.
+
+Positive control: I put the bare check_path back, ran the tests and restored the fix in one command. The two refusal tests and no_check_path_reader_skips_the_cd_deny_list_unregistered failed by name, and the near-miss tests stayed green. After the restore everything passed, and no NEUTERED marker remains.
+
+Register: I removed src/context.rs from UNWIRED_CHECK_PATH_READERS, so it went from 2 to 1. The only one left is src/skill_fence.rs (#1040).
+
+Docs: in permissions.md, I replaced the sentence saying /spawn ignores the /cd deny list (#1042) with the new behaviour. I also added an entry to ARCHITECTURE.md. The module-size gate gave only warnings that don't fail the run.
+
+Still unfenced: /context's file list (list_project_context_files) still reads files without any fence. It never calls check_path, so the register guard can't see it. This is noted in the commit and in ARCHITECTURE.md.
+
+I skipped the optional live pty canary run, so the fix is checked only by the unit tests, not by running the binary.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,16 @@
+diff --git a/src/commands_config.rs b/src/commands_config.rs
+index f9028558..4114e368 100644
+--- a/src/commands_config.rs
++++ b/src/commands_config.rs
+@@ -1568,8 +1568,9 @@ mod tests {
+     #[test]
+     fn test_mcp_help_mentions_collision_warning() {
+         // If we leave server-filesystem in the help text at all, it must
+-        // be annotated with the collision warning so users know why it
+-        // won't work.
++        // be annotated with the collision note so users know why its tools
++        // arrive prefixed. (Until #1041 this said "why it won't work"; it
++        // works now, under a prefix.)
+         let help = mcp_help_text();
+         if help.contains("server-filesystem") {
+             assert!(

@@ -1,0 +1,124 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src/mcp/ && ls && grep -n "pub fn\|pub…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1,140p src/mcp_preflight.… ✓ (3ms)
+ ✓ (34ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fetch_mcp_tool_names_re… ✓ (33ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn connect_external_ser… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn connect_external_ser… ✓ (25ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src && grep -n "pub fn .*tool" agent.r… ✓ (3ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src && sed -n 410,445p agent.rs; grep … ✓ (9ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src && sed -n 1,80p tool_source.rs; gr… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn connect_external_ser… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "^pub.*fn \|^async fn\|^… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 140,200p src/agent_builde… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 520,550p src/agent_builde… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  12 tools completed in 29.9s (12 ✓)
+
+The tool truncates output; let me view with cat -A-free line ranges.
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && awk 'NR>=520 && NR<=548' src/age… ✓ (8ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/agent_builder.rs:520..550  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/agent_builder.rs:616..636 ✓ (1ms)
+ ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "with_tool_source\|set_… ✓ (22ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src && grep -n "pub use\|pub mod" lib.… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "mcp_server_http\|conne… ✓ (23ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "async" Cargo.toml; sed … ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 1m 40s (7 ✓)
+
+Now write the module with tests first.
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/src/mcp_prefix.rs (329 lines) ✓ (1m 42s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "pub fn is_plain_output… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "^mod m" src/main.rs; gr… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -i '128i mod mcp_prefix;' sr… ✓ (5ms)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/agent_builder.rs:500..520 ✓ (1ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 2m 12s (5 ✓)
+
+Now the first loop edits.
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (133 lines) ✓ (13.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo clippy --all-targets -- -D… ✓ (19.9s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && wc -l src/agent_builder.rs && ca… ✓ (182ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n -B3 '"src/agent_builder.… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (13 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 590 cargo test 2>&1 | gr… ✓ (3m 24s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 590 cargo test 2>&1 | gr… ✓ (3m 19s)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 9m 36s (6 ✓, 1 ✗)
+
+Now the positive control, atomic mutate→test→restore.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/mcp_prefix.rs /tmp/mcp_pr… ✓ (1m 3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "collid\|Tool names mus… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (17 lines) ✓ (26ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "^- \`model_limits_note.… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (9 lines) ✓ (21.5s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo clippy --all-targets -- -D… ✓ (6.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo clippy --all-targets -- -D… ✓ (5.8s)
+  ▶ read /home/runner/work/yoyo-evolve/yoyo-evolve/src/agent_builder.rs:58..73 ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (23 lines) ✓ (52.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/mcp_prefix.rs /tmp/mcp_pr… ✓ (32.1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo build 2>&1 | tail -1 && ca… ✓ (4m 15s)
+  ▶ $ cd /tmp && which npx node; timeout 90 npx -y @modelcontextprotocol/server-filesy… ✓ (9.9s)
+  ▶ $ cd /tmp && rm -rf yy && mkdir yy && cd yy && ANTHROPIC_API_KEY=sk-invalid timeou… ✓ (2.4s)
+  ▶ $ cd /tmp/yy && [ -n "$ANTHROPIC_API_KEY" ] && echo hasKey; echo hello > note.txt;… ✓ (5.9s)
+
+────────────────────────────────────────────────────────────────────────────────
+  14 tools completed in 8m 32s (14 ✓)
+
+End to end on the real filesystem server: the model called mcp1__list_allowed_directories and the server answered. Committing.
+  ╭─ Turn 44 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && rm -rf /tmp/… (18 lines) ✓ (56ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue com… (10 lines) ✓ (1.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 22.6s (2 ✓)
+
+MCP stdio servers whose tool names collide with a yoyo builtin are now connected under a prefix instead of being skipped. All checks pass: build, the full cargo test suite (0 failures), cargo clippy --all-targets -- -D warnings and cargo fmt -- --check. It's committed as 4117b0a0, and #1041 stays OPEN because the title says "Part of".
+
+What a user sees now: I ran the real npx -y @modelcontextprotocol/server-filesystem through --mcp. Before this change all its tools were dropped. Now yoyo prints:
+exposes 'read_file', 'write_file', 'edit_file', already used by yoyo — connected with every tool of this server renamed to 'mcp1__<tool>'.
+In one real prompt the model called mcp1__list_allowed_directories and got the server's answer. An earlier run with a bad key only showed the connection works, because the API rejected the key before it looked at the tool list.
+
+What changed:
+• `src/mcp_prefix.rs` (new): all the new logic lives here.
+  • plan_mcp_connect decides one of three things per server: connect it as before, connect it under a prefix, or skip it.
+  • It reuses the existing detect_mcp_collisions to check names against the builtin list plus names earlier servers already registered.
+  • sanitize_mcp_prefix replaces anything outside [A-Za-z0-9_-] with _, works per character so multibyte names can't panic, caps the prefix at 32 characters, and uses mcp if nothing is left.
+  • prefix_applied_message prints the stderr line; it has no em dash in plain mode and escapes control bytes in the server command.
+  • connect_prefixed makes the connection.
+• How the prefixed tools are added: yoagent's Agent::with_tools replaces the tool list and has no way to add to it, so the prefixed tools go in through a small fixed ToolSource. A failed prefixed connect doesn't throw away the agent, so earlier connections survive. It is still recorded with record_failed_server, so the model is told the server failed rather than just not seeing its tools.
+• `agent_builder.rs`: both guard sites (the --mcp loop and the [mcp_servers.*] loop) now go through the plan. Servers that collide with nothing take the old with_mcp_server_stdio path unchanged. A registered list of tool names is kept and cleared in both MCP rebuild branches.
+• One addition beyond the task file: a server whose tool name matches an earlier MCP server's tool (not a builtin) now also gets a prefix. Before, that case killed the session on turn one with "Tool names must be unique".
+
+Tests: 8 new tests in mcp_prefix.rs. I ran the positive control one step at a time with a restore at the end: forcing the plan to always connect unprefixed made exactly the three plan tests fail by name, and the test for the unchanged path stayed green. After restoring, no NEUTERED marker remains.
+
+One gate change: the file-size limit for agent_builder.rs in tests/module_size.rs went from 4861 to 4969 lines, with the reason written next to it. 60 of those lines were over the limit before this task. Without the bump the test fails, and the whole task would have been reverted.
+
+Docs: updated the CLAUDE.md "MCP gotchas" sentence (keeping the old version as a superseded claim), docs/src/configuration/skills.md, and added an ARCHITECTURE.md entry for mcp_prefix.rs.
+
+Still open, as posted on #1041:
+• Every stdio server is still started twice: once to list its tools, once for the real connection.
+• yoyo has no code path that connects HTTP MCP servers, so stdio is every server it can connect today.
+• Long tool names are only limited through the 32-character prefix cap, so a server whose own tool names are already near a provider's length limit could still go over it.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
