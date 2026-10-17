@@ -1385,16 +1385,10 @@ mod tests {
     /// "unwired" is a test failure unless it is written down here. Wiring a
     /// reader must remove its row (a stale row fails the guard too), so the
     /// register's length is the class's remaining size.
-    const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[
-        (
-            "src/context.rs",
-            "#869 residue, now #1042: the startup loader runs before any /cd, but /spawn reloads instruction files after one",
-        ),
-        (
-            "src/skill_fence.rs",
-            "#869 residue, now #1040: skills are loaded at startup; reloading them after /cd is #1040",
-        ),
-    ];
+    const UNWIRED_CHECK_PATH_READERS: &[(&str, &str)] = &[(
+        "src/skill_fence.rs",
+        "#869 residue, now #1040: skills are loaded at startup; reloading them after /cd is #1040",
+    )];
 
     /// Every function a `/cd`-aware reader routes through. A `check_path` site
     /// whose enclosing function names one of these consults the `/cd` list.

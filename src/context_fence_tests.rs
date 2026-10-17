@@ -8,7 +8,8 @@
 
 use crate::config::DirectoryRestrictions;
 use crate::context::{
-    instruction_file_refused_warning, load_project_context_from, load_project_context_restricted,
+    instruction_file_refused_warning, load_project_context_fenced, load_project_context_from,
+    load_project_context_restricted,
 };
 use std::os::unix::fs::symlink;
 
@@ -220,4 +221,93 @@ fn memory_refused_warning_names_memory_not_instructions() {
         assert!(w.contains("memory file"), "{w}");
         assert!(!w.contains("instruction file"), "{w}");
     }
+}
+
+// ── #1042: the /cd-applied [directories] lists reach the loader ────────────
+// `/spawn` reloads instruction files after `/cd`; these drive the loader over
+// local `/cd` handles, never the process-wide lists.
+
+fn handle(entries: &[&std::path::Path]) -> crate::cd_deny::DenyAdditions {
+    std::sync::Arc::new(std::sync::Mutex::new(
+        entries.iter().map(|d| d.display().to_string()).collect(),
+    ))
+}
+
+/// `proj/CLAUDE.md` holding a canary, plus a sibling `other/` dir.
+fn cd_fixture() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+    let root = tempfile::TempDir::new().unwrap();
+    let base = root.path().canonicalize().unwrap();
+    let proj = base.join("proj");
+    let other = base.join("other");
+    std::fs::create_dir_all(&proj).unwrap();
+    std::fs::create_dir_all(&other).unwrap();
+    std::fs::write(proj.join("CLAUDE.md"), "CD_CANARY_JX4\n").unwrap();
+    (root, proj, other)
+}
+
+#[test]
+fn cd_deny_list_keeps_instruction_file_out_of_spawn_context() {
+    let (_root, proj, _other) = cd_fixture();
+    // Anti-vacuous: the fixture really carries the canary and the open loader reads it.
+    let raw = std::fs::read_to_string(proj.join("CLAUDE.md")).unwrap();
+    assert!(raw.contains("CD_CANARY_JX4"));
+    let open = load_project_context_from(&proj).expect("fixture must load");
+    assert!(open.contains("CD_CANARY_JX4"));
+
+    let (ctx, refused) = load_project_context_fenced(
+        &proj,
+        &DirectoryRestrictions::default(),
+        &handle(&[&proj]),
+        &handle(&[]),
+    );
+    assert!(
+        !ctx.unwrap_or_default().contains("CD_CANARY_JX4"),
+        "/cd-denied CLAUDE.md leaked into the loaded context"
+    );
+    let names: Vec<&str> = refused.iter().map(|(n, _)| *n).collect();
+    assert!(
+        names.contains(&"CLAUDE.md"),
+        "refusal not reported: {names:?}"
+    );
+}
+
+#[test]
+fn cd_allow_list_not_covering_file_keeps_it_out() {
+    let (_root, proj, other) = cd_fixture();
+    let (ctx, _) = load_project_context_fenced(
+        &proj,
+        &DirectoryRestrictions::default(),
+        &handle(&[]),
+        &handle(&[&other]),
+    );
+    assert!(!ctx.unwrap_or_default().contains("CD_CANARY_JX4"));
+}
+
+#[test]
+fn empty_cd_lists_are_byte_identical_to_before() {
+    let (_root, proj, _other) = cd_fixture();
+    let before = load_project_context_from(&proj);
+    assert!(before.as_deref().unwrap_or("").contains("CD_CANARY_JX4"));
+    let (ctx, refused) = load_project_context_fenced(
+        &proj,
+        &DirectoryRestrictions::default(),
+        &handle(&[]),
+        &handle(&[]),
+    );
+    assert_eq!(ctx, before);
+    assert!(refused.is_empty());
+}
+
+#[test]
+fn cd_deny_of_a_different_dir_leaves_file_loaded() {
+    let (_root, proj, other) = cd_fixture();
+    let before = load_project_context_from(&proj);
+    let (ctx, refused) = load_project_context_fenced(
+        &proj,
+        &DirectoryRestrictions::default(),
+        &handle(&[&other]),
+        &handle(&[]),
+    );
+    assert_eq!(ctx, before);
+    assert!(refused.is_empty());
 }

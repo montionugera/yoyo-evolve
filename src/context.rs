@@ -203,17 +203,44 @@ pub(crate) fn load_project_context_restricted(
     dir: &std::path::Path,
     restrictions: &crate::config::DirectoryRestrictions,
 ) -> (Option<String>, Vec<(&'static str, String)>) {
+    load_project_context_fenced(
+        dir,
+        restrictions,
+        &crate::cd_config_note::cd_denied_dirs_handle(),
+        &crate::cd_config_note::cd_allowed_dirs_handle(),
+    )
+}
+
+/// [`load_project_context_restricted`] over explicit `/cd` fence handles
+/// (#1042). Each file is asked of the same guard the file tools use
+/// (`cd_config_note::path_guard_refusal_lists`): the startup fence first,
+/// byte-identical to before, then whatever `/cd` has applied. At startup no
+/// `/cd` has run, so both lists are empty and the result is unchanged; the
+/// reader this exists for is `/spawn`, which reloads instruction files from
+/// the cwd `/cd` moved to. Tests pass local handles instead of the
+/// process-wide lists (tests/global_state_races.rs).
+pub(crate) fn load_project_context_fenced(
+    dir: &std::path::Path,
+    restrictions: &crate::config::DirectoryRestrictions,
+    cd_deny: &crate::cd_deny::DenyAdditions,
+    cd_allow: &crate::cd_deny::DenyAdditions,
+) -> (Option<String>, Vec<(&'static str, String)>) {
     let mut refused = Vec::new();
-    let ctx = load_project_context_inner(dir, &mut |name, path| match restrictions
-        .check_path(&path.to_string_lossy())
-    {
-        Ok(()) => true,
-        Err(reason) => {
-            let plain = crate::format::is_plain_output();
-            let msg = instruction_file_refused_warning(name, &reason, plain);
-            eprintln!("{YELLOW}{msg}{RESET}");
-            refused.push((name, reason));
-            false
+    let ctx = load_project_context_inner(dir, &mut |name, path| {
+        match crate::cd_config_note::path_guard_refusal_lists(
+            cd_deny,
+            cd_allow,
+            restrictions,
+            &path.to_string_lossy(),
+        ) {
+            None => true,
+            Some(reason) => {
+                let plain = crate::format::is_plain_output();
+                let msg = instruction_file_refused_warning(name, &reason, plain);
+                eprintln!("{YELLOW}{msg}{RESET}");
+                refused.push((name, reason));
+                false
+            }
         }
     });
     (ctx, refused)
