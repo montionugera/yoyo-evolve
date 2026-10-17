@@ -1,0 +1,206 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; git l…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 80,330p src/cd_config_not… ✓ (5ms)
+ ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 186,226p src/cd_config_no…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "After \`/cd\`" -A40 doc… ✓ (9ms)
+ ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 180,262p src/cli.rs; grep… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 262,290p src/cli.rs; sed … ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && awk 'NR>=1436 && NR<=1482 {print… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "is_trust_project()" sr… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && ls tests/ | head -50; grep -ln "… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n '"--base-url"\|"--provid… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn dir_is_trusted" -A25… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn parse" -A12 src/hook… ✓ (147ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn as_str" -A10 src/hoo… ✓ (4ms)
+  ▶ $ mkdir -p /tmp/m869 && cat > /tmp/m869/stub.py <<'EOF' (23 lines) ✓ (1.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "KNOWN_PROVIDERS" -A20 s… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  15 tools completed in 1m 4s (15 ✓)
+
+Now the pty driver.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cat > /tmp/m869/drive.py <<'EOF' (53 lines) ✓ (27.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /tmp/m869 && sed -i "s/('run echo hi',6),('n',4)/('run echo hi',5),('y',5)/" … ✓ (1m 35s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn skill_flag_dirs\|fn … ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "\"skills\"\|\.yoyo/ski… ✓ (12ms)
+  ▶ $ cd /tmp/m869 && sed -i "s#{B}/skills/bskill#{B}/.yoyo/skills/bskill#g" drive.py … ✓ (1m 35s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && awk 'NR>=680 && NR<=700 {print N… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "trust_changed_on_cd_me… ✓ (33ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && awk 'NR>=7603 && NR<=7680 {print… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && awk 'NR>=560 && NR<=670 {print N… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue view 869 --json state,t… ✓ (984ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 4m 49s (10 ✓)
+
+Now file the new issue with the measured table.
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp/m869 && cat > issue.md <<'EOF' (33 lines) ✓ (68ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh label list --limit 50 --json … ✓ (556ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue create --title "/cd int… ✓ (957ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue view 1040 --json state,… ✓ (261ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && awk 'NR>=246 && NR<=273 {print N… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 23.8s (5 ✓)
+
+Test first (expected to fail against current text):
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/cli.rs (2 → 34 lines)
+  +     #[test]
+  +     fn trust_change_note_does_not_claim_cd_loads_the_new_dirs_toml() {
+  +         // Day 231 (#869, #1040): measured with the built binary, a `/cd` into a
+  +         // trust-store-listed dir did NOT run its hook, apply its allow, start its
+  +         // MCP server or load its .yoyo/skills/, while this note said the first
+  +         // three "are live here" two lines above the #869 warning saying the
+  +         // opposite. Only .yoyo/goal_verify.md reads trust at call time from cwd.
+  +         let dir = std::path::Path::new("/home/u/proj");
+  +         assert_eq!(
+  +             trust_changed_on_cd_message(dir, false, true, false).unwrap(),
+  +             "⚠ Project trust is now ON for this directory: /home/u/proj\n  It is listed in \
+  + your user-level trusted_dirs store — its .yoyo/goal_verify.md is live here. Its .yoyo.toml \
+  + MCP servers, permissions.allow and shell hooks, and its .yoyo/skills/, are not loaded by /cd: \
+  + restart yoyo here to use them (#1040)."
+  +         );
+  +         assert_eq!(
+  +             trust_changed_on_cd_message(dir, true, false, true).unwrap(),
+  +             "Project trust is now OFF for this directory: /home/u/proj\n  Trust is \
+  + per-directory, a --trust-project flag grants only the directory it was typed in. Its \
+  + .yoyo/goal_verify.md will not run here, and /cd never loads its .yoyo.toml MCP servers, \
+  ... (14 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --bin yoyo trust_chan… ✓ (2m 36s)
+  +     #[test]
+  +     fn trust_change_note_does_not_claim_cd_loads_the_new_dirs_toml() {
+  +         // Day 231 (#869, #1040): measured with the built binary, a `/cd` into a
+  +         // trust-store-listed dir did NOT run its hook, apply its allow, start its
+  +         // MCP server or load its .yoyo/skills/, while this note said the first
+  +         // three "are live here" two lines above the #869 warning saying the
+  +         // opposite. Only .yoyo/goal_verify.md reads trust at call time from cwd.
+  +         let dir = std::path::Path::new("/home/u/proj");
+  ... (13 more lines)
+ ✓ (2m 36s)
+  2 tools completed in 2m 42s (2 ✓)
+
+Red as expected. Now fix the message.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (20 lines) ✓ (28.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/cli.rs (3 → 7 lines)
+  - /// did not see reads as yoyo mysteriously refusing things that worked a moment ago. The
+  - /// wording deliberately mirrors `trusted_by_store_message` rather than inventing a second
+  - /// vocabulary for the same four capabilities. `plain` drops the glyph **and** the em
+  + /// did not see reads as yoyo mysteriously refusing things that worked a moment ago. It
+  + /// uses `trusted_by_store_message`'s names for the four capabilities, but NOT its claim
+  + /// that they are live: at startup they are, after `/cd` only `.yoyo/goal_verify.md` is
+  + /// (it reads trust at call time from the cwd). Superseded claim (Day 231, measured with
+  + /// the built binary): this note said the new dir's MCP servers, permissions.allow and
+  + /// shell hooks "are live here", while none of them is loaded by `/cd` (#869, #1040).
+  + /// `plain` drops the glyph **and** the em
+ ✓ (4m 23s)
+  - /// did not see reads as yoyo mysteriously refusing things that worked a moment ago. The
+  - /// wording deliberately mirrors `trusted_by_store_message` rather than inventing a second
+  - /// vocabulary for the same four capabilities. `plain` drops the glyph **and** the em
+  + /// did not see reads as yoyo mysteriously refusing things that worked a moment ago. It
+  + /// uses `trusted_by_store_message`'s names for the four capabilities, but NOT its claim
+  + /// that they are live: at startup they are, after `/cd` only `.yoyo/goal_verify.md` is
+  + /// (it reads trust at call time from the cwd). Superseded claim (Day 231, measured with
+  + /// the built binary): this note said the new dir's MCP servers, permissions.allow and
+  + /// shell hooks "are live here", while none of them is loaded by `/cd` (#869, #1040).
+  + /// `plain` drops the glyph **and** the em
+  ▶ edit /home/runner/work/yoyo-evolve/yoyo-evolve/src/cd_config_note.rs (2 → 25 lines)
+  +     #[test]
+  +     fn measured_b_fixture_names_every_widening_section_as_not_applied() {
+  +         // Day 231 (#869, #1040): the exact .yoyo.toml of the built-binary run. After
+  +         // `/cd` into it, trusted or not, its hook did not run, `echo hi` still asked,
+  +         // and its MCP server never started, which is what this note says.
+  +         let text = "hooks.post.bash = \"echo HOOKFIRED >> /tmp/m\"\n\
+  +                     [permissions]\nallow = [\"echo *\"]\n\
+  +                     [mcp_servers.x]\ncommand = \"sh\"\nargs = [\"-c\", \"touch /tmp/n\"]\n";
+  +         // Anti-vacuous: the fixture really carries all three widening sections.
+  +         for needle in ["hooks.post.bash", "allow = ", "[mcp_servers.x]"] {
+  +             assert!(text.contains(needle), "{needle}");
+  +         }
+  +         let reading = sets(text);
+  +         assert_eq!(note_volume(&reading), NoteVolume::Warning);
+  +         assert_eq!(
+  +             cd_config_note("/tmp/B", &reading, false).unwrap(),
+  +             "  /tmp/B/.yoyo.toml sets [permissions] allow, hooks, MCP servers and they are NOT \
+  +              applied in this session — the launch directory's settings stay in force, except \
+  +              that its own [permissions] allow and hooks pause outside its tree. Restart yoyo \
+  +              here to use them (#869)."
+  ... (5 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --bin yoyo measured_b… ✓ (4m 19s)
+  +     #[test]
+  +     fn measured_b_fixture_names_every_widening_section_as_not_applied() {
+  +         // Day 231 (#869, #1040): the exact .yoyo.toml of the built-binary run. After
+  +         // `/cd` into it, trusted or not, its hook did not run, `echo hi` still asked,
+  +         // and its MCP server never started, which is what this note says.
+  +         let text = "hooks.post.bash = \"echo HOOKFIRED >> /tmp/m\"\n\
+  +                     [permissions]\nallow = [\"echo *\"]\n\
+  +                     [mcp_servers.x]\ncommand = \"sh\"\nargs = [\"-c\", \"touch /tmp/n\"]\n";
+  ... (13 more lines)
+ ✓ (4m 19s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "now ON\|are live here\… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "/cd" docs/src | grep -… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 9m 35s (6 ✓)
+
+Now the doc edit: correct the "warning naming what was skipped" overclaim and add the table.
+  ╭─ Turn 35 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (19 lines) ✓ (24ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (7 lines) ✓ (32.5s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 41.1s (2 ✓)
+
+Re-measure the trusted /cd case with the rebuilt binary (emission point), then run the full suite.
+  ╭─ Turn 37 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp/m869 && timeout 90 python3 drive.py cd trusted > cd_trusted_after.txt 2>… ✓ (25.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (4m 1s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (3m 13s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat > /tmp/m… (22 lines) ✓ (985ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "NEUTERED\|DO NOT COMMI… ✓ (22ms)
+  ▶ $ pkill -f "m869/stub.py"; echo ok ✓ (12ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 8m 17s (6 ✓)
+
+I measured what /cd does with the new folder's four widening settings, and the measurement turned up a false message. Per the task's rule, I fixed that message and retitled the commit. It's committed as cca85d95; build, the full cargo test, clippy with -D warnings and fmt --check all pass.
+
+What I measured: I ran the built binary in a pty against a small fake provider that asks the agent to run echo hi. The last column is a control run that starts yoyo inside a trusted B, to show each setting can load.
+
+| B's setting | /cd ../B, untrusted | /cd ../B, trusted | Started in B, trusted |
+|---|---|---|---|
+| hooks.post.bash | not run | not run | runs |
+| [permissions] allow = ["echo *"] | not applied (asks first) | not applied (asks first) | applied |
+| [mcp_servers.x] | not started | not started | started |
+| .yoyo/skills/bskill | not loaded | not loaded | loaded |
+
+The false message: the #869 warning was accurate. The bug was in the message printed just above it when /cd lands in a trusted directory. It said the directory's ".yoyo.toml MCP servers, permissions.allow, shell hooks … are live here", and the next line said the opposite. The table shows none of them load. The one thing that does follow trust after /cd is .yoyo/goal_verify.md, because /goal check reads it from the current directory when it runs.
+
+Changes:
+• `src/cli.rs`: both the trust ON and OFF messages now say what actually happens and point to #1040. A new test pins both full strings; it failed before the fix and passes after. The three existing trust-message tests are unchanged and still pass. After rebuilding, I re-ran the trusted /cd and the two lines now agree.
+• `src/cd_config_note.rs` (test only): a new test pins the warning's full text for the exact config from the run, and checks that config really contains all three sections.
+• `docs/src/configuration/permissions.md` ("After `/cd`"): added the setting / untrusted / trusted / why table. Untrusted directories don't load these by decision: there's no moment to consent, and startup refuses the same four. Trusted directories don't load them because this version can't yet. I also corrected the doc's claim that the warning names skills: it only covers the three .yoyo.toml parts.
+
+Issues:
+• Filed #1040 (confirmed OPEN): /cd into a trusted project should load its hooks, allow list, MCP servers and skills without a restart. It carries the table above.
+• Posted the table and the fix on #869.
+
+The commit still says "Part of #869" rather than "Fixes". The doc's statement that the launch project's MCP servers stay connected after /cd comes from reading the /cd code in dispatch.rs, which never touches the agent; I didn't measure it. If that gets measured, the next session could close #869.
+
+  (interrupted)

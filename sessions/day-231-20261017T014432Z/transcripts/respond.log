@@ -1,0 +1,20 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '=> "' src/providers.rs | … ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (12 lines) ✓ (667ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 18.9s (3 ✓)
+
+I posted one comment this session, on #1037, which stays open. I didn't comment on any other issue.
+
+• #1037 (stale default models): b0c7e7ab changes the openai default from gpt-5 to gpt-6-sol, and the push happens at wrap-up. The old default had no preset, so every run printed yoyo's own guessed-limits warning and capped replies at 4096 output tokens.
+  • The comment explains why I didn't use gpt-6.1-sol: yoyo has no preset or price for it yet.
+  • It also lists the 7 provider defaults that still trip the warning: openrouter, xai, groq, mistral, github, zai and cerebras. That list is now pinned in model_limits_note.rs.
+  • Bedrock is still undecided, and google is tracked separately in #1021.
+• No comment: #997, #991, #1026, #1023, #1021, #1018, #1016, #1014, #1012, #1011, #1009, #988 and #982 got no work this session, so there was nothing new to report.
+• #869: Task 2 made progress on it, but it wasn't in this session's issue list, so I didn't comment there. The trusted-dir reload work that came out of it is filed as #1040.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,34 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; git l… ✓ (622ms)
+
+────────────────────────────────────────────────────────────────────────────────
+
+Commit, #1040 and the #869 comment all exist. Running the full verification on the committed state.
+  ╭─ Turn 2 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo build 2>&1 | tail -1 && ca… ✓ (3m 55s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (3m 11s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 7m 17s (2 ✓)
+
+This task was already finished and committed when the previous attempt was cut off. Build, tests, clippy and fmt all pass on that commit, and nothing is left uncommitted, so I made no new commit.
+
+What I measured (built binary, a pty, and a stub server that answers with one bash call to echo hi): after /cd ../B, none of B's four settings load, whether B is untrusted or listed in trusted_dirs. The four are its hook, its [permissions] allow, its MCP server and its skills. As a control, launching yoyo directly in a trusted B loads all four.
+
+The step-1 trigger fired. The #869 warning ("Restart yoyo here to use them") was correct. But the note printed on the line above it, when trust turns on after /cd, said three of those settings "are live here", which the measurement shows is false. Fixing that note was the one behaviour change the task allowed:
+
+• `src/cli.rs`: the trust note now says the only thing that follows trust after /cd is .yoyo/goal_verify.md, and points to #1040 for the reload.
+• `src/cd_config_note.rs`: a new test pins the rendered note.
+• `docs/src/configuration/permissions.md`: the "After /cd" section has a table of each setting, whether it's applied on /cd, and why. For an untrusted folder, "not applied" is a decision with a reason. For a trusted folder, it's "not in this version".
+
+Tracker:
+• #1040 is filed and confirmed OPEN: loading a trusted folder's settings on /cd without a restart.
+• The measurement table and the #1040 number are posted as a comment on #869.
+
+The title stays "Part of #869", since the trusted-folder reload is still missing. I didn't separately check whether the commit gives a present-tense reason for the launch project's MCP servers staying connected after /cd, which the task requires before #869 could be fully closed.
+  watch: no files changed this turn — skipping

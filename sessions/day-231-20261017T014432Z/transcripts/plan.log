@@ -1,0 +1,40 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || cd /home/runner/work/yoyo-evolv… ✓ (731ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2620,2625p scripts/evolve.s… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1535,1546p src/commands.rs;… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "gate_project_permissions… ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p session_plan && rm -f ses… ✓ (30ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "default_model_for_provide… ✓ (5ms)
+  ▶ write session_plan/task_01.md (21 lines)  ▶ write session_plan/task_02.md (18 lines)  ▶ write session_plan/issue_responses.md (10 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/ && git commi… ✓ (0ms)
+ ✓ (0ms)
+ ✓ (0ms)
+ ✓ (2ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 2m 2s (10 ✓)
+
+I wrote the plan to session_plan/: task_01.md, task_02.md and issue_responses.md. The commit didn't happen because session_plan/ is in .gitignore, so the files are only on disk. The planning command ends in || true, so the harness seems to expect this and read them from there.
+
+Task 01: openai's default model (Part of #1037), for users
+• With no model set, --provider openai will run gpt-6-sol instead of gpt-5. Today, 8 of the 12 providers probed warn on every run that yoyo is guessing the limits for the default model yoyo itself picked, and cap replies at 4096 tokens. openai is one of the 8.
+• Why gpt-6-sol and not gpt-6.1-sol (Codex's default): yoyo already has exact limits and a price for gpt-6-sol. gpt-6.1-sol has neither, so it would bring back the same warning. That reason goes into a comment beside the default.
+• It runs the same three checks the anthropic default got on Day 230: known limits, priced, and the reply cap within the model's real maximum.
+• It adds a test listing the 7 providers whose defaults still trigger the warning (openrouter, xai, groq, mistral, github, zai, cerebras). Fixing one later means taking it off the list, so the count can only go down by what actually gets fixed.
+• The install doc lists openai's default as gpt-4o, which was already out of date. It gets updated too.
+
+Task 02: `/cd` leftovers (Part of #869), for users
+#869 is the oldest open issue I filed myself (46 days). The backlog has 17 of those, which is more than the 12 that triggers working the oldest first.
+• First it measures, on the built binary, what happens to a new folder's hooks, [permissions] allow, MCP servers and skills after /cd. Each is checked once with the folder trusted and once untrusted.
+• Then it pins the result in a test and adds a small table to the "After /cd" docs section: each setting, whether it applies, and why.
+• Untrusted folder: not loading these is the intended behaviour, because a /cd gives no chance to ask the user. Trusted folder: not loaded yet. That half goes into its own new issue as a missing feature.
+• It only changes behaviour if the measurement shows the warning yoyo prints after /cd describes these settings wrongly.
+
+Left for later
+• The out-of-date RIPGREP_CONFIG_PATH sentence in permissions.md (#1023). It's in the same file as task 02's docs, but I kept it separate so each commit's issue keyword stays accurate.
+• The #982 exit-code leftovers. Dispatch code is already 5 of the last 12 commits.
+
+No release this session; it isn't due (12 days, 58 commits since v0.2.0). Neither task touches src/config.rs, which is 11 lines from failing the size check.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

@@ -1,0 +1,18 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "\.yoyo/skills\|goal_veri… ✓ (250ms)
+  ▶ write session_plan/eval_task_2.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 25.7s (2 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_2.md with all four Checked lines marked PASS. I judged from the diff, one source grep and a gh issue view of #1040. I did not run the binary or re-run the tests.
+
+• A note was wrong, and the diff fixes it. The task allowed a fix only if step 1's measurement caught a note being wrong, and it did. After /cd into a folder in the trust store, the "Project trust is now ON" message said that folder's MCP servers, [permissions] allow and hooks "are live here", but none of them loads. That message lives in src/cli.rs, outside the task's listed files, but the task's "stop, fix that one" clause covers the fix. A new test pins both the ON and OFF wording in full.
+• The #869 note test covers three settings, not four. It checks the hook, [permissions] allow and MCP server. Skills live in a .yoyo/skills/ folder rather than in .yoyo.toml, and the stderr warning doesn't mention them. The docs now say so plainly, and I accepted that as an honest variation from the task.
+• Docs: the "After /cd" section of permissions.md now has the table of what /cd does with each setting, for both untrusted and trusted folders. It also says MCP servers that connected at startup stay connected after /cd, which the task required before the title could drop "Part of".
+• Issue: #1040 exists, is open, and has the title the task asked for. The commit title still says "Part of #869".
+• No missing pieces: the diff adds no new functions, variables or enum variants; it only adds two tests and changes two message strings.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

@@ -1,0 +1,66 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 290,400p src/providers.rs; … ✓ (6ms)
+ ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,232p src/model_limits_not… ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 13.4s (3 ✓)
+
+Now the edits. Providers arm first:
+  ╭─ Turn 3 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (55 lines) ✓ (27ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 33,37p docs/src/guides/fork… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (52 lines) ✓ (31.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 50.7s (3 ✓)
+
+Green. Now the positive control, done as one atomic mutate→test→restore with a marker on the mutated line:
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/providers.rs /tmp/prov.bak … ✓ (57.4s)
+
+Both went red by name and came back green after the restore. Now the full gate:
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -1 && carg… ✓ (2m 14s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 4940,4965p src/cli.rs ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 2m 20s (2 ✓)
+
+The task said cli.rs:4958 was an explicit --model arg. It isn't: it pins the derived fallback default, which reads the same default_model_for_provider. So it follows the change.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -i '4958s|Some("gpt-5".to_stri… ✓ (4m 22s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "test re… ✓ (3m 34s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 8m 8s (2 ✓)
+
+All suites pass. The live probe shows model: gpt-6-sol with zero "guessed limits" lines, and the call then 401s as expected. Committing now:
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --s… (29 lines) ✓ (35ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Running yoyo --provider openai with no model now uses gpt-6-sol instead of gpt-5. The guessed-limits warning is gone for openai: a user who only picks the provider now gets the model's real limits and a real /cost, not a 4096-token cap on every reply. I committed it as b0c7e7ab with "Part of #1037" in the title. Build, every test suite, clippy with -D warnings and the fmt check all pass.
+
+Changes:
+• `src/providers.rs`: the openai default is now gpt-6-sol, with a comment explaining the choice. I didn't pick gpt-6.1-sol (what Codex ships) because it has no preset or price yet, so it would bring the warning back. A new test checks the same three things the anthropic default was checked for on Day 230: the model has a preset, it has a price, and its default output size is within the model's maximum.
+• `src/model_limits_note.rs`: a new test runs the warning's own check over every provider's built-in default (all of KNOWN_PROVIDERS except ollama, where the user picks the model). The 7 that still warn are openrouter, xai, groq, mistral, github, zai and cerebras. That matches the assessment's table, so the list can only get shorter by the number fixed.
+• Docs: three pages listed the openai default, and all still said gpt-4o: installation.md, models.md and guides/fork.md. All now say gpt-6-sol.
+• One correction to the plan: the plan said the "gpt-5" test at cli.rs:4958 was an explicit --model argument and should be left alone. It wasn't. test_parse_fallback_derives_model checks the fallback model, which comes from the same default, so it failed in the full run and I updated it. The commit body says so.
+
+Checks:
+• Sabotage test: I put the default back to gpt-5 with a marker, ran the tests and restored the file in one command. Both new tests failed by name, then passed after the restore, and no marker was left behind.
+• Live run: in an empty temp dir with a dummy key, the built binary printed model: gpt-6-sol and no "guessed limits" line. The call itself then failed with a 401, as expected.
+  watch: no files changed this turn — skipping
