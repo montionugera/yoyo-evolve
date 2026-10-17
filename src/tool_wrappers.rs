@@ -43,7 +43,7 @@ pub const REFUSAL_STEM_PATH_DENIED: &str = "User denied ";
 ///
 /// Thin alias over [`crate::prompt_retry::is_deterministic_tool_error`] so the
 /// three stems above keep exactly one predicate reading them (#710).
-fn is_deterministic_refusal(err: &str) -> bool {
+pub(crate) fn is_deterministic_refusal(err: &str) -> bool {
     crate::prompt_retry::is_deterministic_tool_error(err)
 }
 
@@ -121,6 +121,11 @@ impl AgentTool for GuardedTool {
                 crate::cd_config_note::path_guard_refusal(&self.restrictions, path)
             {
                 return Err(yoagent::types::ToolError::Failed(reason));
+            }
+            // Opt-in ask-once fence on reads outside the cwd (#879, src/outside_read.rs).
+            if let Some(r) = crate::outside_read::check(self.inner.name(), path, &self.restrictions)
+            {
+                return Err(yoagent::types::ToolError::Failed(r));
             }
         }
         // `search`/`list_files` take a ROOT: fence what they return too (#1022).
@@ -220,6 +225,11 @@ impl AgentTool for ArcGuardedTool {
                 crate::cd_config_note::path_guard_refusal(&self.restrictions, path)
             {
                 return Err(yoagent::types::ToolError::Failed(reason));
+            }
+            // Opt-in ask-once fence on reads outside the cwd (#879, src/outside_read.rs).
+            if let Some(r) = crate::outside_read::check(self.inner.name(), path, &self.restrictions)
+            {
+                return Err(yoagent::types::ToolError::Failed(r));
             }
         }
         // `search`/`list_files` take a ROOT: fence what they return too (#1022).

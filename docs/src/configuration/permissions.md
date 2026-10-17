@@ -234,6 +234,21 @@ Files you name yourself (`@path` mentions, `/add`, `/explain`, `--image`) are fe
 resolved target is refused is not sent to the model, yoyo prints a warning naming it, and the rest of the prompt
 still goes through.
 
+### Ask before reading outside the working directory (opt-in)
+
+By default, `read_file` can read any path. Set `YOYO_ASK_OUTSIDE_READS=1` to make it ask first when a path resolves (symlinks followed) to somewhere outside the current directory:
+
+```bash
+YOYO_ASK_OUTSIDE_READS=1 yoyo
+```
+
+- In a terminal, yoyo asks `y/n`. A yes covers that file's directory for the rest of the session, so three reads in `/etc` ask once. It does not cover subdirectories. A no refuses only that read, and the next read in that directory asks again.
+- With no terminal (for example `-p` in a pipe or CI), the read is refused. The refusal names the path and tells the model how it can be allowed.
+- A path that does not exist is not asked about. `read_file` reports its own error.
+- With `--allow-dir` set, nothing is asked, because the directories you listed are your answer.
+
+This fences the `read_file` tool, and it is not a sandbox. `bash` can still `cat` the same file, and `search`/`list_files` are not covered yet. For a hard boundary, use `--allow-dir` or `--restricted`. Any value other than `1` leaves the setting off.
+
 ### Rules
 
 - If **`--allow-dir`** is set, *only* paths under allowed directories are accessible. Everything else is blocked.
