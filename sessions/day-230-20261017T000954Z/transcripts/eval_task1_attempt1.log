@@ -1,0 +1,29 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && ls -la target/debug/yoyo && B=$P… ✓ (41ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 2380,2410p src/cli.rs; gi… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && mkdir -p ses… (9 lines) ✓ (7ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 15.1s (3 ✓)
+
+I'm passing this task: a bad or out-of-range max_auto_continues now prints one warning line at startup, and how the value is read and capped hasn't changed. The verdict is in session_plan/eval_task_1.md.
+
+Tried on the built binary. I ran yoyo -p in empty temp dirs, each with only a .yoyo.toml:
+• `"abc"`: one stderr line, warning: invalid max_auto_continues value 'abc' (use a whole number from 0 to 20); the auto-continue cap uses the default (5)
+• `500`: one line, ... capped at 20
+• `5`: no warning.
+• A value containing an escape byte: shown escaped as \u001b[31mx, so it can't change the terminal colours.
+
+Each run then stopped with "No API key found", so no tokens were spent.
+
+Checklist:
+• Matches the task: the new message function is written the same way as the cost_warn one, and it's called right after the cost_warn warnings in src/cli.rs. Like those, it isn't silenced by quiet mode. The tests cover the bad values (abc, -1, empty, 21, 500), the valid ones (0, 5, 20) giving no warning, and the escape-byte case.
+• Nothing added without a use: the new function and length constant are both used in this diff. The default of 5 was made visible to the rest of the crate so cli.rs can name it in the warning, and it is used there.
+• Docs: docs/src/usage/repl.md now gives the valid range (0 to 20) and says what happens outside it.
+• User-facing behaviour: this is a product task and the only change is the new warning. Defaults, the value actually used and the exit code are the same.
+
+I didn't re-run the test suite (the harness already passed it), and I didn't check the positive control or the commit body.
+  watch: no files changed this turn — skipping

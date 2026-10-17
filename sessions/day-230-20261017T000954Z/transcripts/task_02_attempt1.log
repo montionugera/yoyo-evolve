@@ -1,0 +1,100 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,260p src/cd_config_note.r…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 400,600p src/cd_config_note… ✓ (6ms)
+ ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "reading_for_note\|readin… ✓ (30ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1450,1485p src/dispatch.rs;… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 945,1010p src/cd_config_not… ✓ (155ms)
+  ▶ $ cd /tmp && rm -rf p869 && mkdir -p p869/A p869/B && cd p869/A && printf '[permis… ✓ (21ms)
+  ▶ $ cd /tmp/p869/A && which script expect python3; python3 - <<'… (22 lines) ✓ (13.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; awk 'NR>=538&&NR<=543' src/cd_conf… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (51 lines) ✓ (30.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  10 tools completed in 1m 53s (10 ✓)
+
+Surprise: the foreign note does not mention the hook. Check whether the anti-vacuous assertion (hook parsed) holds:
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo cd_config_no… ✓ (146ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The anti-vacuous check caught it: [hooks]\npost.bash isn't recognised as a hook here. Before deciding whether that's my fixture or a bug, check how the real hook loader reads keys:
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn build_hook_registry" -… ✓ (6ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n 'strip_prefix("hooks' src/… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n '"hooks\.\|hooks\.' src/ho… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 18.7s (3 ✓)
+
+The real loader also only reads flat hooks. keys, so the fixture was wrong, not the disclosure — and so was my binary measurement. Re-measure with the issue's exact hooks.post.bash key:
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /tmp/p869/A && printf 'hooks.post.bash = "echo hi"\n\n[pe… (24 lines) ✓ (13.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (10 lines) ✓ (30.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo deny_and_hoo… ✓ (134ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 1s (3 ✓)
+
+Now the captured pre-edit bytes go into the near-miss as a full-string compare:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (18 lines) ✓ (33.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+No behaviour change, but the pin should still be shown to bite. Atomic, serial positive control on the is_loaded branch of reading_for_note:
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/cd_config_note.rs /tmp/cdn.… ✓ (1m 3s)
+
+Control bit by name and restored (marker count 1 → 0). Second control on the other half (the startup-deny filter) so both halves of "silent" are shown to be load-bearing:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/cd_config_note.rs /tmp/cdn.… ✓ (33.1s)
+
+Both halves bite; tree restored. Full gate:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff --stat; cargo fmt -- --ch… ✓ (4m 36s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (6m 19s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 11m 13s (2 ✓)
+
+All 20 test binaries are green and nothing failed. Committing with the measurement in the body:
+  ╭─ Turn 22 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (38 lines) ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view … (14 lines) ✓ (1.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 20.5s (2 ✓)
+
+The warning was already gone, so I added a test to keep it gone and changed no behaviour. Since 528dea35 (Day 230, 11:14), /cd back into the launch directory no longer repeats its deny-list warning.
+
+What I measured (on the built binary, with the exact setup from #869: a deny pattern plus hooks.post.bash, --trust-project --yes, /cd ../B, then /cd ../A):
+• /cd ../A printed no warning from this note. The only other line was the correct "1 hook from the launch project's .yoyo.toml fires again".
+• /permissions listed ✗ rm * once, not twice.
+• My first run had a mistake. I wrote the hook as a [hooks] table, and yoyo doesn't read that form as a hook at all. The new test's sanity check caught it, so I re-ran with the flat key the issue used. Both runs are in the commit body.
+
+What I added (in src/cd_config_note.rs only), with tests that check the exact stderr text through the same steps /cd runs:
+• cd_home_with_deny_and_hook_renders_nothing: going home prints nothing (None).
+• foreign_dir_with_deny_and_hook_still_warns_byte_identically: the same file in a directory yoyo didn't load at startup still gets the full warning. The test compares the whole string against output I captured before writing it.
+• I broke each of the two pieces that keep home quiet, one at a time: the is_loaded arm of reading_for_note, and the filter that drops deny entries already in force. Each time only the home test failed. Both are restored and the tree is clean.
+
+fmt, build, clippy (-D warnings) and cargo test all pass. Commit 7f2d9c79 is titled "Part of #869", and I commented on #869 with these numbers.
+
+Still open on #869: 4 items (the new directory's hooks, [permissions] allow, MCP servers, skills). Each one widens what the session trusts, so each needs a decision about who wrote the config before anything else.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,90 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git show 9470fd… ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1105,1135p src/config.rs; s… ✓ (21ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "cost_warn\|resolve_cost_t… ✓ (453ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2380,2412p src/cli.rs; grep… ✓ (19ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 34.8s (4 ✓)
+
+Writing the function with its tests and the call site together.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (127 lines) ✓ (13.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (17 lines) ✓ (32.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 2s (2 ✓)
+
+Positive control, atomic and serial:
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/config.… (9 lines) ✓ (1m 2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Neutered: the two firing tests failed and the near-miss stayed green. Restored: green, no marker left. Next I'm probing the binary:
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; B=$PWD/target/debug/yoyo; for v in… ✓ (34ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Each bad value prints exactly one line, and 5 prints none. The exit=1 is the "No API key" stop that comes later, which is expected. Now the docs:
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 110,135p docs/src/usage/rep… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (11 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && echo FMT_O… ✓ (20.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 > /tmp/test.log; g… ✓ (3m 26s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>/dev/null | grep -E "… ✓ (6m 17s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 12m 33s (4 ✓, 1 ✗)
+
+Everything is green: 6630 passed, 0 failed. Before committing I'm doing the close-out check for other silent numeric parses in config readers:
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "parse::<\(u\|i\|f\)[0-9a-… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+That grep finds only the reader this task covers, so "Fixes" holds as far as that search reaches.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git status --s… (43 lines) ✓ (30ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+A bad or out-of-range max_auto_continues now prints a warning at startup instead of being dropped or clamped silently. Committed as 0ad8d9be, and the title says "Fixes #1030". Build, the full cargo test (6630 passed, 0 failed), clippy with -D warnings, and the fmt check all pass.
+
+What changed
+• The warning: a new function, config::max_auto_continues_warning, decides whether a value deserves one. Junk like "abc", "-1" or "" says the default cap of 5 applies, and anything above 20 says it's capped at 20. The value shown is passed through sanitize_for_display and cut at 64 bytes.
+• Valid values stay silent: every in-range value, 0 through 20, gets no warning. That includes 0, which already means "auto-continue off" and which /config set accepts.
+• Where it prints: in src/cli.rs, right after the cost_warn lines, with the same gating (one stderr line, not hidden by quiet mode). To reach the default from there I made `DEFAULT_MAX_AUTO_CONTINUES` in `src/repl.rs pub(crate)`.
+• What didn't change: the parse, fallback and clamp logic, and the exit code.
+• Why it only warns: the commit body gives the reason in the words you set out. The knob is a cap, both fallbacks have a limit, and the line prints before any token is spent.
+• Docs: docs/src/usage/repl.md now gives the 0–20 range and mentions the warning.
+
+Checks
+• Built binary, run in an empty temp dir:
+  • "abc" printed warning: invalid max_auto_continues value 'abc' (use a whole number from 0 to 20); the auto-continue cap uses the default (5)
+  • 500 printed …; capped at 20
+  • 5 printed nothing.
+  • All three runs exited 1, but that's the later "No API key" stop, not this change.
+• Tests: the bad values are checked against the full expected string, the valid values are checked to return nothing, and there's an escape-byte fixture whose input is confirmed to contain \x1b while the output doesn't.
+• Positive control: forcing the function to always return nothing made the two tests that expect a warning fail by name, while the valid-values test stayed green. I put the code back in the same command; everything is green again and no NEUTERED marker is left.
+• Close-out: I re-read #1030. A grep for silent .parse::<number>().ok() calls in the config readers finds only this one, so there was nothing new to file. That search covers only that one pattern.
+
+The module-size gate now reports src/cli.rs at 24 lines over its recorded size. It's a non-fatal warning, and I didn't update the register.
+  watch: no files changed this turn — skipping
