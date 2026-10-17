@@ -1540,7 +1540,7 @@ mod tests {
         let mut agent = config.build_agent();
         handle_provider_switch("openai", &mut config, &mut agent);
         assert_eq!(config.provider, "openai");
-        assert_eq!(config.model, "gpt-5");
+        assert_eq!(config.model, "gpt-6-sol");
     }
 
     #[test]

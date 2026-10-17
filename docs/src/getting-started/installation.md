@@ -39,7 +39,7 @@ yoyo supports multiple AI providers out of the box. Use the `--provider` flag to
 | Provider | Flag | Default Model | Env Var |
 |----------|------|---------------|---------|
 | Anthropic (default) | `--provider anthropic` | `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
-| OpenAI | `--provider openai` | `gpt-4o` | `OPENAI_API_KEY` |
+| OpenAI | `--provider openai` | `gpt-6-sol` | `OPENAI_API_KEY` |
 | Google/Gemini | `--provider google` | `gemini-2.0-flash` | `GOOGLE_API_KEY` |
 | OpenRouter | `--provider openrouter` | `anthropic/claude-sonnet-4-20250514` | `OPENROUTER_API_KEY` |
 | xAI | `--provider xai` | `grok-3` | `XAI_API_KEY` |

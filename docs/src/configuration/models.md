@@ -33,7 +33,7 @@ Use `--provider <name>` to select a provider. Each provider has a default model 
 | Provider | Default Model | API Key Env Var |
 |----------|--------------|-----------------|
 | `anthropic` (default) | `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
-| `openai` | `gpt-4o` | `OPENAI_API_KEY` |
+| `openai` | `gpt-6-sol` | `OPENAI_API_KEY` |
 | `google` | `gemini-2.0-flash` | `GOOGLE_API_KEY` |
 | `openrouter` | `anthropic/claude-sonnet-4-20250514` | `OPENROUTER_API_KEY` |
 | `ollama` | `llama3.2` | *(none — local)* |

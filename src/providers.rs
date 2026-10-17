@@ -167,7 +167,16 @@ pub fn model_is_known_for_provider(provider: &str, model: &str) -> bool {
 /// Get the default model for a given provider.
 pub fn default_model_for_provider(provider: &str) -> String {
     match provider {
-        "openai" => "gpt-5".into(),
+        // The openai default is `gpt-6-sol` (#1037, Day 231), chosen by the same
+        // three checks as the anthropic default below: `openai_preset` matches it
+        // exactly, it is priced in yoagent's bundled prices, and the preset's
+        // max_tokens is within `GPT_6_OUTPUT_MAXIMUM`. So a user who only picks
+        // `--provider openai` gets real limits and a real `/cost`. The old `gpt-5`
+        // had no preset and tripped yoyo's own guessed-limits warning (4096 output
+        // tokens) on every run. Not `gpt-6.1-sol`, which Codex ships: it has no
+        // preset and no price today, so it would reproduce that exact warning.
+        // Sol over astra/luna because sol is the tier the reference peer defaults to.
+        "openai" => "gpt-6-sol".into(),
         "google" => "gemini-2.5-flash".into(),
         "openrouter" => "anthropic/claude-sonnet-4-6".into(),
         "ollama" => "llama3.2".into(),
@@ -334,6 +343,32 @@ mod tests {
         );
         assert!(
             model_is_known_for_provider("anthropic", &model),
+            "the default must not trip the unknown-model warning"
+        );
+    }
+
+    /// The openai default gets the same three checks as the anthropic one
+    /// (#1037, Day 231): preset, priced, within its output maximum.
+    #[test]
+    fn openai_default_model_is_preset_priced_and_within_its_output_maximum() {
+        let model = default_model_for_provider("openai");
+        assert_eq!(model, "gpt-6-sol");
+        let preset = crate::agent_builder::openai_preset(&model)
+            .expect("the openai default must have a preset, or it runs on guessed limits (#1037)");
+        assert!(
+            preset.cost.is_some(),
+            "the openai default must be priced, or /cost reports nothing"
+        );
+        let max =
+            crate::agent_builder::openai_compat_output_ceiling("openai", &model, preset.max_tokens)
+                .expect("the openai default must declare an output maximum");
+        assert!(
+            preset.max_tokens <= max,
+            "a no-config run sends {} max_tokens, above {model}'s {max}",
+            preset.max_tokens
+        );
+        assert!(
+            model_is_known_for_provider("openai", &model),
             "the default must not trip the unknown-model warning"
         );
     }

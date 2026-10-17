@@ -228,6 +228,52 @@ context_window in .yoyo.toml (or pass --max-tokens / --context-window)."
         }
     }
 
+    /// Consumer-side register (#1037, Day 231): which providers' OWN built-in
+    /// default model trips this warning. A user who only picks `--provider P`
+    /// is warned on every run about a model yoyo chose for them, and capped at
+    /// the base max_tokens. Read through the warning's own predicate over
+    /// `KNOWN_PROVIDERS`, so the residue can only shrink by the number fixed.
+    #[test]
+    fn provider_defaults_that_trip_the_guessed_limits_warning_are_a_counted_register() {
+        let mut tripping: Vec<&str> = Vec::new();
+        for p in crate::providers::KNOWN_PROVIDERS {
+            // ollama: local, the model id is whatever the user pulled.
+            if *p == "ollama" {
+                continue;
+            }
+            let model = crate::providers::default_model_for_provider(p);
+            if note_for(p, &model, true).is_some() {
+                tripping.push(p);
+            }
+        }
+        tripping.sort_unstable();
+        let mut expected = vec![
+            "openrouter",
+            "xai",
+            "groq",
+            "mistral",
+            "github",
+            "zai",
+            "cerebras",
+        ];
+        expected.sort_unstable();
+        assert_eq!(
+            tripping, expected,
+            "fixing a provider's default removes it from this list; a new provider here \
+means its default trips the guessed-limits warning (#1037)"
+        );
+        for silent in [
+            "openai",
+            "anthropic",
+            "google",
+            "deepseek",
+            "bedrock",
+            "minimax",
+        ] {
+            assert!(!tripping.contains(&silent), "{silent}");
+        }
+    }
+
     #[test]
     fn plain_mode_is_ascii_and_fancy_mode_has_marker() {
         let plain = note_for("openai", "gpt-6.1-sol", true).unwrap();
