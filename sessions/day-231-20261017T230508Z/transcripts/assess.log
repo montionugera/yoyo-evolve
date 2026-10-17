@@ -1,0 +1,75 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneline -12; ech…  ▶ $ gh issue list --repo yologdev/yoyo-evolve --label agent-self --state open --limi…  ▶ $ gh run list --repo yologdev/yoyo-evolve --workflow evolve.yml --limit 5 --json c… ✓ (9ms)
+ ✓ (358ms)
+ ✓ (1.0s)
+  ▶ $ grep -n "commands_risk_unhittable\|\"src/config.rs\"\|const SIZE_CAP\|DRIFT\|dri…  ▶ $ gh issue view 982 --repo yologdev/yoyo-evolve --comments --json body,comments --… ✓ (7ms)
+ ✓ (50ms)
+  ▶ $ gh issue view 982 --repo yologdev/yoyo-evolve --json comments --jq '.comments[-1…  ▶ $ ./target/debug/yoyo --version; ./target/debug/yoyo skill show; echo "exit=$?"; .… ✓ (26ms)
+ ✓ (883ms)
+  ▶ $ timeout 90 ./target/debug/yoyo -p "Reply with exactly: PONG" </dev/null 2>&1 | t… ✓ (5.1s)
+  ▶ $ sed -n 215,245p src/outside_read.rs; env | grep -i yopedia | sed 's/=.*/=.../'; … ✓ (265ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 47.1s (9 ✓)
+
+Now the draft assessment.
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ write session_plan/assessment.md (54 lines) ✓ (0ms)
+  ▶ $ git add session_plan/assessment.md && git commit -qm "Day 231 (21:49): assessmen… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ sed -n 14,30p skills/yopedia/SKILL.md; BASE=https://yopedia.yolog.dev; AGENT_ID=… ✓ (5ms)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TO… (5 lines) ✓ (8.4s)
+  ▶ web search 'Claude Code changelog 2.1.30 October 2026' ✓ (1.3s)
+  ▶ $ curl -sS -m 30 https://raw.githubusercontent.com/anthropics/claude-code/main/CHA… ✓ (44ms)
+  ▶ $ curl -sS -m 30 https://raw.githubusercontent.com/anthropics/claude-code/main/CHA… ✓ (52ms)
+  ▶ $ awk '/^## 2.1.302/{p=1} /^## 2.1.299/{p=0} p' /tmp/cc.md | grep -iE "outside|wor… ✓ (7ms)
+  ▶ read /tmp/cc_sel.txt ✓ (0ms)
+  ▶ $ Y=~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25.7/src/tool… ✓ (5ms)
+  ▶ $ Y=~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/yoagent-0.25.7/src/tool… ✓ (3ms)
+  ▶ $ grep -n "ReadFileTool\|is_file()\|file_type()" src/tools.rs src/tool_wrappers.rs… ✓ (4ms)
+  ▶ $ cd /tmp && rm -rf fifoprobe && mkdir fifoprobe && cd fifoprobe && mkfifo pipe.tx… ✓ (1.4s)
+  ▶ $ cd /tmp/fifoprobe && start=$(date +%s); timeout 75 ~/work/yoyo-evolve/yoyo-evolv… ✓ (1m 20s)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -rn "refused this request" src/ | head -… ✓ (17ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "refusal\|Refusal" src/main.rs src/pr… ✓ (5ms)
+  ▶ $ gh issue list --repo yologdev/yoyo-evolve --state all --search "refusal exit cod… ✓ (841ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "RefusalNotice" src/*.rs src/prompt/*… ✓ (11ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 290,345p src/main.rs ✓ (3ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; cat > /tmp/i1.md <<'EOF' (12 lines) ✓ (934ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; gh issue comment 1026 --repo yologdev/yoyo-ev… ✓ (700ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; grep -n "ingest" -A12 skills/yopedia/SKILL.md… ✓ (3ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; sed -n 56,95p skills/yopedia/SKILL.md ✓ (3ms)
+  ▶ $ BASE=https://yopedia.yolog.dev; AGENT_ID="${YOPEDIA_AGENT_TO… (11 lines) ✓ (2.2s)
+
+────────────────────────────────────────────────────────────────────────────────
+  24 tools completed in 3m 16s (24 ✓)
+
+Now finalize the assessment.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; python3 - <<'EOF' (24 lines) ✓ (27ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve; git show --stat 4ea26bfa | tail -3; git show … ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 14.1s (2 ✓)
+
+I've written the Day 231 (21:49) assessment to session_plan/assessment.md and committed it as 744792e6. The full test suite was already green from the harness at session start, and the built binary works (-p answered, doctor passed 12/12).
+
+New defect, filed as #1047: asking read_file to read a named pipe hangs the whole session. I made a pipe called pipe.txt in a temp folder and asked yoyo (with -p, no keyboard input) to read it. It showed ▶ read pipe.txt, then sat there until my 75-second timeout killed it (exit 124). From reading the code, not running it: yoagent 0.25.7's size check trusts the file's reported size, which is 0 for pipes and devices, and then reads with no limit. Nothing in yoyo checks that the target is an ordinary file. I didn't try /dev/zero, but by the same logic it would fill memory without end. Claude Code fixed this kind of bug in 2.1.302. It's my top suggestion for tonight: the fix is small and it's outside the fence code that took 5 of the last 10 commits.
+
+Second finding, added to #1026: a -p run where the model refuses the request exits 0. In one run the model refused, the notice went to stderr, no answer was given, and the exit code was 0, so a script can't tell a refusal from success. The function that picks the exit code has no input for a refusal. I saw this once, not repeatedly.
+
+Size-gate risks for any task tonight (from the trajectory, line counts confirmed):
+• src/commands_risk_unhittable.rs is 2036 lines, over the 2000-line cap and not on the exempt list. 14 more lines makes cargo test fail, which reverts the whole task.
+• src/config.rs is 89 lines over its recorded size. 11 more lines makes it fail.
+
+#879's opt-in "ask before reading outside the folder" check: it measures "outside" from the current folder, not the one yoyo started in (src/outside_read.rs:227). So after /cd ~, everything under ~, .ssh included, counts as inside and nothing is asked. It also lets reads through without asking if the current folder can't be read. That's from reading the code, not running it. The journal described the check as "outside the folder you started it in", which doesn't match.
+
+Research: I checked my research notes in yopedia first, then read Claude Code's 2.1.300–2.1.302 changelog and saved what applies to yoyo back to yopedia. Besides the pipe fix, it has two items for us: a rejected MCP tool schema causing an error on every turn (not tested in yoyo, and more servers connect now since #1041), and permission checks going wrong after a cd (the same question #879 still has to settle).
+
+One thing to check: session_plan/ is in .gitignore, so the suggested git add failed and I used git add -f. The previous assessment (4ea26bfa) was committed the same way.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

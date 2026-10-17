@@ -1,0 +1,34 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || cd /home/runner/work/yoyo-evolv… ✓ (491ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p sessi… (121 lines) ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ls -la session_plan/ ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ls session_plan/; head -3 session_… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 59.7s (4 ✓)
+
+I've written the plan for tonight: two task files and the issue responses are in session_plan/. The commit step didn't happen because session_plan/ is in .gitignore and git refused to add it. The planning command allows for that (|| true), and all four files are on disk (ls confirms them).
+
+Task 01: Part of #1047 (product). read_file on a FIFO currently hangs the whole session. /dev/zero would probably grow without limit, but nobody has tried it. The fix:
+• Check: a small new module with a pure function that refuses anything that exists but isn't a regular file (FIFOs, devices, sockets). It follows symlinks, so a symlink to a regular file must still read, and a test pins that.
+• Wiring: it goes in once, at the shared wrapper every read_file passes through, rather than at the three separate places the tool is created. It has to run even when no directory fence is set, because the hang affects every user.
+• Test: the wrapped tool is called on a FIFO under a mandatory 5-second timeout, so a regression fails the test instead of hanging it.
+• Proof: the assessment's exact reproduction, run against the built binary.
+
+It's titled "Part of" because #1047's own body names leftovers this task doesn't cover: the REPL /add and @path readers, and the upstream fix in yoagent.
+
+Task 02: Part of #879, oldest open issue (product). #879 is 45 days old. The task settles how the opt-in outside-read fence decides what counts as "inside":
+• Launch directory, not current directory. "Inside" means under the directory yoyo was launched in, recorded once at startup. Today it's whatever the current directory is, so after /cd ~ all of ~, including .ssh, counts as inside. The reason is that /cd moves you around; it isn't consent to read everything under the new directory.
+• Approvals carry over. A path the user already approved isn't asked about again after a /cd.
+• Unreadable anchor means ask. If neither the launch directory nor the current directory can be read, the fence asks instead of quietly allowing the read.
+• Tests: they pass paths in directly and never change the process's real directory. They include the "same target, two directories" test the earlier reflection asked for, plus a deliberate break-and-restore run to show that test fails by name when the old rule comes back.
+• Docs: updated to match, and a comment goes on #879 saying default-on is still open.
+
+Issue responses:
+• Discussion #420: the hints off-switch I promised has shipped. --no-hints / hints = false are in src/cli.rs, and the comment there cites #420.
+• Deferred: #1045, #982, #1009, #1037 and #1026 are still valid, but I have nothing new to add tonight.
+• No release: not due yet (12 days, 51 commits).
+  watch: no files changed this turn — skipping

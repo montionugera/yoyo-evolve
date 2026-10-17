@@ -1,0 +1,127 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (9ms)
+  ▶ $ sed -n 1,62p src/outside_read.rs; echo ----; sed -n 140,330p src/outside_read.rs ✓ (5ms)
+  ▶ read src/outside_read.rs (64 lines)  ▶ $ grep -rn "launch_dir\|startup_dir\|LAUNCH_DIR\|STARTUP_DIR\|launch dir\|initial_… ✓ (1ms)
+ ✓ (24ms)
+  ▶ $ grep -rn "launch" src --include=*.rs | grep -iv "^.*//.*launch" | head -40; grep… ✓ (19ms)
+  ▶ $ grep -rn "suspension_note(\|fn resolve_cd_target\|record_startup_fences\|struct … ✓ (25ms)
+  ▶ $ sed -n 170,200p src/cd_allow.rs; grep -n "launch\b\|launch:\|LAUNCH\|struct .*La… ✓ (5ms)
+  ▶ $ sed -n 36,92p src/cd_allow.rs; grep -rn "record_launch_project_allow\|cd_allow::… ✓ (13ms)
+  ▶ $ grep -n "static\|fn record\|current_dir" src/cd_hooks.rs | head; grep -rn "curre… ✓ (5ms)
+  ▶ $ grep -n "fn main\|async fn main\|parse_args(" src/main.rs | head; grep -n "outsi… ✓ (11ms)
+  ▶ $ sed -n 1181,1232p src/main.rs; sed -n 115,135p src/tool_wrappers.rs; sed -n 225,… ✓ (6ms)
+  ▶ $ grep -rn "set_current_dir" src --include=*.rs | grep -v "test" | head ✓ (10ms)
+  ▶ $ grep -n "decide(\|resolve_outside(\|fn \|&work,\|cwd" src/outside_read.rs | sed … ✓ (4ms)
+  ▶ $ sed -n 360,382p src/outside_read.rs; sed -n 596,647p src/outside_read.rs ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (139 lines) ✓ (9.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  15 tools completed in 1m 29s (15 ✓)
+
+Now the call site in main.rs (the dead-code warning is record_launch_dir):
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/main.rs (3 → 7 lines)
+        let args: Vec<String> = std::env::args().collect();
+  + 
+  +     // #879: anchor the opt-in outside-read fence on the launch dir, before any
+  +     // tool or `/cd` can run, so `/cd ~` does not make `~/.ssh` "inside".
+  +     outside_read::record_launch_dir();
+    
+        apply_cli_flags(&args);
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 395,420p src/outside_read… ✓ (15.4s)
+        let args: Vec<String> = std::env::args().collect();
+  + 
+  +     // #879: anchor the opt-in outside-read fence on the launch dir, before any
+  +     // tool or `/cd` can run, so `/cd ~` does not make `~/.ssh` "inside".
+  +     outside_read::record_launch_dir();
+    
+        apply_cli_flags(&args);
+ ✓ (15.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 440,470p src/outside_read… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (19 lines) ✓ (28.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 1m 8s (4 ✓)
+
+Compiles. Now the new tests (appended to the test module):
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (112 lines) ✓ (27.4s)
+
+The one remaining red is an exact-text assertion of the wording I deliberately changed (the refusal now names the launch dir). Updating that expected string only:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 605,625p src/outside_read… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -i '622,624s/the working dir… ✓ (27.5s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --bin yoyo outside_re… ✓ (113ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "working directory" src/… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -i '684s/the working directo… ✓ (27.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 1m 7s (5 ✓)
+
+Green. Positive control — one atomic mutate→test→restore, anchoring back on the cwd:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/outside_read.rs /tmp/or.b… ✓ (52.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control reddened exactly the named test; restored, green, marker gone. Now the module doc:
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (53 lines) ✓ (20ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -i '77s/a search rooted insi… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 232,262p docs/src/configu… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "ask-before-reading" do… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (19 lines) ✓ (26ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 18.8s (5 ✓)
+
+Now the full gate:
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt -- --check && cargo cl… ✓ (3m 37s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "test … ✓ (2m 49s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 6m 32s (2 ✓)
+
+All suites green, clippy clean, fmt clean. Committing, then the #879 comment.
+  ╭─ Turn 32 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git add -A && git commit -q -m "… ✓ (239ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat > /tmp/c… (16 lines) ✓ (730ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 21.1s (2 ✓)
+
+The read fence now anchors on the directory you launched yoyo in, so /cd ~ no longer makes ~/.ssh count as "inside". It also asks instead of allowing when it can't tell where you are. Committed as 3cbba4ac (Part of #879). Build, all tests, clippy with -D warnings and fmt check pass.
+
+What changed (src/outside_read.rs, plus one call in src/main.rs):
+• No existing record to reuse. I searched for a stored launch dir first. cd_allow and cd_hooks each store one, but only when they have config entries to suspend, so neither works as a general anchor. I added record_launch_dir(), which saves the canonical cwd once. It's called at the top of main, before any tool or /cd can run.
+• Paths are checked against the launch dir. A relative path is still joined to the live cwd, because that's where the tool will open it. The inside/outside test then compares against the launch dir. The live cwd is used as the anchor only when nothing was recorded, as in tests. Approvals you already gave still hold after /cd.
+• It fails closed. The old current_dir().ok()? meant "allow" whenever the cwd couldn't be read. Now, if there is no anchor at all, every path that exists is treated as outside and you get asked. A relative path with an unreadable cwd is refused, and the refusal asks for an absolute path.
+• The prompt and refusal messages now say "outside the directory yoyo was launched in". I updated the three tests that check those messages word for word. No test was weakened or deleted.
+
+Tests: five new ones. One uses two calls to show a path counted as inside under the old cwd rule is now outside. The others cover users who never /cd (behaviour unchanged), an approval surviving /cd, the no-anchor case (with a check that the test setup really has no anchor), and launch dir taking priority over the cwd. As a check on the tests, I temporarily put the cwd back as the anchor, then restored it in the same command: exactly the two-call test failed, by name, and everything was green again afterwards.
+
+Two corrections to the plan:
+• Cost: the plan said a "dir-yes covers B's subtree". It doesn't: a yes has never covered subdirectories. So after /cd outside the launch tree, reads ask once per directory, not once per subtree. The docs and module comment say so.
+• New gap I found: a search or list_files call with no root is never checked, because the wrapper only calls the fence when a path is given. So after /cd ~, an unrooted search walks ~ without asking. The fix belongs in tool_wrappers.rs, which was out of scope here. I wrote the gap into permissions.md and the module doc, and put it in the #879 comment.
+
+Docs and issue: docs/src/configuration/permissions.md now says "launch directory", that /cd doesn't move it, that approvals survive /cd, and how the fail-closed case behaves. I also fixed two code comments in tool_wrappers.rs that still said "outside the cwd". I commented on #879 with the decision and what's still open: the fence is still opt-in (turning it on by default is the other half of #879), plus the unrooted-search gap.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 1/1 changed files were in top-10 predictions (100.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 100.0%
+     Predicted correctly: src/main.rs

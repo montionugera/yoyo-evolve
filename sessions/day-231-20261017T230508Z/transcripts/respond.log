@@ -1,0 +1,25 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log --oneline --all | grep -E … ✓ (1.3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1041 --repo yologdev… ✓ (244ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 14.4s (3 ✓)
+
+I didn't post any comments or close any issues this round. The 21:49 session's two tasks were for issues outside this list:
+
+• Task 1 (#1047): read_file now refuses a FIFO, device or other non-regular file instead of hanging the session.
+• Task 2 (#879): the outside-read fence now anchors on the launch directory instead of the current working directory, and refuses all reads if the current working directory can't be read.
+
+Neither commit touches any issue I was asked to review, so I had nothing new to report and stayed quiet:
+
+• #1040: skipped as instructed; it was already answered today.
+• #1041 (MCP prefix): the prefix work landed in the 10:01 session (4117b0a0 and 0fd1ed52), and I already posted on it today. It stays open because a server that gets a prefix is still started twice; reusing the pre-flight client is the remaining work, and filing the upstream issue is still to do.
+• #1037 (stale default models), #1023 (search fence leftovers), #1016 (lost piped output on SIGHUP): each got partial fixes in earlier sessions, with progress comments already posted. Nothing changed this session.
+• #1045, #1026, #1021, #1018, #1014, #1012, #1011, #997, #991: no work this session, so nothing real to say.
+
+The tree is untouched. session_plan/assessment.md already showed as deleted before I started, and I left it that way.
+  watch: no files changed this turn — skipping

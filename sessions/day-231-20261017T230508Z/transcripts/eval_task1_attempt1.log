@@ -1,0 +1,20 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 95,135p src/tool_wrappers.r… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ls -la target/debug/yoyo 2>&1 | he… ✓ (12.2s)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 35.7s (3 ✓)
+
+Verdict: PASS. read_file now refuses FIFOs, devices and sockets instead of hanging the session. I wrote the verdict to session_plan/eval_task_1.md.
+
+• Applies to everyone: the check is wired into the execute of GuardedTool and ArcGuardedTool. I checked maybe_guard and maybe_guard_arc: both always wrap, even with no --allow-dir/--deny-dir set. So every read_file site goes through the check, not only fenced ones.
+• Run end to end: I made a FIFO in a temp dir and ran the built binary with timeout 60 yoyo -p "... read_file pipe.txt" </dev/null. It exited 0 after 12 seconds, and the model reported the FIFO refusal. Before this fix, the same run hung until it was killed.
+• Unchanged paths: regular files, symlinks to regular files, directories and missing paths all return None, so yoagent reports its own errors for them as before. A near-miss test also confirms a regular file's content still comes back through both wrappers.
+• Tests, size cap, docs: the tests cover everything the task asked for, including the check that the FIFO fixture really is a FIFO. The hang test uses a 10-second recv_timeout on a separate thread rather than tokio::time::timeout, and the diff explains why the latter wouldn't catch a stuck blocking read. The growth in tool_wrappers.rs (5684 → 5692 lines) is registered in tests/module_size.rs, and the docs entry is in common-issues.md.
+
+The diff also includes a one-line auto-generated append to .yoyo/risk_validations.jsonl, which is harmless.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
