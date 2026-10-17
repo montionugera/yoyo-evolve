@@ -127,6 +127,10 @@ impl AgentTool for GuardedTool {
             {
                 return Err(yoagent::types::ToolError::Failed(r));
             }
+            // FIFO/device/socket would hang `read_file` forever (#1047, src/non_regular_read.rs).
+            if let Some(r) = crate::non_regular_read::check(self.inner.name(), path) {
+                return Err(yoagent::types::ToolError::Failed(r));
+            }
         }
         // `search`/`list_files` take a ROOT: fence what they return too (#1022).
         // The root as the inner tool will see it (yoagent defaults to `.`), and
@@ -229,6 +233,10 @@ impl AgentTool for ArcGuardedTool {
             // Opt-in ask-once fence on reads outside the cwd (#879, src/outside_read.rs).
             if let Some(r) = crate::outside_read::check(self.inner.name(), path, &self.restrictions)
             {
+                return Err(yoagent::types::ToolError::Failed(r));
+            }
+            // FIFO/device/socket would hang `read_file` forever (#1047, src/non_regular_read.rs).
+            if let Some(r) = crate::non_regular_read::check(self.inner.name(), path) {
                 return Err(yoagent::types::ToolError::Failed(r));
             }
         }

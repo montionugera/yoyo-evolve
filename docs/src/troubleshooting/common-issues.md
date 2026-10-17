@@ -70,6 +70,16 @@ echo "" | yoyo
 
 **Fix:** Make sure your piped input contains actual content.
 
+## "is not a regular file (FIFO)"
+
+```
+pipe.txt is not a regular file (FIFO): reading it could block forever or never end; read_file only reads regular files
+```
+
+The `read_file` tool only reads regular files (symlinks to regular files are fine). It refuses FIFOs (named pipes), character and block devices (such as `/dev/null` or a tty) and sockets, because reading one can block forever or never end, which used to hang a `-p` run until it was killed. This applies with or without `--allow-dir`/`--deny-dir`. Directories and missing paths get the tool's own error, as before.
+
+**Fix:** If you meant to read what flows through a pipe or device, capture it to a regular file first (for example `cat pipe.txt > out.txt` in another shell) and read that.
+
 ## Model errors
 
 ```

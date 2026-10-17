@@ -127,6 +127,7 @@ mod format;
 mod gasp;
 mod mcp_prefix;
 mod model_limits_note;
+mod non_regular_read;
 #[cfg(test)]
 mod openai_preset_tests;
 #[cfg(test)]
