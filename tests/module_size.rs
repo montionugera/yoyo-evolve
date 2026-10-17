@@ -193,7 +193,11 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // Fable 5.1) plus their ordering comment; the tests went to a sibling file.
     // Day 224 (#1003 residue): +20 — `claude_sonnet_5_5()` (Sonnet 5 plus its
     // own $0.10 cache read) and its ordering arm; tests in anthropic_preset_tests.rs.
-    ("src/agent_builder.rs", 4861),
+    // Day 231 (#1041): the two MCP collision-guard sites now dispatch on
+    // `plan_mcp_connect` (Plain / Prefixed / Skip) and track `registered`;
+    // all new logic and its tests live in src/mcp_prefix.rs. The rest of the
+    // drift since 4861 predates this task.
+    ("src/agent_builder.rs", 4969),
     // Day 164 (#728): +98 lines — `/skill install`'s destination becomes a third
     // auto-discovery source, so an explicitly installed skill actually loads.
     // The two near-identical per-directory blocks were collapsed into one loop

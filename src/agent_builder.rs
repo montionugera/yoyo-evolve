@@ -19,6 +19,9 @@ use crate::cli;
 use crate::config;
 use crate::format::*;
 use crate::hooks::{self, maybe_hook};
+use crate::mcp_prefix::{
+    connect_prefixed, plan_mcp_connect, sanitize_mcp_prefix, McpConnectPlan, PrefixedConnect,
+};
 use crate::prompt::{run_prompt, run_prompt_with_content, PromptOutcome};
 use crate::prompt_budget::is_audit_enabled;
 use crate::tool_wrappers::{with_session_cap, SESSION_TOOL_CALL_CAP};
@@ -499,9 +502,12 @@ pub(crate) async fn connect_external_servers(
     openapi_specs: &[String],
 ) -> (Agent, u32, u32) {
     let mut mcp_count = 0u32;
+    // Tool names earlier servers registered, so a later server that reuses
+    // one is prefixed rather than killing turn one (#1041, `mcp_prefix.rs`).
+    let mut registered: Vec<String> = Vec::new();
 
     // Connect to MCP servers (--mcp flags)
-    for mcp_cmd in mcp_servers {
+    for (flag_pos, mcp_cmd) in mcp_servers.iter().enumerate() {
         let parts: Vec<&str> = mcp_cmd.split_whitespace().collect();
         if parts.is_empty() {
             eprintln!("{YELLOW}warning:{RESET} Empty --mcp command, skipping");
@@ -517,33 +523,51 @@ pub(crate) async fn connect_external_servers(
         // "Tool names must be unique". See #MCP collision guard (Day 39).
         // Retried (#841) because a transient pre-flight failure used to
         // disable the guard entirely for this server — a silent fail-open.
+        let mut preflight_names = Vec::new();
+        let prefix = format!("mcp{}", flag_pos + 1);
         match fetch_mcp_tool_names_retrying(command, &args_slice, None).await {
             Ok(tool_names) => {
-                let collisions = detect_mcp_collisions(&tool_names, BUILTIN_TOOL_NAMES);
-                if !collisions.is_empty() {
-                    for tool in &collisions {
-                        eprintln!(
-                            "{YELLOW}warning:{RESET} MCP server '{command}' exposes tool '{tool}' which collides with yoyo's builtin; skipping this server"
-                        );
+                match plan_mcp_connect(&tool_names, BUILTIN_TOOL_NAMES, &registered, &prefix) {
+                    McpConnectPlan::Plain => preflight_names = tool_names,
+                    McpConnectPlan::Prefixed { prefix, colliding } => {
+                        let spec = PrefixedConnect {
+                            command,
+                            args: &args_slice,
+                            env: None,
+                            label: mcp_cmd,
+                            failure_id: mcp_cmd,
+                            prefix: &prefix,
+                            colliding: &colliding,
+                        };
+                        agent =
+                            connect_prefixed(agent, spec, &mut registered, &mut mcp_count).await;
+                        continue;
                     }
-                    eprintln!(
+                    McpConnectPlan::Skip(collisions) => {
+                        for tool in &collisions {
+                            eprintln!(
+                            "{YELLOW}warning:{RESET} MCP server '{command}' exposes tool '{tool}' even under its prefix, which collides with a builtin or an earlier MCP server; skipping this server"
+                        );
+                        }
+                        eprintln!(
                         "{DIM}  mcp: skipping '{mcp_cmd}' — rename/exclude the colliding tool(s) or use a different server{RESET}"
                     );
-                    // Deliberately NOT recorded via `record_failed_server`, and
-                    // the omission is a decision rather than an oversight: this
-                    // is a **refusal working as designed**, not a connection
-                    // failure. The model-facing note exists to say "the
-                    // capability was configured and the connection failed, so
-                    // report it unavailable rather than hand-rolling it"; here
-                    // the server was refused *because* it exposes a name yoyo
-                    // already provides, so the capability is not missing at all
-                    // — the builtin is right there. Telling the model a tool is
-                    // unavailable while it sits in the tool list would be the
-                    // confident-wrong-diagnosis defect, and dressing a guard
-                    // working as designed as a malfunction is the same rule
-                    // `RecoveryHintTool`/`DiagnosticSubAgentTool` already follow
-                    // for `REFUSAL_STEM_*` (#710).
-                    continue;
+                        // Deliberately NOT recorded via `record_failed_server`, and
+                        // the omission is a decision rather than an oversight: this
+                        // is a **refusal working as designed**, not a connection
+                        // failure. The model-facing note exists to say "the
+                        // capability was configured and the connection failed, so
+                        // report it unavailable rather than hand-rolling it"; here
+                        // the server was refused *because* it exposes a name yoyo
+                        // already provides, so the capability is not missing at all
+                        // — the builtin is right there. Telling the model a tool is
+                        // unavailable while it sits in the tool list would be the
+                        // confident-wrong-diagnosis defect, and dressing a guard
+                        // working as designed as a malfunction is the same rule
+                        // `RecoveryHintTool`/`DiagnosticSubAgentTool` already follow
+                        // for `REFUSAL_STEM_*` (#710).
+                        continue;
+                    }
                 }
             }
             Err(e) => {
@@ -565,6 +589,7 @@ pub(crate) async fn connect_external_servers(
             Ok(updated) => {
                 agent = updated;
                 mcp_count += 1;
+                registered.extend(preflight_names);
                 eprintln!("{GREEN}  ✓ mcp: {command} connected{RESET}");
             }
             Err(e) => {
@@ -590,6 +615,7 @@ pub(crate) async fn connect_external_servers(
                 agent = agent_config.build_agent();
                 let note = connections_lost_note("mcp", mcp_count, is_plain_output());
                 mcp_count = 0;
+                registered.clear();
                 eprintln!("{DIM}  mcp: agent rebuilt (previous MCP connections lost){RESET}");
                 if let Some(note) = note {
                     eprintln!("{YELLOW}  {note}{RESET}");
@@ -613,14 +639,34 @@ pub(crate) async fn connect_external_servers(
         );
 
         // Pre-flight collision check (see comment above), same retry policy.
+        let mut preflight_names = Vec::new();
         match fetch_mcp_tool_names_retrying(&server_cfg.command, &args_refs, env_map.clone()).await
         {
-            Ok(tool_names) => {
-                let collisions = detect_mcp_collisions(&tool_names, BUILTIN_TOOL_NAMES);
-                if !collisions.is_empty() {
+            Ok(tool_names) => match plan_mcp_connect(
+                &tool_names,
+                BUILTIN_TOOL_NAMES,
+                &registered,
+                &sanitize_mcp_prefix(&server_cfg.name),
+            ) {
+                McpConnectPlan::Plain => preflight_names = tool_names,
+                McpConnectPlan::Prefixed { prefix, colliding } => {
+                    let id = mcp_failed_server_id(&server_cfg.name, &server_cfg.command);
+                    let spec = PrefixedConnect {
+                        command: &server_cfg.command,
+                        args: &args_refs,
+                        env: env_map,
+                        label: &server_cfg.name,
+                        failure_id: &id,
+                        prefix: &prefix,
+                        colliding: &colliding,
+                    };
+                    agent = connect_prefixed(agent, spec, &mut registered, &mut mcp_count).await;
+                    continue;
+                }
+                McpConnectPlan::Skip(collisions) => {
                     for tool in &collisions {
                         eprintln!(
-                            "{YELLOW}warning:{RESET} MCP server '{}' exposes tool '{tool}' which collides with yoyo's builtin; skipping this server",
+                            "{YELLOW}warning:{RESET} MCP server '{}' exposes tool '{tool}' even under its prefix, which collides with a builtin or an earlier MCP server; skipping this server",
                             server_cfg.name
                         );
                     }
@@ -630,7 +676,7 @@ pub(crate) async fn connect_external_servers(
                     );
                     continue;
                 }
-            }
+            },
             Err(e) => {
                 // See the --mcp loop above: same fall-through, same honest
                 // message, one statement of each.
@@ -648,6 +694,7 @@ pub(crate) async fn connect_external_servers(
             Ok(updated) => {
                 agent = updated;
                 mcp_count += 1;
+                registered.extend(preflight_names);
                 eprintln!("{GREEN}  ✓ mcp: {} connected{RESET}", server_cfg.name);
             }
             Err(e) => {
@@ -671,6 +718,7 @@ pub(crate) async fn connect_external_servers(
                 agent = agent_config.build_agent();
                 let note = connections_lost_note("mcp", mcp_count, is_plain_output());
                 mcp_count = 0;
+                registered.clear();
                 eprintln!("{DIM}  mcp: agent rebuilt (previous MCP connections lost){RESET}");
                 if let Some(note) = note {
                     eprintln!("{YELLOW}  {note}{RESET}");

@@ -125,6 +125,7 @@ mod fence_result_filter;
 mod format;
 #[cfg(feature = "gasp")]
 mod gasp;
+mod mcp_prefix;
 mod model_limits_note;
 #[cfg(test)]
 mod openai_preset_tests;
