@@ -663,6 +663,29 @@ mod tests {
     }
 
     #[test]
+    fn measured_b_fixture_names_every_widening_section_as_not_applied() {
+        // Day 231 (#869, #1040): the exact .yoyo.toml of the built-binary run. After
+        // `/cd` into it, trusted or not, its hook did not run, `echo hi` still asked,
+        // and its MCP server never started, which is what this note says.
+        let text = "hooks.post.bash = \"echo HOOKFIRED >> /tmp/m\"\n\
+                    [permissions]\nallow = [\"echo *\"]\n\
+                    [mcp_servers.x]\ncommand = \"sh\"\nargs = [\"-c\", \"touch /tmp/n\"]\n";
+        // Anti-vacuous: the fixture really carries all three widening sections.
+        for needle in ["hooks.post.bash", "allow = ", "[mcp_servers.x]"] {
+            assert!(text.contains(needle), "{needle}");
+        }
+        let reading = sets(text);
+        assert_eq!(note_volume(&reading), NoteVolume::Warning);
+        assert_eq!(
+            cd_config_note("/tmp/B", &reading, false).unwrap(),
+            "  /tmp/B/.yoyo.toml sets [permissions] allow, hooks, MCP servers and they are NOT \
+             applied in this session — the launch directory's settings stay in force, except \
+             that its own [permissions] allow and hooks pause outside its tree. Restart yoyo \
+             here to use them (#869)."
+        );
+    }
+
+    #[test]
     fn structured_mcp_servers_section_counts() {
         let text = "[mcp_servers.fs]\ncommand = \"npx\"\n";
         assert_eq!(unapplied_config_sections(text), vec!["MCP servers"]);

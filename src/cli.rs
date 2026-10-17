@@ -238,9 +238,13 @@ pub(crate) fn reevaluate_trust_on_cd(dir: &std::path::Path) -> TrustChange {
 ///
 /// A silent trust change is a bug in **both** directions: a grant the user did not see
 /// is the state `trusted_by_store_message` exists to prevent, and a revocation the user
-/// did not see reads as yoyo mysteriously refusing things that worked a moment ago. The
-/// wording deliberately mirrors `trusted_by_store_message` rather than inventing a second
-/// vocabulary for the same four capabilities. `plain` drops the glyph **and** the em
+/// did not see reads as yoyo mysteriously refusing things that worked a moment ago. It
+/// uses `trusted_by_store_message`'s names for the four capabilities, but NOT its claim
+/// that they are live: at startup they are, after `/cd` only `.yoyo/goal_verify.md` is
+/// (it reads trust at call time from the cwd). Superseded claim (Day 231, measured with
+/// the built binary): this note said the new dir's MCP servers, permissions.allow and
+/// shell hooks "are live here", while none of them is loaded by `/cd` (#869, #1040).
+/// `plain` drops the glyph **and** the em
 /// dashes for screen-reader output; the caller drops the whole message under `--quiet`.
 pub(crate) fn trust_changed_on_cd_message(
     dir: &std::path::Path,
@@ -256,17 +260,18 @@ pub(crate) fn trust_changed_on_cd_message(
         let marker = if plain { "" } else { "⚠ " };
         format!(
             "{marker}Project trust is now ON for this directory: {}\n  It is listed in your \
-user-level trusted_dirs store{dash} project-local .yoyo.toml MCP servers, permissions.allow, \
-shell hooks and .yoyo/goal_verify.md are live here.",
+user-level trusted_dirs store{dash} its .yoyo/goal_verify.md is live here. Its .yoyo.toml MCP \
+servers, permissions.allow and shell hooks, and its .yoyo/skills/, are not loaded by /cd: \
+restart yoyo here to use them (#1040).",
             dir.display()
         )
     } else {
         let marker = if plain { "" } else { "✓ " };
         format!(
             "{marker}Project trust is now OFF for this directory: {}\n  Trust is per-directory{dash} \
-a --trust-project flag grants only the directory it was typed in. Project-local .yoyo.toml MCP \
-servers, permissions.allow, shell hooks and .yoyo/goal_verify.md will not run here.\n  Run yoyo \
-with --trust-project-always in this directory to record it.",
+a --trust-project flag grants only the directory it was typed in. Its .yoyo/goal_verify.md \
+will not run here, and /cd never loads its .yoyo.toml MCP servers, permissions.allow or shell \
+hooks, trusted or not.\n  Run yoyo with --trust-project-always in this directory to record it.",
             dir.display()
         )
     })
@@ -7635,6 +7640,41 @@ command = "server-two"
                 revoked.contains(capability),
                 "revocation must say which capabilities are now off: {capability}"
             );
+        }
+    }
+
+    #[test]
+    fn trust_change_note_does_not_claim_cd_loads_the_new_dirs_toml() {
+        // Day 231 (#869, #1040): measured with the built binary, a `/cd` into a
+        // trust-store-listed dir did NOT run its hook, apply its allow, start its
+        // MCP server or load its .yoyo/skills/, while this note said the first
+        // three "are live here" two lines above the #869 warning saying the
+        // opposite. Only .yoyo/goal_verify.md reads trust at call time from cwd.
+        let dir = std::path::Path::new("/home/u/proj");
+        assert_eq!(
+            trust_changed_on_cd_message(dir, false, true, false).unwrap(),
+            "⚠ Project trust is now ON for this directory: /home/u/proj\n  It is listed in \
+your user-level trusted_dirs store — its .yoyo/goal_verify.md is live here. Its .yoyo.toml \
+MCP servers, permissions.allow and shell hooks, and its .yoyo/skills/, are not loaded by /cd: \
+restart yoyo here to use them (#1040)."
+        );
+        assert_eq!(
+            trust_changed_on_cd_message(dir, true, false, true).unwrap(),
+            "Project trust is now OFF for this directory: /home/u/proj\n  Trust is \
+per-directory, a --trust-project flag grants only the directory it was typed in. Its \
+.yoyo/goal_verify.md will not run here, and /cd never loads its .yoyo.toml MCP servers, \
+permissions.allow or shell hooks, trusted or not.\n  Run yoyo with --trust-project-always \
+in this directory to record it."
+        );
+        // The specific false sentence, for both forms and both directions.
+        for (was, now) in [(false, true), (true, false)] {
+            for plain in [false, true] {
+                let m = trust_changed_on_cd_message(dir, was, now, plain).unwrap();
+                assert!(
+                    !m.contains("shell hooks and .yoyo/goal_verify.md are live"),
+                    "{m}"
+                );
+            }
         }
     }
 
