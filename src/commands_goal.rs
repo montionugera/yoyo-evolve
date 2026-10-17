@@ -548,6 +548,11 @@ pub fn handle_goal_fenced(
 ) -> CommandResult {
     let arg = input.strip_prefix("/goal").unwrap_or("").trim();
 
+    if goal_subcommand_is_unknown(arg) {
+        print_goal_unknown_subcommand(arg);
+        return CommandResult::Continue;
+    }
+
     if arg.is_empty() || arg == "show" {
         // /goal or /goal show — display current goal
         match load_goal() {
@@ -701,25 +706,84 @@ pub fn handle_goal_fenced(
             }
         }
     } else {
-        println!(
-            "{YELLOW}Unknown subcommand: {arg}{RESET}\n\n\
-             Usage:\n\
-             \x20 /goal              Show current goal\n\
-             \x20 /goal set <desc>   Set a new goal\n\
-             \x20 /goal show         Show current goal\n\
-             \x20 /goal clear        Remove current goal\n\
-             \x20 /goal check        Ask AI to evaluate progress\n\
-             \x20 /goal verify <cmd> Set a verification command\n\
-             \x20 /goal verify       Show current verify command\n\
-             \x20 /goal verify clear Remove verify command\n"
-        );
+        // Unreachable while goal_subcommand_is_unknown mirrors this chain
+        // (pinned by its table test); kept so a drift still prints usage.
+        print_goal_unknown_subcommand(arg);
         CommandResult::Continue
     }
+}
+
+/// True when `/goal <arg>` names no verb [`handle_goal_fenced`] implements.
+/// It is the single authority for the unknown-verb branch: the handler routes
+/// on it before its own chain, and the shell `yoyo goal` arm reads it to exit 2
+/// (#982), so the printed usage and the exit code cannot disagree. The
+/// conditions mirror that handler's if-chain exactly, including `set`/`verify` being
+/// prefix matches.
+pub(crate) fn goal_subcommand_is_unknown(arg: &str) -> bool {
+    let arg = arg.trim();
+    !(arg.is_empty()
+        || arg == "show"
+        || arg.starts_with("set")
+        || arg == "clear"
+        || arg.starts_with("verify")
+        || arg == "check")
+}
+
+fn print_goal_unknown_subcommand(arg: &str) {
+    println!(
+        "{YELLOW}Unknown subcommand: {arg}{RESET}\n\n\
+         Usage:\n\
+         \x20 /goal              Show current goal\n\
+         \x20 /goal set <desc>   Set a new goal\n\
+         \x20 /goal show         Show current goal\n\
+         \x20 /goal clear        Remove current goal\n\
+         \x20 /goal check        Ask AI to evaluate progress\n\
+         \x20 /goal verify <cmd> Set a verification command\n\
+         \x20 /goal verify       Show current verify command\n\
+         \x20 /goal verify clear Remove verify command\n"
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn goal_subcommand_is_unknown_mirrors_the_handler_chain() {
+        // #982: the shell door exits 2 exactly when this is true, so a false
+        // positive would fail a working verb and a false negative would let a
+        // typo read as success.
+        for known in [
+            "",
+            "show",
+            "set ship it",
+            "set",
+            "clear",
+            "verify",
+            "verify cargo test",
+            "verify clear",
+            "check",
+            "  show  ",
+        ] {
+            assert!(
+                !goal_subcommand_is_unknown(known),
+                "{known:?} is a real verb"
+            );
+        }
+        for unknown in [
+            "frobnicate",
+            "check now",
+            "checkpoint",
+            "chek",
+            "showw",
+            "clear all",
+        ] {
+            assert!(
+                goal_subcommand_is_unknown(unknown),
+                "{unknown:?} is not a verb"
+            );
+        }
+    }
     use serial_test::serial;
     use tempfile::TempDir;
 

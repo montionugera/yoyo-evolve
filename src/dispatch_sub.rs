@@ -232,7 +232,8 @@ fn goal_args_need_session(args: &[String]) -> bool {
 /// "requires an interactive session" refusals did nothing, so they return
 /// [`crate::setup::SETUP_NOT_INTERACTIVE_EXIT`] — the one code a shell refusal
 /// for want of a live session uses — instead of the success the arm used to
-/// fall through to. Every verb that runs returns 0, as before.
+/// fall through to. An unknown verb returns 2, the usage-error code `risk` and
+/// `config` use; every verb that runs returns 0, as before.
 fn goal_shell_status(args: &[String]) -> i32 {
     // Plain join: handle_goal's `set` arm takes its remainder
     // verbatim (strip_prefix("set").trim(), no tokenize_quoted in
@@ -257,7 +258,26 @@ fn goal_shell_status(args: &[String]) -> i32 {
         eprintln!("{DIM}  Start yoyo and use: /goal check{RESET}\n");
         return crate::setup::SETUP_NOT_INTERACTIVE_EXIT;
     }
-    0
+    // #982: an unknown verb printed its usage and exited 0. Same predicate
+    // handle_goal routed on, so the text and the code cannot disagree.
+    let arg = input.strip_prefix("/goal").unwrap_or("");
+    2 * i32::from(crate::commands_goal::goal_subcommand_is_unknown(arg))
+}
+
+/// `yoyo todo <verb>` exit code after the handler ran (#982): 2 when the verb
+/// is not one `TODO_VERBS` names (the usage block was printed), 0 otherwise.
+/// Bare `yoyo todo` is the listing, so an empty verb is fine.
+fn todo_shell_status(verb: &str) -> i32 {
+    let unknown = !verb.is_empty() && !crate::commands_todo::TODO_VERBS.contains(&verb);
+    2 * i32::from(unknown)
+}
+
+/// `yoyo ast` exit code for a usage error (#982): 2 when the same parser
+/// `handle_ast_grep` uses rejected the input (bare `yoyo ast`, a flag with no
+/// value, a bare positional path), so the printed usage no longer reads as
+/// success. 0 otherwise, including "sg not installed", which is not a usage error.
+fn ast_shell_status(input: &str) -> i32 {
+    2 * i32::from(crate::commands_ast_grep::parse_ast_grep_args(input).is_err())
 }
 
 /// `yoyo extended` from the shell: always a refusal, since extended mode needs
@@ -517,6 +537,7 @@ pub(crate) fn try_dispatch_subcommand_in(
                 // `cap_ast_output`'s 200-line bound — applies here too.
                 let input = join_args_as_command(args);
                 crate::commands_ast_grep::handle_ast_grep(&input);
+                exit_if_nonzero(ast_shell_status(&input));
                 return Some(None);
             }
             "def" => {
@@ -729,6 +750,7 @@ pub(crate) fn try_dispatch_subcommand_in(
                 if let Some(note) = crate::commands_todo::shell_todo_session_note(verb) {
                     eprintln!("{DIM}  {note}{RESET}");
                 }
+                exit_if_nonzero(todo_shell_status(verb));
                 return Some(None);
             }
             "goal" => {
@@ -1806,7 +1828,11 @@ mod tests {
         // absent and `src/` makes #767's bare-path refusal fire; both are
         // handler-internal outcomes that leave the routing decision the same.
         let cases: &[&[&str]] = &[
-            &["yoyo", "ast", "$X.unwrap()", "src/"],
+            // Day 231 (#982): the Day 169 shape `ast $X.unwrap() src/` is now the
+            // #767 bare-path usage error, which exits 2 inside the arm and would
+            // kill this test binary; its code is pinned by
+            // `unknown_verbs_exit_with_the_usage_code`. Its `--in` spelling routes.
+            &["yoyo", "ast", "$X.unwrap()", "--in", "src/"],
             &["yoyo", "ast", "unwrap()", "--in", "src/commands_goal.rs"],
             &["yoyo", "def", "handle_goal"],
         ];
@@ -2102,6 +2128,45 @@ mod tests {
             );
             assert_eq!(goal_shell_status(&argv(&["yoyo", "goal", "show"])), 0);
         });
+    }
+
+    #[test]
+    fn unknown_verbs_exit_with_the_usage_code() {
+        // #982: goal, todo and bare ast printed their usage and exited 0.
+        let argv =
+            |parts: &[&str]| -> Vec<String> { parts.iter().map(|s| s.to_string()).collect() };
+        let tmp = tempfile::TempDir::new().expect("create temp dir");
+        crate::commands_goal::with_goal_base_dir(tmp.path(), || {
+            assert_eq!(goal_shell_status(&argv(&["yoyo", "goal", "frobnicate"])), 2);
+            assert_eq!(
+                goal_shell_status(&argv(&["yoyo", "goal", "check", "now"])),
+                2
+            );
+            // The unknown verb wrote nothing.
+            assert!(!tmp.path().join(".yoyo").exists());
+            // Near-miss: real verbs still succeed.
+            assert_eq!(goal_shell_status(&argv(&["yoyo", "goal"])), 0);
+            assert_eq!(goal_shell_status(&argv(&["yoyo", "goal", "show"])), 0);
+        });
+
+        assert_eq!(todo_shell_status("zzz"), 2);
+        assert_eq!(todo_shell_status("lst"), 2);
+        for verb in ["", "list", "board"] {
+            assert_eq!(todo_shell_status(verb), 0, "todo {verb:?} is a real verb");
+        }
+        for verb in crate::commands_todo::TODO_VERBS {
+            assert_eq!(todo_shell_status(verb), 0, "todo {verb} is a real verb");
+        }
+
+        assert_eq!(ast_shell_status("/ast"), 2);
+        assert_eq!(ast_shell_status("/ast --lang"), 2);
+        // The #767 bare positional path (needs `src/` to exist; tests run at the
+        // crate root) is a usage error too.
+        assert_eq!(ast_shell_status("/ast $X.unwrap() src/"), 2);
+        // Near-miss: a well-formed query is not a usage error, whether or not
+        // sg is installed to run it.
+        assert_eq!(ast_shell_status("/ast $X.unwrap() --in src/"), 0);
+        assert_eq!(ast_shell_status("/ast $X.unwrap()"), 0);
     }
 
     #[test]

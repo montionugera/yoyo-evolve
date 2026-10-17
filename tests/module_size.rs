@@ -406,7 +406,9 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // source-level pin, since the arm now exits), pasted.
     // Day 229 (#1024): 2328 -> 2336 (+8), the non-TTY refusal in the `setup` arm; the
     // decision itself lives in setup.rs (`setup_stdin_refusal`), pasted.
-    ("src/dispatch_sub.rs", 2336),
+    // Day 231 (#982): 2336 -> 2457 (+121): +56 of earlier unrecorded drift, plus the
+    // goal/todo/ast unknown-verb exit-2 helpers and their test, pasted.
+    ("src/dispatch_sub.rs", 2457),
     // Day 209: 3439 -> 3455 (+16, within the drift band, pasted rather than left to absorb).
     // #937 option 1: nine lines of doc above `builtin_model_pricing` naming both ignored
     // audit commands (deliverable 4 — an alarm nobody can find is the #745/#767/#769

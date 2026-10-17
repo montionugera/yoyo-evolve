@@ -16,7 +16,8 @@ pub fn handle_skill(input: &str, skills: &yoagent::skills::SkillSet) {
 
 /// [`handle_skill`], returning the process exit code the shell `yoyo skill`
 /// arm uses (#982): 1 when `show` names a skill that is not loaded (or whose
-/// file cannot be read), 0 otherwise. Decided from the lookup, never from text.
+/// file cannot be read), 2 for an unknown subcommand (the usage-error code
+/// `risk`/`config` use), 0 otherwise. Decided from the branch, never from text.
 pub fn handle_skill_status(input: &str, skills: &yoagent::skills::SkillSet) -> i32 {
     let sub = input.strip_prefix("/skill").unwrap_or(input).trim();
 
@@ -68,6 +69,7 @@ pub fn handle_skill_status(input: &str, skills: &yoagent::skills::SkillSet) -> i
     } else {
         eprintln!("{RED}  unknown subcommand: {sub}{RESET}");
         eprintln!("{DIM}  try: /skill list, /skill show <name>, /skill path, /skill install <path>, /skill search <query>, /skill init <name>{RESET}\n");
+        return 2;
     }
     0
 }
@@ -1926,5 +1928,17 @@ mod tests {
         assert_eq!(handle_skill_status("/skill show nosuch", &skills), 1);
         assert_eq!(handle_skill_status("/skill list", &skills), 0);
         assert_eq!(handle_skill_status("/skill show", &skills), 0);
+    }
+
+    #[test]
+    fn unknown_skill_subcommand_exits_with_the_usage_code() {
+        // #982: `yoyo skill nosuch` printed "unknown subcommand" and exited 0.
+        let skills = yoagent::skills::SkillSet::empty();
+        assert_eq!(handle_skill_status("/skill nosuch", &skills), 2);
+        assert_eq!(handle_skill_status("nosuch", &skills), 2);
+        // Near-miss: real verbs on the same function still succeed.
+        assert_eq!(handle_skill_status("/skill list", &skills), 0);
+        assert_eq!(handle_skill_status("/skill", &skills), 0);
+        assert_eq!(handle_skill_status("/skill path", &skills), 0);
     }
 }
