@@ -1,4 +1,4 @@
-//! GPT-6 Astra/Sol/Luna (Day 223): on `provider = "openai"` these ids take
+//! GPT-6 Astra/Sol/Luna (Day 223) and GPT-6.1 Sol (yoagent 0.25.8, #1037): on `provider = "openai"` these ids take
 //! yoagent's preset window, max_tokens, cost and reasoning instead of the bare
 //! `ModelConfig::openai` defaults (128K window, 4096 max_tokens), and the two
 //! readers — `/model info`'s window and `/cost`'s price table — report the
@@ -22,13 +22,18 @@ fn presets() -> Vec<(&'static str, ModelConfig)> {
         ("gpt-6-astra", ModelConfig::gpt_6_astra()),
         ("gpt-6-sol", ModelConfig::gpt_6_sol()),
         ("gpt-6-luna", ModelConfig::gpt_6_luna()),
+        // yoagent 0.25.8 (#1037): Codex's default, its own price (cache hit
+        // $0.10, not gpt-6-sol's $0.20). Values read from the constructor.
+        ("gpt-6.1-sol", ModelConfig::gpt_6_1_sol()),
     ]
 }
 
-/// Ids that must NOT resolve to a GPT-6 preset. `gpt-6.1-sol` is the one that
-/// matters: a prefix match would bill it as `gpt-6-sol` (#1003 class).
+/// Ids that must NOT resolve to a GPT-6 preset. `gpt-6.1-sol` was the one that
+/// mattered until yoagent 0.25.8 gave it a preset; its suffixed and
+/// made-up neighbours keep the #1003 guard (a prefix match would misbill them).
 const NEAR_MISSES: &[&str] = &[
-    "gpt-6.1-sol",
+    "gpt-6.1-sol-mini",
+    "gpt-6.9-test",
     "gpt-6",
     "gpt-6-sol-mini",
     "GPT-6-SOL",
@@ -117,8 +122,8 @@ fn model_info_window_reads_the_preset() {
             "{id}"
         );
     }
-    // Near-misses: unchanged readings (gpt-6.1-sol stays unknown — residue).
-    assert_eq!(model_context_window("gpt-6.1-sol"), None);
+    // Near-misses: unchanged readings (a made-up id stays unknown).
+    assert_eq!(model_context_window("gpt-6.9-test"), None);
     assert_eq!(model_context_window("gpt-5"), Some(1_048_576));
     assert_eq!(model_context_window("gpt-4o"), Some(128_000));
 }
@@ -142,7 +147,7 @@ fn cost_table_reads_the_preset_price() {
             "openai/{id}"
         );
     }
-    assert_eq!(model_pricing_with(&none, "gpt-6.1-sol"), None);
+    assert_eq!(model_pricing_with(&none, "gpt-6.9-test"), None);
     assert_eq!(model_pricing_with(&none, "gpt-6"), None);
     assert_eq!(
         model_pricing_with(&none, "gpt-5"),
@@ -196,7 +201,7 @@ fn output_ceiling_is_the_model_maximum_not_the_preset_default() {
     // the ceiling, which was the bug: it told users to lower to 4096.
     assert_eq!(openai_compat_output_ceiling("openai", "gpt-5", 4096), None);
     assert_eq!(
-        openai_compat_output_ceiling("openai", "gpt-6.1-sol", 4096),
+        openai_compat_output_ceiling("openai", "gpt-6.9-test", 4096),
         None
     );
     assert_eq!(
@@ -223,7 +228,7 @@ fn no_ceiling_warning_when_no_preset_declares_a_maximum() {
         ("ollama", "llama3.3", 16_000),
         ("groq", "llama-3.3-70b-versatile", 16_000),
         ("openrouter", "some/model", 16_000),
-        ("openai", "gpt-6.1-sol", 64_000),
+        ("openai", "gpt-6.9-test", 64_000),
         ("custom", "my-local", 16_000),
         ("zai", "glm-5", 16_000),
         ("minimax", "MiniMax-M2", 16_000),
@@ -268,6 +273,6 @@ fn gpt6_ids_are_known_models_for_openai_only() {
     for (id, _) in presets() {
         assert!(model_is_known_for_provider("openai", id), "{id}");
     }
-    assert!(!model_is_known_for_provider("openai", "gpt-6.1-sol"));
+    assert!(!model_is_known_for_provider("openai", "gpt-6.9-test"));
     assert!(!model_is_known_for_provider("openai", "gpt-6"));
 }

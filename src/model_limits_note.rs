@@ -1,7 +1,8 @@
 //! The honest half of an OpenAI-compatible model id with no preset (Day 224).
 //!
 //! Day 223 gave `gpt-6-astra/sol/luna` exact-match presets on provider
-//! `openai`. Exact matching was right, and it routes every OTHER id into
+//! `openai` (yoagent 0.25.8 added `gpt-6.1-sol`, #1037). Exact matching was
+//! right, and it routes every OTHER id into
 //! yoagent's base config: a 128K window and `max_tokens = 4096`, which caps
 //! reasoning plus answer on every turn and used to say nothing. This module
 //! does not invent limits for unknown ids (there is no source for them); it
@@ -138,11 +139,11 @@ mod tests {
         let (window, max) = base();
         // Premise, so a yoagent change to the base guess is noticed here.
         assert_eq!((window, max), (128_000, 4096), "base guess changed");
-        let out = note_for("openai", "gpt-6.1-sol", true).expect("gpt-6.1-sol must warn");
+        let out = note_for("openai", "gpt-6.9-test", true).expect("gpt-6.9-test must warn");
         assert_eq!(
             out,
             format!(
-                "warning: no preset is known for openai model 'gpt-6.1-sol', so yoyo is using \
+                "warning: no preset is known for openai model 'gpt-6.9-test', so yoyo is using \
 guessed limits: a {window}-token context window and max_tokens = {max}. Every reply (reasoning \
 included) is capped at {max} output tokens. If the model allows more, set max_tokens and \
 context_window in .yoyo.toml (or pass --max-tokens / --context-window)."
@@ -152,11 +153,13 @@ context_window in .yoyo.toml (or pass --max-tokens / --context-window)."
 
     #[test]
     fn day_223_preset_ids_stay_silent_near_miss() {
-        for id in ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"] {
+        for id in ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"] {
             assert_eq!(note_for("openai", id, false), None, "{id} has a preset");
         }
-        // One character off a preset id: no preset, so it must warn.
-        assert!(note_for("openai", "gpt-6.1-sol", false).is_some());
+        // One character off a preset id: no preset, so it must warn. (Until
+        // yoagent 0.25.8 this row was `gpt-6.1-sol`, which now has a preset.)
+        assert!(note_for("openai", "gpt-6.9-test", false).is_some());
+        assert!(note_for("openai", "gpt-6.1-sol-2", false).is_some());
         assert!(note_for("openai", "gpt-6-sol-2", false).is_some());
     }
 
@@ -164,7 +167,15 @@ context_window in .yoyo.toml (or pass --max-tokens / --context-window)."
     fn explicit_max_tokens_silences_it() {
         let (window, max) = base();
         assert_eq!(
-            unknown_model_limits_note("openai", "gpt-6.1-sol", window, max, Some(4096), None, true),
+            unknown_model_limits_note(
+                "openai",
+                "gpt-6.9-test",
+                window,
+                max,
+                Some(4096),
+                None,
+                true
+            ),
             None
         );
     }
@@ -174,7 +185,7 @@ context_window in .yoyo.toml (or pass --max-tokens / --context-window)."
         let (window, max) = base();
         let out = unknown_model_limits_note(
             "openai",
-            "gpt-6.1-sol",
+            "gpt-6.9-test",
             window,
             max,
             None,
@@ -276,9 +287,9 @@ means its default trips the guessed-limits warning (#1037)"
 
     #[test]
     fn plain_mode_is_ascii_and_fancy_mode_has_marker() {
-        let plain = note_for("openai", "gpt-6.1-sol", true).unwrap();
+        let plain = note_for("openai", "gpt-6.9-test", true).unwrap();
         assert!(plain.is_ascii(), "{plain}");
-        let fancy = note_for("openai", "gpt-6.1-sol", false).unwrap();
+        let fancy = note_for("openai", "gpt-6.9-test", false).unwrap();
         assert!(fancy.starts_with("⚠ "), "{fancy}");
     }
 

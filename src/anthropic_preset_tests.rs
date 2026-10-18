@@ -5,7 +5,7 @@
 //! `claude-fable-5-1` billed Fable 5's $1.00 cache hit (vendor: $0.25).
 //! Lives beside `agent_builder.rs` because that module is at its size gate.
 
-use crate::agent_builder::{anthropic_preset, claude_haiku_5_5, claude_sonnet_5_5};
+use crate::agent_builder::anthropic_preset;
 use yoagent::provider::{CostConfig, ModelConfig};
 
 /// (id, the constructor that owns that exact model). The expected value is
@@ -27,12 +27,16 @@ fn preset_table() -> Vec<(&'static str, ModelConfig)> {
         ("claude-sonnet-5-20260101", ModelConfig::claude_sonnet_5()),
         ("claude-haiku-4-5", ModelConfig::claude_haiku_4_5()),
         ("claude-haiku-4-5-20251001", ModelConfig::claude_haiku_4_5()),
-        // yoyo-side arm (Day 222): keeps its own hand-assigned cost.
-        ("claude-haiku-5-5", claude_haiku_5_5()),
-        ("claude-haiku-5-5-20261001", claude_haiku_5_5()),
-        // yoyo-side arm (Day 224): cache reads $0.10, not Sonnet 5's $0.20.
-        ("claude-sonnet-5-5", claude_sonnet_5_5()),
-        ("claude-sonnet-5-5-20261001", claude_sonnet_5_5()),
+        // yoagent 0.25.8 constructors (#1037); yoyo's hand-built copies
+        // (Day 222 / Day 224) matched them field for field and were deleted.
+        // The vendor-typed tests below still pin both prices independently.
+        ("claude-haiku-5-5", ModelConfig::claude_haiku_5_5()),
+        ("claude-haiku-5-5-20261001", ModelConfig::claude_haiku_5_5()),
+        ("claude-sonnet-5-5", ModelConfig::claude_sonnet_5_5()),
+        (
+            "claude-sonnet-5-5-20261001",
+            ModelConfig::claude_sonnet_5_5(),
+        ),
     ]
 }
 

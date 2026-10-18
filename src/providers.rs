@@ -173,8 +173,9 @@ pub fn default_model_for_provider(provider: &str) -> String {
         // max_tokens is within `GPT_6_OUTPUT_MAXIMUM`. So a user who only picks
         // `--provider openai` gets real limits and a real `/cost`. The old `gpt-5`
         // had no preset and tripped yoyo's own guessed-limits warning (4096 output
-        // tokens) on every run. Not `gpt-6.1-sol`, which Codex ships: it has no
-        // preset and no price today, so it would reproduce that exact warning.
+        // tokens) on every run. `gpt-6.1-sol` (Codex's default) gained a preset and
+        // a price in yoagent 0.25.8; switching the default to it is a separate
+        // slice of #1037, not yet made.
         // Sol over astra/luna because sol is the tier the reference peer defaults to.
         "openai" => "gpt-6-sol".into(),
         "google" => "gemini-2.5-flash".into(),

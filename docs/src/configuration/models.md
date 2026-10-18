@@ -108,21 +108,21 @@ Cost estimation is built in for many providers:
 | Haiku 3.5 | $0.80 | $4.00 |
 
 Cost estimates are also available for OpenAI, Google, DeepSeek, Mistral, xAI, Groq, ZAI and more.
-On `provider = "openai"`, the exact ids `gpt-6-astra`, `gpt-6-sol` and `gpt-6-luna` use yoagent's
-own preset: a 1,050,000-token window, 64K default `max_tokens` (128K maximum), and its price,
-including the higher whole-request rate above 272K prompt tokens. Other ids, `gpt-6.1-sol` included,
-keep the generic OpenAI defaults.
+On `provider = "openai"`, the exact ids `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna` and `gpt-6.1-sol` use
+yoagent's own preset: a 1,050,000-token window, 64K default `max_tokens` (128K maximum), and its price,
+including the higher whole-request rate above 272K prompt tokens (`gpt-6.1-sol` has its own
+price, not `gpt-6-sol`'s). Other ids keep the generic OpenAI defaults.
 
 ### Models with no preset run on guessed limits
 
 On the OpenAI-compatible providers `openai`, `openrouter`, `xai`, `groq`, `mistral`, `cerebras`,
 `github` and `zai`, a model id yoyo has no preset for runs on a guessed 128,000-token context window
 and `max_tokens = 4096`. That cap covers reasoning plus answer on every turn, so a newer model
-(for example `gpt-6.1-sol`) can be cut short. yoyo now says so once per model on stderr, even in
+(for example a GPT release newer than yoyo's presets) can be cut short. yoyo now says so once per model on stderr, even in
 quiet or piped runs (stdout is unchanged):
 
 ```text
-warning: no preset is known for openai model 'gpt-6.1-sol', so yoyo is using guessed limits: ...
+warning: no preset is known for openai model 'gpt-6.9-test', so yoyo is using guessed limits: ...
 ```
 
 If the model allows more, set the real limits yourself, which also silences the warning:

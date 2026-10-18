@@ -9,8 +9,8 @@ use yoagent::agent::Agent;
 use yoagent::context::{estimate_tokens, ContextConfig, ExecutionLimits};
 use yoagent::openapi::{OpenApiConfig, OperationFilter};
 use yoagent::provider::{
-    AnthropicCompat, AnthropicProvider, ApiProtocol, BedrockProvider, ContextTier, CostConfig,
-    GoogleProvider, ModelConfig, OpenAiCompat, OpenAiCompatProvider,
+    AnthropicProvider, ApiProtocol, BedrockProvider, GoogleProvider, ModelConfig, OpenAiCompat,
+    OpenAiCompatProvider,
 };
 use yoagent::tools::SharedStateTool;
 use yoagent::*;
@@ -812,7 +812,8 @@ fn ensure_bundled_prices() {
 /// Look up a yoagent 0.9 fleet preset for an Anthropic model name.
 ///
 /// The fleet models (claude-fable-5, claude-opus-5, claude-opus-4-8,
-/// claude-sonnet-5, claude-haiku-4-5) ship with authoritative pricing, context-window, and
+/// claude-sonnet-5, claude-sonnet-5-5, claude-haiku-4-5, claude-haiku-5-5)
+/// ship with authoritative pricing, context-window, and
 /// max-output defaults inside yoagent's presets — that's where truth lives,
 /// so we start from the preset instead of a hand-rolled config. Dated
 /// variants (e.g. "claude-opus-4-8-20260301") match by prefix and keep the
@@ -835,13 +836,13 @@ pub fn anthropic_preset(model: &str) -> Option<ModelConfig> {
     } else if model.starts_with("claude-opus-4-8") {
         ModelConfig::claude_opus_4_8()
     } else if model.starts_with("claude-sonnet-5-5") {
-        claude_sonnet_5_5()
+        ModelConfig::claude_sonnet_5_5()
     } else if model.starts_with("claude-sonnet-5") {
         ModelConfig::claude_sonnet_5()
     } else if model.starts_with("claude-haiku-4-5") {
         ModelConfig::claude_haiku_4_5()
     } else if model.starts_with("claude-haiku-5-5") {
-        claude_haiku_5_5()
+        ModelConfig::claude_haiku_5_5()
     } else {
         return None;
     };
@@ -852,82 +853,21 @@ pub fn anthropic_preset(model: &str) -> Option<ModelConfig> {
     Some(config)
 }
 
-/// Claude Sonnet 5.5 — yoagent 0.24.2 (and 0.25.2, re-checked #1007) ships no constructor and no `prices.json`
-/// row, so it used to resolve through `claude_sonnet_5()` and bill cache reads
-/// at $0.20/M. Rates from models.dev's `claude-sonnet-5-5` row (Day 224: $2 in,
-/// $10 out, $0.10 cache read, $2.50 cache write; no long-context tier), the
-/// cache read corroborated by Claude Code 2.1.293–296's changelog. Everything
-/// but id, name and cost is Sonnet 5's (#1003).
-pub(crate) fn claude_sonnet_5_5() -> ModelConfig {
-    let mut config = ModelConfig::claude_sonnet_5();
-    config.id = "claude-sonnet-5-5".to_string();
-    config.name = "Claude Sonnet 5.5".to_string();
-    config.cost = Some(
-        CostConfig::new(2.0, 10.0)
-            .with_cache_read(0.10)
-            .with_cache_write(2.5),
-    );
-    config
-}
-
-/// Claude Haiku 5.5 — yoagent 0.24.2 (and 0.25.2, re-checked #1007) ships no preset (and no price-table row)
-/// for it, so without this arm it got the generic 200K config and `/cost`
-/// fell through to the Haiku 3.5 row, overstating its bill about 8x.
-///
-/// Every number below was measured on 2026-10-08, not copied from a changelog:
-/// - limits: <https://platform.claude.com/docs/en/about-claude/models/overview>
-///   ("Context window 1M tokens", "Max output 128K tokens"); the model page
-///   adds that it supports adaptive thinking with the effort parameter, so it
-///   takes `AnthropicCompat::default()` like the other 5.x presets, not
-///   Haiku 4.5's `legacy()`.
-/// - price: <https://platform.claude.com/docs/en/about-claude/pricing>, base
-///   input $0.10, 5-minute cache write $0.125, cache hit $0.01, output $0.50
-///   per MTok; "for prompts over 100,000 tokens" $0.50 / $0.625 / $0.05 /
-///   $2.50. <https://models.dev/api.json> agrees on every figure.
-///
-/// `max_tokens` follows the fleet convention (64K of the 128K maximum) and
-/// stays under [`anthropic_output_maximum`]. The >100K tier is recorded in
-/// `context_tiers`. Since Day 222 `/cost`'s per-turn breakdown reads it
-/// (`estimate_request_cost_with` in `format/cost.rs`, per request); the
-/// session-total estimates still use only the base rates, so a long-prompt
-/// Haiku 5.5 session is **under**stated there.
-///
-/// The `cost` is assigned by hand, so `ModelConfig::reprice()` would replace it
-/// with yoagent's table entry (`None` today). yoyo never calls `reprice`; if it
-/// starts to, this arm needs its price re-checked.
-pub(crate) fn claude_haiku_5_5() -> ModelConfig {
-    // `ModelConfig` is `#[non_exhaustive]`, so start from the generic Anthropic
-    // config and overwrite the fields this model differs on.
-    let mut config = ModelConfig::anthropic("claude-haiku-5-5", "Claude Haiku 5.5");
-    config.context_window = 1_000_000;
-    config.max_tokens = 64_000;
-    config.anthropic = Some(AnthropicCompat::default().with_native_structured_output(true));
-    config.cost = Some(
-        CostConfig::new(0.10, 0.50)
-            .with_cache_read(0.01)
-            .with_cache_write(0.125)
-            .with_context_tier(
-                ContextTier::new(100_000, 0.50, 2.50)
-                    .with_cache_read(0.05)
-                    .with_cache_write(0.625),
-            ),
-    );
-    config
-}
-
-/// Look up a yoagent preset for an OpenAI model id: GPT-6 Astra/Sol/Luna.
+/// Look up a yoagent preset for an OpenAI model id: GPT-6 Astra/Sol/Luna and
+/// GPT-6.1 Sol (yoagent 0.25.8).
 ///
 /// **Exact id match only, deliberately unlike `anthropic_preset`'s prefixes.**
-/// `gpt-6.1-sol` (Codex's default) has no yoagent preset and its own vendor
-/// price; prefix-matching it onto `gpt-6-sol` would bill one id as its
-/// sibling (the #1003 misbill class). Unknown ids stay `None` so the caller
-/// keeps the generic `ModelConfig::openai` defaults.
+/// `gpt-6.1-sol` (Codex's default) has its own vendor price (cache hit $0.10,
+/// not `gpt-6-sol`'s $0.20); prefix-matching would bill one id as its sibling
+/// (the #1003 misbill class). Unknown ids stay `None` so the caller keeps the
+/// generic `ModelConfig::openai` defaults (and `model_limits_note` warns).
 pub fn openai_preset(model: &str) -> Option<ModelConfig> {
     ensure_bundled_prices();
     match model {
         "gpt-6-astra" => Some(ModelConfig::gpt_6_astra()),
         "gpt-6-sol" => Some(ModelConfig::gpt_6_sol()),
         "gpt-6-luna" => Some(ModelConfig::gpt_6_luna()),
+        "gpt-6.1-sol" => Some(ModelConfig::gpt_6_1_sol()),
         _ => None,
     }
 }
