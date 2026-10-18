@@ -284,18 +284,20 @@ pub fn load_goal() -> Option<String> {
 /// callers that must not depend on the process-global working directory — every
 /// test, and anything reached from a `*_in` function — pass their own root.
 pub fn load_goal_in(dir: &Path) -> Option<String> {
-    let path = dir.join(GOAL_FILE);
-    if path.exists() {
-        fs::read_to_string(path).ok().and_then(|s| {
-            let trimmed = s.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        })
-    } else {
+    read_goal_family_file(&dir.join(GOAL_FILE)).unwrap_or_else(|reason| {
+        report_goal_refusal(&reason);
         None
+    })
+}
+
+/// Read a goal-family file trimmed, `Ok(None)` when absent, unreadable or
+/// blank (as before), `Err(reason)` when it is a FIFO/device/socket: opening
+/// one blocks forever, which hung startup (#1047). Symlinks are judged by target.
+fn read_goal_family_file(path: &Path) -> Result<Option<String>, String> {
+    match crate::non_regular_read::read_regular_to_string(path) {
+        Ok(s) => Ok(Some(s.trim().to_string()).filter(|t| !t.is_empty())),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => Err(e.to_string()),
+        Err(_) => Ok(None),
     }
 }
 
@@ -334,19 +336,11 @@ fn save_verify_command(cmd: &str) -> Result<(), String> {
 
 /// Load the verification command, if one is set.
 pub fn load_verify_command() -> Option<String> {
-    let path = verify_path();
-    if path.exists() {
-        fs::read_to_string(path).ok().and_then(|s| {
-            let trimmed = s.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        })
-    } else {
+    read_goal_family_file(&verify_path()).unwrap_or_else(|reason| {
+        let reason = crate::cli::sanitize_for_display(&reason);
+        eprintln!("{YELLOW}warning: verify command {VERIFY_FILE} not loaded - {reason}{RESET}");
         None
-    }
+    })
 }
 
 /// Remove the verification command file.
@@ -1812,5 +1806,81 @@ mod fence_tests {
                 );
             }
         });
+    }
+}
+
+/// #1047: a FIFO at `.yoyo/goal.md` / `.yoyo/goal_verify.md` hung startup.
+#[cfg(all(test, unix))]
+mod non_regular_goal_tests {
+    use super::*;
+    use std::time::Duration;
+
+    /// Make a FIFO at `<dir>/<rel>`, or `None` if `mkfifo` is unavailable.
+    fn fifo_at(dir: &Path, rel: &str) -> Option<std::path::PathBuf> {
+        let p = dir.join(rel);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        let ok = std::process::Command::new("mkfifo").arg(&p).status();
+        ok.map(|s| s.success()).unwrap_or(false).then_some(p)
+    }
+
+    /// Run `f` on a thread; fail (not hang) if it does not return in 5s.
+    fn bounded<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || tx.send(f()).ok());
+        rx.recv_timeout(Duration::from_secs(5))
+            .expect("loader blocked on a non-regular file (#1047)")
+    }
+
+    #[test]
+    fn fifo_goal_is_refused_without_blocking() {
+        let tmp = tempfile::tempdir().unwrap();
+        let Some(fifo) = fifo_at(tmp.path(), GOAL_FILE) else {
+            return eprintln!("mkfifo unavailable; skipping");
+        };
+        use std::os::unix::fs::FileTypeExt;
+        assert!(std::fs::metadata(&fifo).unwrap().file_type().is_fifo());
+        let dir = tmp.path().to_path_buf();
+        assert_eq!(bounded(move || load_goal_in(&dir)), None);
+        let r = bounded(move || read_goal_family_file(&fifo)).unwrap_err();
+        assert!(r.contains("goal.md") && r.contains("FIFO"), "{r}");
+    }
+
+    #[test]
+    fn fifo_verify_file_is_refused_without_blocking() {
+        let tmp = tempfile::tempdir().unwrap();
+        let Some(fifo) = fifo_at(tmp.path(), VERIFY_FILE) else {
+            return eprintln!("mkfifo unavailable; skipping");
+        };
+        let dir = tmp.path().to_path_buf();
+        let got = bounded(move || {
+            let mut v = Some(String::new());
+            with_goal_base_dir(&dir, || v = load_verify_command());
+            v
+        });
+        assert_eq!(got, None);
+        let r = bounded(move || read_goal_family_file(&fifo)).unwrap_err();
+        assert!(r.contains("goal_verify.md") && r.contains("FIFO"), "{r}");
+    }
+
+    #[test]
+    fn regular_goal_and_verify_load_byte_identically() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".yoyo")).unwrap();
+        std::fs::write(tmp.path().join(GOAL_FILE), "  ship it ✓\n\n").unwrap();
+        std::fs::write(tmp.path().join(VERIFY_FILE), "cargo test\n").unwrap();
+        assert_eq!(load_goal_in(tmp.path()).as_deref(), Some("ship it ✓"));
+        let mut v = None;
+        with_goal_base_dir(tmp.path(), || v = load_verify_command());
+        assert_eq!(v.as_deref(), Some("cargo test"));
+    }
+
+    #[test]
+    fn missing_or_blank_goal_stays_silent_none() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join(GOAL_FILE);
+        assert_eq!(read_goal_family_file(&p), Ok(None));
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(&p, "  \n").unwrap();
+        assert_eq!(read_goal_family_file(&p), Ok(None));
     }
 }

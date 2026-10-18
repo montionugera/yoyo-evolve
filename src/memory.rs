@@ -52,11 +52,24 @@ pub fn load_memories() -> ProjectMemory {
     load_memories_from(&memory_file_path())
 }
 
-/// Load project memories from a specific path (for testing).
+/// Load project memories from a specific path (for testing). A FIFO, device
+/// or socket there is refused with a stderr warning instead of blocking
+/// startup forever (#1047); a missing file stays silent, as before.
 pub fn load_memories_from(path: &Path) -> ProjectMemory {
-    match std::fs::read_to_string(path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
-        Err(_) => ProjectMemory::default(),
+    read_memories(path).unwrap_or_else(|reason| {
+        let reason = crate::cli::sanitize_for_display(&reason);
+        eprintln!("warning: project memories not loaded - {reason}");
+        ProjectMemory::default()
+    })
+}
+
+/// `Err(reason)` only for a non-regular file; absent/unreadable/unparseable
+/// files are an empty store, exactly as before. Symlinks are judged by target.
+fn read_memories(path: &Path) -> Result<ProjectMemory, String> {
+    match crate::non_regular_read::read_regular_to_string(path) {
+        Ok(content) => Ok(serde_json::from_str(&content).unwrap_or_default()),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => Err(e.to_string()),
+        Err(_) => Ok(ProjectMemory::default()),
     }
 }
 
@@ -1739,5 +1752,56 @@ mod tests {
         assert_eq!(loaded.entries[2].category, "general");
 
         cleanup(&path);
+    }
+}
+
+/// #1047: a FIFO at `.yoyo/memory.json` hung startup.
+#[cfg(all(test, unix))]
+mod non_regular_memory_tests {
+    use super::*;
+
+    fn entry(note: &str) -> MemoryEntry {
+        MemoryEntry {
+            note: note.to_string(),
+            timestamp: "2026-10-18 08:32".to_string(),
+            category: "convention".to_string(),
+        }
+    }
+
+    #[test]
+    fn fifo_memory_is_refused_without_blocking() {
+        let tmp = tempfile::tempdir().unwrap();
+        let fifo = tmp.path().join("memory.json");
+        let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+        if !made.map(|s| s.success()).unwrap_or(false) {
+            return eprintln!("mkfifo unavailable; skipping");
+        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        let p = fifo.clone();
+        std::thread::spawn(move || tx.send((load_memories_from(&p), read_memories(&p))).ok());
+        let (mem, raw) = rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("memory loader blocked on a FIFO (#1047)");
+        assert!(mem.entries.is_empty());
+        let r = raw.unwrap_err();
+        assert!(r.contains("memory.json") && r.contains("FIFO"), "{r}");
+    }
+
+    #[test]
+    fn regular_and_symlinked_memory_load_identically_missing_is_silent() {
+        let tmp = tempfile::tempdir().unwrap();
+        let real = tmp.path().join("real.json");
+        let mem = ProjectMemory {
+            entries: vec![entry("uses ✓ tabs")],
+        };
+        save_memories_to(&mem, &real).unwrap();
+        let link = tmp.path().join("memory.json");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        for p in [&real, &link] {
+            assert_eq!(read_memories(p).unwrap().entries, mem.entries);
+            assert_eq!(load_memories_from(p).entries, mem.entries);
+        }
+        let missing = read_memories(&tmp.path().join("nope.json")).unwrap();
+        assert!(missing.entries.is_empty());
     }
 }
