@@ -3812,6 +3812,42 @@ fn config_unknown_subcommand_refusal_exits_two() {
 }
 
 #[test]
+fn unknown_skill_goal_todo_and_bare_ast_exit_two_through_the_binary() {
+    // #982: these printed a usage/unknown-subcommand message and exited 0.
+    // The status helpers are unit-tested in commands_skill.rs and
+    // dispatch_sub.rs; this pins the WIRING — that each shell arm hands its
+    // status to the process exit code — which no unit test can see.
+    // stdin is /dev/null and the dir is a fresh temp dir, as in the probe.
+    let dir = tempfile::tempdir().expect("tempdir");
+    for args in [
+        &["skill", "nosuch"][..],
+        &["goal", "frobnicate"][..],
+        &["goal", "check", "now"][..],
+        &["todo", "zzz"][..],
+        &["ast"][..],
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+        // Anti-vacuous: the arm really ran and said something.
+        assert!(
+            !(stdout.is_empty() && stderr.is_empty()),
+            "{args:?} printed nothing"
+        );
+    }
+    // Near-misses: real verbs, and the bare listings, still succeed.
+    for args in [&["goal"][..], &["skill", "list"][..], &["todo"][..]] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(0), "{args:?}: stdout={stdout} stderr={stderr}");
+    }
+    // None of the above wrote anything into the project dir.
+    let left: Vec<_> = std::fs::read_dir(dir.path())
+        .expect("read tempdir")
+        .map(|e| e.expect("entry").file_name())
+        .collect();
+    assert!(left.is_empty(), "files written: {left:?}");
+}
+
+#[test]
 fn config_set_and_edit_refusals_exit_two() {
     // `set` and `edit` share the unknown-subcommand arm: from the shell they
     // are refused (they need agent state), so `yoyo config set ... && next`
