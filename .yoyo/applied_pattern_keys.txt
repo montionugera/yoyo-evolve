@@ -1,1 +1,0 @@
-lessons.same_day_lessons_cannot_reach_the_next_slice
