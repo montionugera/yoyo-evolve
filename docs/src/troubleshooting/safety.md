@@ -167,6 +167,18 @@ For a hard read-only session, combine them:
 yoyo --restricted --read -p "review this code"
 ```
 
+## Reads outside the launch directory ask first (interactive sessions)
+
+In a terminal, `read_file`, `search` and `list_files` ask `y/n` once per
+directory before reading anywhere outside the directory you launched yoyo
+in (so the model cannot quietly read `~/.ssh` while working on your
+project). Piped and scripted runs with no terminal are not fenced by
+default, because there nobody could answer and the only possible outcome
+would be a refusal. `YOYO_ASK_OUTSIDE_READS=0` turns the fence off,
+`YOYO_ASK_OUTSIDE_READS=1` turns it on even without a terminal (outside
+reads are then refused). `bash` is not covered: it can still `cat` the
+same file. Details: [Permissions](../configuration/permissions.md).
+
 ## What happens in practice
 
 A typical evolution session:

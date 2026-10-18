@@ -234,24 +234,27 @@ Files you name yourself (`@path` mentions, `/add`, `/explain`, `--image`) are fe
 resolved target is refused is not sent to the model, yoyo prints a warning naming it, and the rest of the prompt
 still goes through.
 
-### Ask before reading outside the launch directory (opt-in)
+### Ask before reading outside the launch directory
 
-By default, `read_file`, `search` and `list_files` can reach any path. Set `YOYO_ASK_OUTSIDE_READS=1` to make them ask first when the path (`read_file`) or the root (`search`, `list_files`) resolves (symlinks followed) to somewhere outside the directory you launched yoyo in:
+In an interactive session (stdin is a terminal), `read_file`, `search` and `list_files` ask first when the path (`read_file`) or the root (`search`, `list_files`) resolves (symlinks followed) to somewhere outside the directory you launched yoyo in. In a non-interactive run (`-p` in a pipe, CI, any script with no terminal) the fence is off by default and those tools can reach any path, exactly as before: turned on there it could only refuse, never ask. The environment variable `YOYO_ASK_OUTSIDE_READS` overrides the default for either kind of run:
 
 ```bash
-YOYO_ASK_OUTSIDE_READS=1 yoyo
+YOYO_ASK_OUTSIDE_READS=0 yoyo            # never ask, even in a terminal
+YOYO_ASK_OUTSIDE_READS=1 yoyo -p "..."   # fence on with no terminal: outside reads are refused
 ```
+
+Only the exact values `1` and `0` are recognised; anything else (including unset) takes the default above.
 
 - `/cd` does not move that anchor: launching in `~/project` and typing `/cd ~` does not make `~/.ssh` "inside". Navigating is not consent to read the new directory, so reads there ask (once per directory). Anything you already approved stays approved after `/cd`.
 - If yoyo cannot tell where it was launched (the directory was deleted and the current directory cannot be read), it asks rather than allowing, and a relative path it cannot resolve is refused with a request for an absolute one.
 
 - In a terminal, yoyo asks `y/n`. A yes covers that file's directory for the rest of the session, so three reads in `/etc` ask once. It does not cover subdirectories. A no refuses only that call, and the next call there asks again.
 - A `search` or `list_files` rooted at an outside directory asks about that directory, and a yes covers later searches and listings rooted at exactly that directory (both tools walk into subdirectories, so the prompt says so). It does not cover a root one level down, and a yes for *reading* files in a directory does not cover a recursive search of it: reading `~/.bashrc` must not quietly grant a search that reaches `~/.ssh`. A root that is a file is treated like `read_file` of that file. No root means the current directory, and it is checked as that directory at the moment of the call: after `/cd ~`, a search or listing with no root asks about `~` (as a recursive search of it) instead of walking it. Without a `/cd` the current directory is the launch directory, so nothing is asked.
-- With no terminal (for example `-p` in a pipe or CI), the read is refused. The refusal names the path and tells the model how it can be allowed.
+- With no terminal (for example `-p` in a pipe or CI) and `YOYO_ASK_OUTSIDE_READS=1`, the read is refused. The refusal names the path and tells the model how it can be allowed. Without that setting a run with no terminal is not fenced at all.
 - A path that does not exist is not asked about. `read_file` reports its own error.
 - With `--allow-dir` set, nothing is asked, because the directories you listed are your answer.
 
-This fences the path argument of `read_file`, `search` and `list_files`, and it is not a sandbox. `bash` can still `cat` the same file, and writes (`write_file`, `edit_file`, `rename_symbol`) are not covered by it. For a hard boundary, use `--allow-dir` or `--restricted`. Any value other than `1` leaves the setting off.
+This fences the path argument of `read_file`, `search` and `list_files`, and it is not a sandbox. `bash` can still `cat` the same file, and writes (`write_file`, `edit_file`, `rename_symbol`) are not covered by it. For a hard boundary, use `--allow-dir` or `--restricted`.
 
 ### Rules
 

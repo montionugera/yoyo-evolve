@@ -1,13 +1,23 @@
-//! Opt-in ask-once fence for `read_file`, `search` and `list_files` outside
-//! the directory yoyo was launched in (part of #879).
+//! Ask-once fence for `read_file`, `search` and `list_files` outside the
+//! directory yoyo was launched in (part of #879).
 //!
-//! **Off by default, and off means byte-identical.** The fence is active only
-//! when the environment variable `YOYO_ASK_OUTSIDE_READS` is exactly `1`, read
-//! once per process. Unset, or any other value, and [`check`] returns `None`
-//! for every call, so the file tool behaves exactly as before. The default is
-//! deliberately unchanged: peers disagree (Claude Code asks before reading above
-//! the launch folder, Codex's read-only sandbox reads anywhere), and a default
-//! that asks would break every piped/CI user with no terminal to answer (#448).
+//! **On by default when there is a terminal; off by default when there is
+//! not (Day 232).** The switch is the environment variable
+//! `YOYO_ASK_OUTSIDE_READS`, read once per process (see [`fence_on`]):
+//! exactly `1` forces the fence on, exactly `0` forces it off, and anything
+//! else (unset included) means "on iff stdin is a terminal" -- the same test
+//! the fence already uses to choose between asking and refusing. The split is
+//! by population because the two populations get different things from the
+//! fence: an interactive user is asked once (a person is there to answer, and
+//! Claude Code asks here too), while a piped/CI run could only be REFUSED,
+//! because the fence never prompts without a terminal. So the non-interactive
+//! default stays off, and off means [`check`] returns `None` for every call,
+//! byte-identical to before. **Superseded claim, recorded rather than erased:**
+//! until Day 232 this said the fence was off by default for everyone because
+//! "a default that asks would break every piped/CI user with no terminal to
+//! answer (#448)". That mechanism was false of this code (no terminal means a
+//! refusal, not a hang); what was true is that a default-on fence would
+//! refuse reads scripts rely on, which is why that population stays off.
 //!
 //! **The anchor is the LAUNCH directory, not the live cwd (Day 231).** The
 //! property this fence protects is consent: the user agreed to reads under the
@@ -118,13 +128,44 @@ impl Approval {
 /// Approvals granted this session.
 static APPROVED: LazyLock<Mutex<HashSet<Approval>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
-/// Only the exact value `1` turns the fence on.
+/// Only the exact value `1` forces the fence on.
 fn enabled_from(value: Option<&str>) -> bool {
     value == Some("1")
 }
 
+/// Only the exact value `0` forces the fence off.
+fn disabled_from(value: Option<&str>) -> bool {
+    value == Some("0")
+}
+
+/// Is the fence on? `1` forces it on and `0` forces it off. Anything else
+/// (unset, empty, a typo) takes the default, which splits by population:
+/// on when there is a terminal to ask on, off when there is not. Off for a
+/// non-interactive run is byte-identical to before Day 232, because turning
+/// it on there could only REFUSE reads that work today (it never prompts
+/// without a terminal, see `decide`), and a silent new refusal in a script
+/// or CI job is the breakage to avoid. `interactive` is the same test the
+/// fence uses to choose between asking and refusing.
+fn fence_on(value: Option<&str>, interactive: bool) -> bool {
+    if enabled_from(value) {
+        return true;
+    }
+    if disabled_from(value) {
+        return false;
+    }
+    interactive
+}
+
 fn is_enabled() -> bool {
-    *ENABLED.get_or_init(|| enabled_from(std::env::var(ENV_VAR).ok().as_deref()))
+    *ENABLED.get_or_init(|| {
+        // Under `cargo test` stdin is the developer's terminal when run by
+        // hand; a test that routes an outside read through a guarded tool
+        // must not stop and wait for a y/n, so the default is the
+        // non-interactive one there. The decision itself is table-tested
+        // through `fence_on`.
+        let interactive = !cfg!(test) && io::stdin().is_terminal();
+        fence_on(std::env::var(ENV_VAR).ok().as_deref(), interactive)
+    })
 }
 
 /// The directory yoyo was launched in, canonicalized, recorded once at
@@ -214,9 +255,9 @@ fn no_tty_refusal(tool: &str, target: &Path, anchor: Option<&Path>, approval: &A
 /// read: there is no target to ask about, so refuse rather than allow.
 fn no_cwd_refusal(tool: &str, path: &str) -> String {
     format!(
-        "{ENV_VAR}=1{stem}{tool} refused '{path}': the current directory cannot be read, \
-         so this relative path cannot be checked against the launch directory. Use an \
-         absolute path.",
+        "The outside-read fence ({ENV_VAR}){stem}{tool} refused '{path}': the current \
+         directory cannot be read, so this relative path cannot be checked against the \
+         launch directory. Use an absolute path.",
         stem = crate::tool_wrappers::REFUSAL_STEM_MODE_ACTIVE,
     )
 }
@@ -362,6 +403,59 @@ mod tests {
         for v in [None, Some(""), Some("0"), Some("true"), Some(" 1")] {
             assert!(!enabled_from(v), "{v:?} must not enable the fence");
         }
+    }
+
+    /// Every env state x both populations. The near-miss that matters is
+    /// unset + non-interactive = off: every piped `-p`, CI job and yoyo's own
+    /// evolve loop behaves exactly as before Day 232.
+    #[test]
+    fn fence_on_by_env_and_population() {
+        let rows: &[(Option<&str>, bool, bool)] = &[
+            (Some("1"), true, true),
+            (Some("1"), false, true),
+            (Some("0"), true, false),
+            (Some("0"), false, false),
+            (None, true, true),
+            (None, false, false),
+            // Unrecognised values take the default, like unset.
+            (Some(""), true, true),
+            (Some(""), false, false),
+            (Some("true"), false, false),
+            (Some("yes"), true, true),
+        ];
+        for &(value, interactive, want) in rows {
+            assert_eq!(
+                fence_on(value, interactive),
+                want,
+                "env {value:?}, interactive={interactive}"
+            );
+        }
+    }
+
+    #[test]
+    fn interactive_unset_is_on() {
+        assert!(
+            fence_on(None, true),
+            "a terminal user who chose nothing is asked"
+        );
+    }
+
+    #[test]
+    fn non_interactive_unset_is_off() {
+        assert!(!fence_on(None, false), "piped/CI runs are unchanged");
+    }
+
+    /// The no-cwd refusal is reachable with the env unset (interactive
+    /// default), so it must not claim `YOYO_ASK_OUTSIDE_READS=1`.
+    #[test]
+    fn no_cwd_refusal_does_not_claim_the_env_was_set() {
+        let msg = no_cwd_refusal("read_file", "x");
+        assert!(!msg.contains("=1"), "{msg}");
+        assert!(
+            msg.contains(crate::tool_wrappers::REFUSAL_STEM_MODE_ACTIVE),
+            "{msg}"
+        );
+        assert!(msg.contains("read_file refused 'x'"), "{msg}");
     }
 
     #[test]
