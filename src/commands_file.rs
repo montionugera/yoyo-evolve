@@ -65,7 +65,7 @@ pub fn read_file_for_add(
     restrictions: &crate::config::DirectoryRestrictions,
 ) -> Result<(String, usize), AddReadError> {
     admit_for_add(path, restrictions)?;
-    let content = std::fs::read_to_string(path)
+    let content = crate::non_regular_read::read_regular_to_string(std::path::Path::new(path))
         .map_err(|e| AddReadError::Failed(format!("could not read {path}: {e}")))?;
 
     match range {
@@ -176,7 +176,7 @@ pub fn read_image_for_add(
 ) -> Result<(String, String), AddReadError> {
     use base64::Engine;
     admit_for_add(path, restrictions)?;
-    let bytes = std::fs::read(path)
+    let bytes = crate::non_regular_read::read_regular(std::path::Path::new(path))
         .map_err(|e| AddReadError::Failed(format!("failed to read {path}: {e}")))?;
     let ext = path.rsplit('.').next().unwrap_or("");
     let mime = mime_type_for_extension(ext).to_string();

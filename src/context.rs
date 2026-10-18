@@ -369,7 +369,16 @@ fn load_project_context_inner(
         if path.exists() && !admit(name, &path) {
             continue;
         }
-        if let Ok(content) = std::fs::read_to_string(&path) {
+        // A FIFO here would block startup forever with no message (#1047).
+        let read = crate::non_regular_read::read_regular_to_string(&path);
+        if let Err(e) = read.as_ref() {
+            if e.kind() == std::io::ErrorKind::InvalidInput {
+                let plain = crate::format::is_plain_output();
+                let msg = instruction_file_refused_warning(name, &e.to_string(), plain);
+                eprintln!("{YELLOW}{msg}{RESET}");
+            }
+        }
+        if let Ok(content) = read {
             let content = content.trim();
             if !content.is_empty() {
                 if !context.is_empty() {
@@ -580,7 +589,7 @@ pub(crate) fn list_project_context_files_fenced(
             || crate::cd_config_note::path_guard_refusal_lists(cd_deny, cd_allow, restrictions, &p);
         if let Some(reason) = path.exists().then(check).flatten() {
             refused.push((*name, reason));
-        } else if let Ok(content) = std::fs::read_to_string(&path) {
+        } else if let Ok(content) = crate::non_regular_read::read_regular_to_string(&path) {
             let content = content.trim();
             if !content.is_empty() {
                 listed.push((*name, content.lines().count()));

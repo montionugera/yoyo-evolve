@@ -24,17 +24,45 @@ use std::path::Path;
 /// The refusal for a non-regular, non-directory file, or `None` to let the
 /// real tool run. Pure apart from one `metadata` call; never opens the file.
 pub(crate) fn non_regular_file_refusal(path: &Path) -> Option<String> {
+    non_regular_reason(path).map(|r| format!("{r}; read_file only reads regular files"))
+}
+
+/// The tool-neutral half of the refusal: why `path` must not be opened, or
+/// `None` for a regular file, a directory, or a path `metadata` cannot see.
+/// `metadata` follows symlinks and never opens the file, so it cannot block.
+fn non_regular_reason(path: &Path) -> Option<String> {
     let meta = std::fs::metadata(path).ok()?;
     let ft = meta.file_type();
     if ft.is_file() || ft.is_dir() {
         return None;
     }
     Some(format!(
-        "{} is not a regular file ({}): reading it could block forever or never end; \
-         read_file only reads regular files",
+        "{} is not a regular file ({}): reading it could block forever or never end",
         path.display(),
         kind_name(&ft)
     ))
+}
+
+/// `std::fs::read_to_string` for readers that load files on their own (the
+/// startup instruction loader, `/add`): a FIFO, device or socket is refused
+/// with an `InvalidInput` error carrying the reason, instead of being opened.
+/// A symlink to a regular file still reads. #1047.
+pub(crate) fn read_regular_to_string(path: &Path) -> std::io::Result<String> {
+    refuse_non_regular(path)?;
+    std::fs::read_to_string(path)
+}
+
+/// The bytes twin of [`read_regular_to_string`] (used by `/add` for images).
+pub(crate) fn read_regular(path: &Path) -> std::io::Result<Vec<u8>> {
+    refuse_non_regular(path)?;
+    std::fs::read(path)
+}
+
+fn refuse_non_regular(path: &Path) -> std::io::Result<()> {
+    match non_regular_reason(path) {
+        None => Ok(()),
+        Some(r) => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, r)),
+    }
 }
 
 #[cfg(unix)]
@@ -213,5 +241,111 @@ pub(crate) mod tests {
         assert!(check("read_file", "/dev/null").is_some());
         assert_eq!(check("list_files", "/dev/null"), None);
         assert_eq!(check("write_file", "/dev/null"), None);
+    }
+
+    /// Run `f` on a thread and fail by name if it blocks: a FIFO with no
+    /// writer would otherwise hang the test binary instead of failing it.
+    fn within_10s<T: Send + 'static>(what: &str, f: impl FnOnce() -> T + Send + 'static) -> T {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(f());
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap_or_else(|_| panic!("{what} hung on a FIFO: #1047 regressed"))
+    }
+
+    #[test]
+    fn read_regular_refuses_fifo_promptly_with_reason() {
+        let dir = tempfile::tempdir().unwrap();
+        let Some(fifo) = make_fifo(dir.path()) else {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        };
+        let f2 = fifo.clone();
+        let text = within_10s("read_regular_to_string", move || {
+            read_regular_to_string(&f2)
+        });
+        let e = text.expect_err("FIFO must be refused");
+        assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(e.to_string().contains("FIFO"), "{e}");
+        let bytes = within_10s("read_regular", move || read_regular(&fifo));
+        assert!(bytes
+            .unwrap_err()
+            .to_string()
+            .contains("not a regular file"));
+    }
+
+    #[test]
+    fn read_regular_reads_regular_file_and_symlink_byte_identically() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("a.txt");
+        let body = "line one\n\u{2713} two\n";
+        std::fs::write(&f, body).unwrap();
+        let link = dir.path().join("link.txt");
+        std::os::unix::fs::symlink(&f, &link).unwrap();
+        for p in [&f, &link] {
+            assert_eq!(read_regular_to_string(p).unwrap(), body);
+            assert_eq!(read_regular(p).unwrap(), body.as_bytes());
+        }
+        // A missing path keeps std's own error, not the refusal.
+        let e = read_regular_to_string(&dir.path().join("nope")).unwrap_err();
+        assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    /// The startup loader: a FIFO named CLAUDE.md must not hang turn zero,
+    /// and a sibling regular AGENTS.md still loads (anti-vacuous).
+    #[test]
+    fn instruction_loader_skips_fifo_claude_md_and_loads_agents_md() {
+        let dir = tempfile::tempdir().unwrap();
+        let Some(fifo) = make_fifo(dir.path()) else {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        };
+        std::fs::rename(&fifo, dir.path().join("CLAUDE.md")).unwrap();
+        std::fs::write(dir.path().join("AGENTS.md"), "agents-canary-1047\n").unwrap();
+        let root = dir.path().to_path_buf();
+        let ctx = within_10s("load_project_context_from", move || {
+            crate::context::load_project_context_from(&root)
+        })
+        .expect("AGENTS.md must still load");
+        assert!(ctx.contains("agents-canary-1047"), "{ctx}");
+        assert!(!ctx.contains("BEGIN CLAUDE.md"), "{ctx}");
+        let root = dir.path().to_path_buf();
+        let (listed, _) = within_10s("list_project_context_files_fenced", move || {
+            let none = crate::config::DirectoryRestrictions::default();
+            // Two distinct handles: one Mutex passed as both would deadlock.
+            let (deny, allow) = (Default::default(), Default::default());
+            crate::context::list_project_context_files_fenced(&root, &none, &deny, &allow)
+        });
+        let names: Vec<&str> = listed.iter().map(|(n, _)| *n).collect();
+        assert_eq!(names, vec!["AGENTS.md"]);
+    }
+
+    /// `/add`: text and image readers refuse a FIFO and admit a regular file.
+    #[test]
+    fn add_refuses_fifo_and_admits_regular_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let Some(fifo) = make_fifo(dir.path()) else {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        };
+        let p = fifo.to_string_lossy().into_owned();
+        let (r1, r2) = within_10s("/add", move || {
+            let none = crate::config::DirectoryRestrictions::default();
+            (
+                crate::commands_file::read_file_for_add(&p, None, &none),
+                crate::commands_file::read_image_for_add(&p, &none),
+            )
+        });
+        let m1 = r1.expect_err("text /add must refuse a FIFO").to_string();
+        let m2 = r2.expect_err("image /add must refuse a FIFO").to_string();
+        assert!(m1.contains("not a regular file (FIFO)"), "{m1}");
+        assert!(m2.contains("not a regular file (FIFO)"), "{m2}");
+        let f = dir.path().join("ok.txt");
+        std::fs::write(&f, "a\nb\n").unwrap();
+        let none = crate::config::DirectoryRestrictions::default();
+        let (text, lines) =
+            crate::commands_file::read_file_for_add(&f.to_string_lossy(), None, &none).unwrap();
+        assert_eq!((text.as_str(), lines), ("a\nb\n", 2));
     }
 }
