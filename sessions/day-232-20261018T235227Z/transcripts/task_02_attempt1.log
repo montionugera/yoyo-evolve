@@ -1,0 +1,97 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; grep … ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1,135p src/outside_read.r… ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1,90p src/outside_read.rs… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 3,85p src/outside_read.rs… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 26.7s (4 ✓)
+
+The read tool elides lines; let me view the module doc with cat.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat -n src/outside_read.rs | sed… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "current directory cann… ✓ (204ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n '=1 is active\|is active… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 240,262p tests/print_stdo… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (118 lines) ✓ (29.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "const .*CAP\|MAX_LINES\… ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 1m 22s (6 ✓)
+
+Now the module doc.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (30 lines) ✓ (25ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "In a terminal, yoyo ask… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 140,170p docs/src/trouble… ✓ (3ms)
+  3 tools completed in 13.9s (3 ✓)
+
+Now edit the docs.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (56 lines) ✓ (23ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "Opt-in ask-once\|outsid…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -i 's|// Opt-in ask-once fen… ✓ (12ms)
+ ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "outside_read\|YOYO_ASK_… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 8.7s (4 ✓)
+
+Not documented there. Now the full checks.
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt && cargo clippy --all-… ✓ (4m 26s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "^test… ✓ (3m 17s)
+  2 tools completed in 8m 1s (2 ✓)
+
+Positive control, atomically and serially: neuter the unset branch, expect the interactive-unset rows red, restore.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/outsi… (7 lines) ✓ (59.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Control went red by name and came back green after the restore. Now the caller line the task asked for:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "yoyo\b.*-p\|\$YOYO" scr… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "\$YOYO_BIN\|yoyo_run\|<… ✓ (3ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -nE '"\$YOYO_BIN"|\$YOYO_BI… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 720,740p scripts/evolve.s… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git add -A &… (43 lines) ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue vie… (14 lines) ✓ (1.2s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 42.6s (6 ✓)
+
+The outside-read check now defaults to asking in interactive sessions, and piped or scripted runs behave exactly as before. Build, clippy with -D warnings, the fmt check and the full test suite all pass. It's committed as afbc0a81 with the title "Part of #879", and I've commented on #879 with the sha and the table below.
+
+What changed (src/outside_read.rs)
+• A new function, fence_on(value, interactive), decides whether the check is on. "Interactive" uses the same stdin-is-a-terminal test the check already used to choose between asking and refusing:
+
+  | YOYO_ASK_OUTSIDE_READS | terminal | no terminal |
+  |---|---|---|
+  | 1 | on (asks) | on (refuses, as before) |
+  | 0 (new opt-out) | off | off |
+  | unset or anything else | on (new) | off, same as before |
+
+• Where I differed from the plan: I didn't accept true/false as values. The existing test enabled_only_by_exact_one, which I left unedited, says "true" must not turn the check on. Keeping exact 1/0 also means a script that set =true still runs unchecked, as it does today. I wrote this down in the commit body.
+• When tests run (cfg(test)), the default treats the session as non-interactive. Otherwise running cargo test by hand in a terminal could stop and wait at a y/n prompt.
+• Wording fix: the refusal for an unreadable current directory began "YOYO_ASK_OUTSIDE_READS=1 is active". That's no longer true when an interactive run reaches it with the variable unset. It now says "The outside-read fence (YOYO_ASK_OUTSIDE_READS) is active", and a new test checks it. The no-terminal refusal keeps its "=1", since it can only appear when the variable is exactly 1.
+• Tests: new tests cover every row of the table above. As a check that they catch a regression, I forced the unset branch to return false (break, test, restore in one command). fence_on_by_env_and_population and interactive_unset_is_on failed by name. After the restore all 24 tests passed and no marker was left in the file.
+
+Who still runs without the check: scripts/evolve.sh:728 and :735 feed yoyo its prompt from a file (< "$prompt_file"), so stdin isn't a terminal and the evolve loop stays unchecked. Nothing in scripts/ or .github/ sets the variable. Both facts are in the commit body.
+
+Docs: permissions.md now describes the default for each kind of run, the 0/1 override and that only those exact values count. safety.md gets a short new section. I also updated a stale "Opt-in" comment in src/tool_wrappers.rs; it's a comment-only change, so the line count is the same.
+
+Still open on #879: bash isn't covered and can still cat files outside the launch directory.
+
+One cost for interactive users: a yes covers only that exact directory, not its subdirectories. Reading across many directories outside the project (dependency sources, for example) will ask several times. YOYO_ASK_OUTSIDE_READS=0 turns it off.
+  watch: no files changed this turn — skipping
