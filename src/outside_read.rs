@@ -41,9 +41,9 @@
 //!
 //! **Which tools, and which argument.** `read_file`'s `path`, and the ROOT
 //! (`path`) of `search` and `list_files`. A missing root means the tool's
-//! default, the current directory, and is not checked (the wrapper only calls
-//! [`check`] when `path` is present), so after `/cd` an unrooted search still
-//! walks the new cwd unasked: a residue of the anchor change, not covered here.
+//! default, the current directory, and is checked as that directory at call
+//! time (see `effective_root`), so after `/cd ~` an unrooted search asks about
+//! `~` instead of walking it unasked (#879).
 //!
 //! **Ask once per directory, and the remembered key.** A yes is remembered for
 //! the rest of the session as an [`Approval`]:
@@ -287,15 +287,33 @@ fn ask_on_terminal(tool: &str, target: &Path, approval: &Approval) -> bool {
     matches!(response.trim().to_lowercase().as_str(), "y" | "yes")
 }
 
+/// The path the tool will actually act on. `search`/`list_files` with no
+/// `path` (absent, or not a string) walk the current directory: yoagent
+/// 0.25.7's `SearchTool` falls back to its `root` (yoyo builds it with
+/// `SearchTool::default()`, so `None`) and then `"."`, and `ListFilesTool`
+/// uses `params["path"].as_str().unwrap_or(".")`. So a missing root is
+/// checked as `"."`, which `decide` resolves against the cwd at call time
+/// (#879). `read_file` with no path reads nothing (the tool reports the
+/// missing argument), so there is nothing to check.
+fn effective_root<'a>(tool: &str, path: Option<&'a str>) -> Option<&'a str> {
+    match path {
+        Some(p) => Some(p),
+        None if tool == "search" || tool == "list_files" => Some("."),
+        None => None,
+    }
+}
+
 /// The wrapper's entry point: `None` = proceed, `Some(refusal)` = refuse.
+/// `path` is the call's `path` argument as a string, if any.
 pub(crate) fn check(
     tool: &str,
-    path: &str,
+    path: Option<&str>,
     restrictions: &crate::cli::DirectoryRestrictions,
 ) -> Option<String> {
     if !is_enabled() {
         return None;
     }
+    let path = effective_root(tool, path)?;
     // A deleted or unreadable cwd is not a reason to allow: `None` flows on
     // and fails closed (see `resolve_outside` and `no_cwd_refusal`).
     let cwd = std::env::current_dir().ok();
@@ -1062,6 +1080,117 @@ mod tests {
         .unwrap();
         assert!(out.contains("current directory cannot be read"), "{out}");
         assert!(crate::tool_wrappers::is_deterministic_refusal(&out));
+    }
+
+    /// The verdict for a call whose `path` argument is `root`, as `check`
+    /// composes it: the effective root, then the decision. No tty, so an
+    /// outside root is refused rather than asked.
+    fn verdict_for(
+        tool: &str,
+        root: Option<&str>,
+        cwd: Option<&Path>,
+        launch: &Path,
+    ) -> Option<String> {
+        let mut never = |_: &str, _: &Path, _: &Approval| -> bool { panic!("no tty, no ask") };
+        let path = effective_root(tool, root)?;
+        decide(
+            true,
+            tool,
+            path,
+            false,
+            cwd,
+            Some(launch),
+            &store(),
+            false,
+            &mut never,
+        )
+    }
+
+    /// #879: a `search`/`list_files` with NO root walks the cwd (yoagent
+    /// 0.25.7 defaults `path` to `.`), so after `/cd` out of the launch dir it
+    /// must be checked as the cwd. Before this, `check` was never called
+    /// without a `path`, and `/cd ~` + an unrooted search walked `~` unasked.
+    #[test]
+    fn unrooted_search_after_cd_is_checked_as_the_cwd() {
+        let (_tmp, root, work) = tree();
+        let moved = root.join("a");
+        for tool in ["search", "list_files"] {
+            assert_eq!(
+                verdict_for(tool, None, Some(&moved), &work),
+                Some(no_tty_refusal(
+                    tool,
+                    &moved,
+                    Some(&work),
+                    &Approval::Tree(moved.clone())
+                )),
+                "{tool} with no root, cwd outside the launch dir, must be refused"
+            );
+            // Tty: asked once, as a recursive Tree over the cwd.
+            let log = std::cell::RefCell::new(Vec::new());
+            let mut ask = recorder(&log, true);
+            let s = store();
+            let path = effective_root(tool, None).unwrap();
+            assert_eq!(
+                decide(
+                    true,
+                    tool,
+                    path,
+                    false,
+                    Some(&moved),
+                    Some(&work),
+                    &s,
+                    true,
+                    &mut ask
+                ),
+                None
+            );
+            assert_eq!(
+                *log.borrow(),
+                vec![(tool.to_string(), Approval::Tree(moved.clone()))]
+            );
+        }
+    }
+
+    /// Near miss for the above: no `/cd` (cwd == launch dir, the common case),
+    /// an unrooted search is inside and nothing is asked.
+    #[test]
+    fn unrooted_search_in_the_launch_dir_is_inside() {
+        let (_tmp, _root, work) = tree();
+        for tool in ["search", "list_files"] {
+            assert_eq!(verdict_for(tool, None, Some(&work), &work), None);
+        }
+    }
+
+    /// An explicit root is unchanged by the default, an empty root is the
+    /// cwd too, `read_file` with no path is not ours to judge (the tool
+    /// reports the missing argument), and an unreadable cwd fails closed
+    /// through the existing `no_cwd_refusal`, not a second policy.
+    #[test]
+    fn unrooted_default_edges() {
+        let (_tmp, root, work) = tree();
+        let moved = root.join("a");
+        let inside = work.join("inside.txt");
+        for tool in ["search", "list_files"] {
+            assert_eq!(effective_root(tool, Some("sub")), Some("sub"));
+            assert_eq!(
+                verdict_for(tool, Some(inside.to_str().unwrap()), Some(&moved), &work),
+                None,
+                "{tool}: explicit root inside the launch dir, from a moved cwd"
+            );
+            assert_eq!(
+                verdict_for(tool, Some(""), Some(&moved), &work),
+                verdict_for(tool, None, Some(&moved), &work),
+                "{tool}: an empty root is the cwd, like no root"
+            );
+            assert!(verdict_for(tool, Some(""), Some(&moved), &work).is_some());
+            assert_eq!(
+                verdict_for(tool, None, None, &work),
+                Some(no_cwd_refusal(tool, "."))
+            );
+        }
+        assert_eq!(effective_root("read_file", None), None);
+        assert_eq!(verdict_for("read_file", None, Some(&moved), &work), None);
+        assert_eq!(effective_root("bash", None), None);
     }
 
     /// The recorded launch dir wins over the cwd; the cwd is only a fallback.
