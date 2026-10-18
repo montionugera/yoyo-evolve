@@ -1,0 +1,129 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short | head; git l…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git show 5443468c --stat | head … ✓ (14ms)
+ ✓ (28ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git log --oneline -8 -S"goal_sub… ✓ (229ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 12.2s (3 ✓)
+
+The work appears to have already landed in 53a6276d (Day 231 18:09). Let me check whether the assessment's binary predates it, and measure HEAD.
+  ╭─ Turn 3 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git merge-base --is-ancestor 53a… ✓ (294ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The assessment's binary (dca0bf3d, 17:20) predates the fix (53a6276d, 18:35) by ~75 minutes, so the premise is stale. Measuring HEAD's binary directly:
+  ╭─ Turn 4 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo build 2>&1 | tail -2; B=$P… ✓ (11.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All four members (plus ast) already exit 2 at HEAD; near-misses exit 0. Let me check which of these are pinned by tests already.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git show 53a6276d | grep -n "^+.… ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn unknown_verbs_exit_w… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -ln "CARGO_BIN_EXE\|cargo_b… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn yoyo_plain_in" -A30 … ✓ (8ms)
+  ▶ edit tests/integration.rs (2 → 38 lines)
+  + #[test]
+  + fn unknown_skill_goal_todo_and_bare_ast_exit_two_through_the_binary() {
+  +     // #982: these printed a usage/unknown-subcommand message and exited 0.
+  +     // The status helpers are unit-tested in commands_skill.rs and
+  +     // dispatch_sub.rs; this pins the WIRING — that each shell arm hands its
+  +     // status to the process exit code — which no unit test can see.
+  +     // stdin is /dev/null and the dir is a fresh temp dir, as in the probe.
+  +     let dir = tempfile::tempdir().expect("tempdir");
+  +     for args in [
+  +         &["skill", "nosuch"][..],
+  +         &["goal", "frobnicate"][..],
+  +         &["goal", "check", "now"][..],
+  +         &["todo", "zzz"][..],
+  +         &["ast"][..],
+  +     ] {
+  +         let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+  +         assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+  +         // Anti-vacuous: the arm really ran and said something.
+  +         assert!(
+  +             !(stdout.is_empty() && stderr.is_empty()),
+  ... (18 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --test integration un… ✓ (4m 7s)
+  + #[test]
+  + fn unknown_skill_goal_todo_and_bare_ast_exit_two_through_the_binary() {
+  +     // #982: these printed a usage/unknown-subcommand message and exited 0.
+  +     // The status helpers are unit-tested in commands_skill.rs and
+  +     // dispatch_sub.rs; this pins the WIRING — that each shell arm hands its
+  +     // status to the process exit code — which no unit test can see.
+  +     // stdin is /dev/null and the dir is a fresh temp dir, as in the probe.
+  +     let dir = tempfile::tempdir().expect("tempdir");
+  ... (13 more lines)
+ ✓ (4m 7s)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 4m 45s (6 ✓)
+
+Now the positive control: drop the todo arm's wiring, watch the test fail by name, then restore. One atomic command:
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/dispatch_sub.rs /tmp/ds.b… ✓ (22.6s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The control went red on ["todo", "zzz"] by name, the restore went green, and src/ has no diff. Now the full gate:
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt -- --check && cargo cl… ✓ (7m 28s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Everything's green. Committing with an honest body, since this task's fix had already shipped:
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git add -A &… (31 lines) ✓ (15ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the #982 comment, so the next planner doesn't pick these members again:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue com… (11 lines) ✓ (829ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The task asked me to fix something that was already fixed. Commit 53a6276d (Day 231, 18:09) had already made skill, goal and todo exit 2 on an unknown verb, and bare ast too. The assessment tested a binary built from dca0bf3d at 17:20, about 75 minutes before that fix, so its "exits 0" readings were out of date before this task was planned.
+
+What I checked. I rebuilt at HEAD and ran each case in a fresh git init temp dir with stdin from /dev/null:
+
+| Command | Exit code |
+|---|---|
+| skill nosuch | 2 |
+| goal check now | 2 |
+| goal frobnicate | 2 |
+| todo zzz | 2 |
+| ast | 2 |
+| goal (near-miss) | 0 |
+| skill list (near-miss) | 0 |
+| todo (near-miss) | 0 |
+
+skill show nosuch still exits 1. Nothing was written into the dir.
+
+What I added (b19e55a0), tests only, no change in behaviour. The existing tests only checked the helper functions that compute each exit code. Nothing ran the actual binary, so if a command's dispatch code stopped passing its code through to the process exit, every test would still pass. The new test, unknown_skill_goal_todo_and_bare_ast_exit_two_through_the_binary in tests/integration.rs, runs the binary for each failing case (expects 2) and each near-miss (expects 0), and checks the dir stays empty.
+• Proof it catches the bug: with the todo arm's exit_if_nonzero call removed, the test failed on ["todo","zzz"]. With it restored, the test passed, and src/ was back to no diff. I did the break and the restore in one command.
+• Build, all tests, clippy with -D warnings and the fmt check all pass.
+
+What's left on #982. Bare ast doesn't belong in the leftovers, since the earlier commit fixed it. A separate set I measured today: memories zzz, permissions zzz, status zzz, security zzz and evolution zzz ignore the extra word and exit 0 (5 commands). I commented on #982 saying which commands are off the list, what's left, and why the old reading triggered this task.
+
+No docs needed changing, because nothing users see changed.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

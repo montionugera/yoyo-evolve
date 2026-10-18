@@ -1,0 +1,122 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,97p src/non_regular_read.… ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 290,310p src/commands_goal.… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "CdConfigReading::Unreadab… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "load_config_file()" src …  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; ls -la target/debug/yoyo 2>/dev/nu… ✓ (5ms)
+ ✓ (14ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 39.1s (6 ✓)
+
+Let me write the test first, then check the control with the current binary.
+  ╭─ Turn 6 ─────────────────────────────────────────────────────────────╮
+  ▶ write tests/config_fifo.rs (127 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 600 cargo test --test conf… ✓ (1m 43s)
+ ✓ (1m 43s)
+  2 tools completed in 1m 55s (2 ✓)
+
+Control passes, FIFO tests fail by timeout — red for the right reason. Now the fix.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (49 lines) ✓ (30ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git diff src/config.rs; sed -n 557… ✓ (9ms)
+  ▶ edit src/cd_config_note.rs (2 → 26 lines)
+  +     /// #1047: a FIFO at `<target>/.yoyo.toml` used to hang `/cd` on open. It
+  +     /// now reads as Unreadable (nothing applied, the note says so) at once.
+  +     #[cfg(unix)]
+  +     #[test]
+  +     fn fifo_target_config_is_unreadable_not_a_hang() {
+  +         let dir = tempfile::tempdir().unwrap();
+  +         let fifo = dir.path().join(".yoyo.toml");
+  +         let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+  +         if !made.map(|s| s.success()).unwrap_or(false) {
+  +             eprintln!("mkfifo unavailable; skipping");
+  +             return;
+  +         }
+  +         let target = dir.path().to_path_buf();
+  +         let (tx, rx) = std::sync::mpsc::channel();
+  +         std::thread::spawn(move || tx.send(read_cd_config(&target)).ok());
+  +         let reading = rx
+  +             .recv_timeout(std::time::Duration::from_secs(10))
+  +             .expect("read_cd_config hung on a FIFO .yoyo.toml (#1047)");
+  +         assert_eq!(reading, CdConfigReading::Unreadable);
+  +         assert!(deny_entries(&reading).is_empty());
+  ... (6 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && timeout 600 cargo tes… ✓ (2m 49s)
+  +     /// #1047: a FIFO at `<target>/.yoyo.toml` used to hang `/cd` on open. It
+  +     /// now reads as Unreadable (nothing applied, the note says so) at once.
+  +     #[cfg(unix)]
+  +     #[test]
+  +     fn fifo_target_config_is_unreadable_not_a_hang() {
+  +         let dir = tempfile::tempdir().unwrap();
+  +         let fifo = dir.path().join(".yoyo.toml");
+  +         let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+  ... (13 more lines)
+ ✓ (2m 49s)
+  ▶ $ cd /tmp && rm -rf ff && mkdir ff && cd ff && mkfifo .yoyo.toml && mkdir h && (HO… ✓ (5.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1645,1665p src/config.rs; s… ✓ (9ms)
+  ▶ $ cd /tmp/ff; ls -la --time-style=full-iso /home/runner/work/yoyo-evolve/yoyo-evol… ✓ (3.0s)
+  ▶ $ cd /tmp/ff; HOME=$PWD/h XDG_CONFIG_HOME=$PWD/h/.config timeout 5 strace -f -e tr… ✓ (5.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "\"get\"" src/dispatch_su… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 655,690p src/dispatch_sub.r… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn detect_loaded_config_p… ✓ (19ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (31 lines) ✓ (2.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/config.rs /tmp/config.rs.ba… ✓ (32.7s)
+  ▶ $ cd /tmp && rm -rf pq && mkdir -p pq/h && cd pq && git init -q && mkfifo .yoyo.to… ✓ (5.0s)
+  ▶ $ cd /tmp/pq; [ -n "$ANTHROPIC_API_KEY" ] && echo has-key || echo no-key; if [ -n … ✓ (1.8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "detect_loaded_config_pat… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 495,525p src/commands_confi… ✓ (5.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "FIFO\|fifo" docs/src/trou… ✓ (9ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "#1047" ARCHITECTURE.md | … ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (23 lines) ✓ (31ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  20 tools completed in 5m 29s (20 ✓)
+
+Now the full gate.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo buil… ✓ (4m 8s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 1500 cargo test 2>&1 | gre… ✓ (3m 18s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (33 lines) ✓ (53ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view … (13 lines) ✓ (938ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 8m 4s (4 ✓)
+
+A FIFO at .yoyo.toml no longer hangs startup or /cd. Committed as 963b6823, titled "Part of #1047", because two more .yoyo.toml readers still hang (below).
+
+Before and after: in a fresh git init dir with mkfifo .yoyo.toml, timeout 12 yoyo -p "Reply with exactly: PONG" used to exit 124 with no output. Now it prints one warning and exits 0 with PONG:
+
+warning: config file skipped - .yoyo.toml is not a regular file (FIFO): reading it could block forever or never end
+
+What changed:
+• `src/non_regular_read.rs`: a new helper, read_config_or_warn. A file that isn't regular (FIFO, device, socket) is skipped with that one warning, reusing the wording already used for the other skipped files. Missing or unreadable files behave as before.
+• `src/config.rs`: both places load_config_file reads a config (the project file, then ~/.yoyo.toml/XDG) now use the helper, so a FIFO project file falls through to the user config. The file is still 4851 lines, the same as before.
+• `src/cd_config_note.rs`: read_cd_config now refuses a FIFO instead of opening it. /cd reports the file as "could not be read" and applies none of it.
+
+Tests:
+• `tests/config_fifo.rs`: runs the real binary with a 10s deadline and covers four cases: a normal config file loads, a symlinked one loads, a FIFO is named in the warning without hanging, and a FIFO project file falls through to the user config.
+• Unit test in `cd_config_note.rs`: a FIFO in the /cd target comes back as unreadable instead of hanging.
+• Why `yoyo permissions` and not `yoyo config get`: the check that the command really reads the project file passed for config get, but the FIFO version still hung. Tracing showed config get reads the file its own way, not through load_config_file, so the tests use yoyo permissions instead.
+• Proof the tests catch the bug: putting std::fs::read_to_string back at the project-file read made both FIFO tests time out by name. Restored, they pass.
+
+Build, clippy, fmt and cargo test all pass (6709 passed, 0 failed), and harness_logic.sh passes 212/212.
+
+Still open on #1047 (posted there with these measurements):
+• `yoyo config get` and `yoyo config show` still hang on a FIFO .yoyo.toml; both timed out (exit 124) under timeout 5. They read the file their own way in commands_config.rs, and fixing them would have meant a fourth source file, which the task didn't allow. The assessment's census didn't list these two.
+• The trusted-dirs store readers in `config_paths.rs` (~299, ~326): these files are owned by the user, so I left them out of this slice on purpose.
+• #1050 upstream is still open.
+
+Docs: I added an ARCHITECTURE.md entry recording the policy and what's left. I also fixed common-issues.md, which said ".yoyo.toml still hangs startup"; that's no longer true.
+
+One wording problem I didn't fix: for a FIFO, the existing /cd note ends "Restart yoyo here to use it", but a restart would skip the file too.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/cd_config_note.rs

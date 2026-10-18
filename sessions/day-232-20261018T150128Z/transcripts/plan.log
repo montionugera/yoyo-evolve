@@ -1,0 +1,53 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 879 --json state,tit… ✓ (867ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 902 --json body --jq… ✓ (616ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l src/commands_spawn.rs src/co… ✓ (427ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 902 --json comments … ✓ (387ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1051 --json title,la… ✓ (352ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "REPL_ONLY_MULTI_TOKEN_AR… ✓ (348ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 936 --json comments … ✓ (673ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "PROTECTED\|protected_file… ✓ (538ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2621,2626p scripts/evolve.s… ✓ (454ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 982 --json comments … ✓ (416ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 982 --json comments … ✓ (443ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 982 --json comments … ✓ (474ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "YOYO_AUDIT" scripts/skill… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat > /tmp/c93… (13 lines) ✓ (1.5s)
+
+────────────────────────────────────────────────────────────────────────────────
+  14 tools completed in 2m 15s (14 ✓)
+
+Now the task files.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p session_plan && rm -f ses… ✓ (5ms)
+  ▶ write session_plan/task_01.md (40 lines)  ▶ write session_plan/task_02.md (26 lines)  ▶ write session_plan/issue_responses.md (11 lines) ✓ (0ms)
+ ✓ (1ms)
+ ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/ && git commi… ✓ (5ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 56.1s (5 ✓)
+
+The plan for this session is two tasks, and I closed one old issue (#936) while planning. The task files are in session_plan/ but aren't committed: that folder is in .gitignore, so the commit step failed. The harness tolerates that (its commit command ends in || true).
+
+Task 1: a FIFO at `.yoyo.toml` (Part of #1047, product). Today a FIFO (a named pipe posing as a file) at .yoyo.toml makes startup hang until killed. The assessment measured it: exit 124, no output. This is the last startup hang #1047 knows of, and it's outside the over-worked tools area.
+• Change: the two config readers in load_config_file and the /cd config reader (cd_config_note.rs:237, a second door a census found that #1047 didn't list) switch to the shared reader that refuses non-regular files. The FIFO is skipped with one warning and ~/.yoyo.toml still loads, the same way the goal and memory files are handled.
+• Why skip with a warning: nobody writes a FIFO as their config on purpose. Refusing to start would let any cloned repo stop yoyo running, and skipping silently would hide that the project config wasn't applied.
+• Size limit: config.rs has only 11 lines of headroom under the module-size gate, so the task caps its growth at 8 lines and puts the tests in a new tests/config_fifo.rs.
+• Tests: a control first, checking that the test command actually reads the config. Then a timeout-bounded FIFO test, a fall-through test, and a break-then-restore check that the FIFO test really fails without the fix.
+• Still open after it: the trusted-dirs store in config_paths.rs and the upstream yoagent fix (#1050).
+
+Task 2: unknown verbs exit 2 instead of 0 (Part of #982, clearing old backlog). yoyo skill nosuch, yoyo goal frobnicate and yoyo todo zzz print an error but exit 0, so a script reads them as success. They'll exit 2 like risk, config and lint already do. The text output stays exactly the same, and bare goal, skill list and bare todo keep exiting 0. Bare yoyo ast waits for a later slice because it would be a fourth file.
+
+Housekeeping and deferrals:
+• #936 closed as not-planned. The closing comment gives a verdict for each class of the 38 remaining verbs. Every one of them is an English word or takes free text, so any guard would refuse real prompts.
+• #879 and #902 (the two oldest) are waiting on product decisions, so they couldn't take the backlog slot. #879 is waiting on the question I put to @yuanhao this morning.
+• #1051 (sub-agent bash waits the full 120s, reports a finished command as timed out and kills the background job) is deferred. It's labelled upstream, since the bug is in yoagent's bash tool, and it falls in the over-worked tools area.
+• #420 (hints off-switch) is already done: --no-hints and hints = false exist in src/cli.rs. The commitment scanner's "unfulfilled" flag is a false positive.
+• Release: not due, so no release this session.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

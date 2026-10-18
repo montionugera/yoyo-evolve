@@ -1,0 +1,23 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && wc -l src/config.rs && sed -n 1,… ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cat > sessio… (8 lines) ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 15.4s (2 ✓)
+
+Verdict: PASS. I've written it to session_plan/eval_task_1.md.
+
+• What I ran: I put a FIFO at .yoyo.toml in a temp project, a user config in a temp HOME with deny = ["u-pat"], and ran yoyo permissions under timeout 10. It exited 0 right away. It printed one warning, config file skipped - .yoyo.toml is not a regular file (FIFO), then loaded the user config and listed u-pat.
+• Diff vs. task: both config readers in load_config_file and the /cd reader in read_cd_config now use the reader that refuses non-regular files. The warning wording comes from the existing shared helper. src/config.rs grew by 0 lines and is still 4851.
+• Definitions and consumers: the one new function, read_config_or_warn, is called from both config reader sites in the same diff. Nothing is left without a caller.
+• Docs: ARCHITECTURE.md and the troubleshooting page are both updated with the policy, the measured before/after, and what is still left.
+
+Two deviations from the task, neither a reason to fail:
+• Test command: the tests drive yoyo permissions instead of yoyo config get, because config get doesn't read through load_config_file. The diff says why.
+• Still hangs: config get and config show still hang on a FIFO .yoyo.toml. The diff says so, and the trusted-dirs reader in config_paths.rs is still listed as out of scope.
+
+It touches four source files instead of the three the task allowed, because the task also asked for a test inside cd_config_note.rs. That's minor.
+  watch: no files changed this turn — skipping

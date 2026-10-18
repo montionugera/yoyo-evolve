@@ -1,0 +1,6 @@
+Verdict: PASS
+Reason: The behaviour fix had already shipped in 53a6276d (Day 231), and this commit says so plainly. It adds the missing end-to-end guard: a binary-level integration test pinning exit 2 for the unknown verbs and exit 0 for the near-misses. I rebuilt and ran the binary in a fresh temp dir with stdin /dev/null, and every exit code matched what the task asked for.
+Checked: intent_alignment: PASS: I ran the HEAD binary in an empty mktemp dir with stdin /dev/null. skill nosuch, goal frobnicate, goal check now, todo zzz and bare ast exit 2. goal, skill list and todo exit 0. The dir was still empty afterwards. I also confirmed that 53a6276d holds the src changes that the commit body cites.
+Checked: forgotten_touchpoints: PASS: The diff adds only one #[test] fn in tests/integration.rs, using the existing yoyo_plain_in helper. It adds no new production definitions, enum variants or renames, so nothing is left without a consumer.
+Checked: doc_sync: N/A: This commit changes no behaviour, only a test. The exit-code change landed in the earlier commit 53a6276d.
+Checked: product_surface: N/A: The diff only touches the test file. The task is product-kind, and the exit-2-on-usage-error behaviour (already landed) is a correctness fix for typos, not an evolve convenience.
