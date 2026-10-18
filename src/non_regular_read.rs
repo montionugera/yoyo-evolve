@@ -52,6 +52,25 @@ pub(crate) fn read_regular_to_string(path: &Path) -> std::io::Result<String> {
     std::fs::read_to_string(path)
 }
 
+/// The config loaders' reader (#1047): `Some(text)` for a readable regular
+/// file; `None` when absent or unreadable, as before; and `None` plus ONE
+/// stderr warning for a FIFO/device/socket, so `load_config_file` skips it and
+/// walks on to `~/.yoyo.toml`/XDG instead of blocking forever. Nobody writes a
+/// FIFO as their config, so this branch is reached only by a broken or hostile
+/// repo: refusing to start would let any clone stop yoyo, and a silent skip
+/// would hide that the project config was not applied.
+pub(crate) fn read_config_or_warn(path: &Path) -> Option<String> {
+    match read_regular_to_string(path) {
+        Ok(s) => Some(s),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
+            let reason = crate::cli::sanitize_for_display(&e.to_string());
+            eprintln!("warning: config file skipped - {reason}");
+            None
+        }
+        Err(_) => None,
+    }
+}
+
 /// The bytes twin of [`read_regular_to_string`] (used by `/add` for images).
 pub(crate) fn read_regular(path: &Path) -> std::io::Result<Vec<u8>> {
     refuse_non_regular(path)?;

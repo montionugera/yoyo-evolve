@@ -234,7 +234,10 @@ pub(crate) fn render_cd_config_note(note: &str, volume: NoteVolume, plain: bool)
 /// Read and classify `<target>/.yoyo.toml`. Read-only; one read per `/cd`, so
 /// the deny entries applied and the note printed come from the same bytes.
 pub(crate) fn read_cd_config(target: &Path) -> CdConfigReading {
-    classify_read(std::fs::read_to_string(target.join(".yoyo.toml")))
+    // Never `std::fs::read_to_string`: a FIFO there would hang `/cd` (#1047).
+    classify_read(crate::non_regular_read::read_regular_to_string(
+        &target.join(".yoyo.toml"),
+    ))
 }
 
 /// The `[permissions] deny` entries `/cd` applies; empty unless the file was read.
@@ -708,6 +711,30 @@ mod tests {
         assert!(deny_entries(&bad).is_empty()); // nothing applied from unread bytes
         let note = cd_config_note("/repo", &bad, false).expect("unreadable must be reported");
         assert!(note.contains("could not be read"), "{note}");
+    }
+
+    /// #1047: a FIFO at `<target>/.yoyo.toml` used to hang `/cd` on open. It
+    /// now reads as Unreadable (nothing applied, the note says so) at once.
+    #[cfg(unix)]
+    #[test]
+    fn fifo_target_config_is_unreadable_not_a_hang() {
+        let dir = tempfile::tempdir().unwrap();
+        let fifo = dir.path().join(".yoyo.toml");
+        let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+        if !made.map(|s| s.success()).unwrap_or(false) {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        }
+        let target = dir.path().to_path_buf();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || tx.send(read_cd_config(&target)).ok());
+        let reading = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("read_cd_config hung on a FIFO .yoyo.toml (#1047)");
+        assert_eq!(reading, CdConfigReading::Unreadable);
+        assert!(deny_entries(&reading).is_empty());
+        let note = cd_config_note("/repo", &reading, true).expect("must be reported");
+        assert!(note.contains(".yoyo.toml"), "{note}");
     }
 
     #[test]

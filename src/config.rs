@@ -2145,7 +2145,7 @@ fn resolve_sub_agent_model(
 pub fn load_config_file() -> (HashMap<String, String>, String) {
     // Check project-level config first, then ~/.yoyo.toml, then XDG.
     for name in CONFIG_FILE_NAMES {
-        if let Ok(content) = std::fs::read_to_string(name) {
+        if let Some(content) = crate::non_regular_read::read_config_or_warn(name.as_ref()) {
             return accept_loaded_config(name, std::path::PathBuf::from(name), content);
         }
     }
@@ -2153,7 +2153,7 @@ pub fn load_config_file() -> (HashMap<String, String>, String) {
         .into_iter()
         .flatten()
     {
-        if let Ok(content) = std::fs::read_to_string(&path) {
+        if let Some(content) = crate::non_regular_read::read_config_or_warn(&path) {
             return accept_loaded_config(&path.display().to_string(), path, content);
         }
     }
