@@ -1,0 +1,193 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log a270ad5f..HEAD --o… ✓ (12ms)
+  ▶ $ git show fe78e0da --stat | grep -n 982; grep -n '"status"\|"version"\|"memories"…  ▶ $ sed -n 330,420p src/dispatch_sub.rs ✓ (4ms)
+ ✓ (10ms)
+  ▶ $ git show 53a6276d --stat; git show b19e55a0 --stat | head; grep -n 'fn exit_if\|… ✓ (14ms)
+  ▶ read src/dispatch_sub.rs:90..330 ✓ (2ms)
+  ▶ read src/dispatch_sub.rs:364..384  ▶ read src/dispatch_sub.rs:416..446  ▶ read src/dispatch_sub.rs:620..800 ✓ (1ms)
+ ✓ (2ms)
+ ✓ (3ms)
+  ▶ $ grep -n 'pub fn handle_memories' -A30 src/commands_memory.rs | head -50; grep -n… ✓ (5ms)
+  ▶ $ grep -n 'fn parse_evolution_count' -A20 src/commands_info.rs; grep -n 'evolution… ✓ (5ms)
+  ▶ $ grep -n 'KNOWN_FLAGS\|FLAGS_WITH_VALUE\|fn flag_takes_value\|VALUE_FLAGS' src/*.… ✓ (21ms)
+  ▶ $ sed -n 690,700p src/cli.rs; sed -n 820,930p src/cli.rs; sed -n 2225,2245p src/cl… ✓ (7ms)
+  ▶ $ grep -n 'flags_needing_values\b\|FLAGS_NEEDING\|collect_positional_args(' src/*.… ✓ (16ms)
+  ▶ $ cd /tmp; for c in "cargo version zzz" "rustup show zzz" "git version zzz" "gh ve… ✓ (100ms)
+  ▶ $ cd ~/work/yoyo-evolve/yoyo-evolve 2>/dev/null || cd /home/runner/work/yoyo-evolv… ✓ (8ms)
+  ▶ $ sed -n 380,415p tests/module_size.rs; grep -n 'module_size\|cap\b\|CAP' tests/mo… ✓ (6ms)
+  ▶ $ grep -n 'const REGISTER_DRIFT_GRACE_LINES\|const OVERSHOOT_GRACE_LINES\|const CA… ✓ (5ms)
+  ▶ $ grep -rn 'unknown_verbs_exit_with_the_usage_code\|fn .*exit.*2\b' tests/*.rs src… ✓ (9ms)
+  ▶ $ git show b19e55a0 -- tests/integration.rs | sed -n 1,60p ✓ (6ms)
+  ▶ $ sed -n 3814,3850p tests/integration.rs; sed -n 1,40p tests/integration.rs | grep… ✓ (5ms)
+  ▶ $ grep -n 'fn yoyo_plain_in' -A20 tests/integration.rs | head -25; grep -n 'pub fn… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  21 tools completed in 1m 53s (21 ✓)
+
+Now the test (first, so it goes red).
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ edit tests/integration.rs (2 → 48 lines)
+  + #[test]
+  + fn zero_arg_verbs_refuse_a_stray_argument_with_exit_two() {
+  +     // #982: `yoyo status zzz` (and version/permissions/security) printed their
+  +     // normal output and exited 0, so a typo'd or misplaced argument was
+  +     // silently ignored. `evolution` takes one optional numeric count, so a
+  +     // non-number is the stray argument there. `memories <query>` is a real
+  +     // search and is deliberately NOT in this table.
+  +     let dir = tempfile::tempdir().expect("tempdir");
+  +     for args in [
+  +         &["status", "zzz"][..],
+  +         &["version", "zzz"][..],
+  +         &["permissions", "zzz"][..],
+  +         &["security", "zzz"][..],
+  +         &["evolution", "zzz"][..],
+  +         &["evolution", "5", "6"][..],
+  +     ] {
+  +         let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+  +         assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+  +         assert!(stdout.is_empty(), "{args:?} printed to stdout: {stdout}");
+  +         let stray = args.last().unwrap();
+  ... (28 more lines)
+ ✓ (2m 3s)
+  + #[test]
+  + fn zero_arg_verbs_refuse_a_stray_argument_with_exit_two() {
+  +     // #982: `yoyo status zzz` (and version/permissions/security) printed their
+  +     // normal output and exited 0, so a typo'd or misplaced argument was
+  +     // silently ignored. `evolution` takes one optional numeric count, so a
+  +     // non-number is the stray argument there. `memories <query>` is a real
+  +     // search and is deliberately NOT in this table.
+  +     let dir = tempfile::tempdir().expect("tempdir");
+  ... (13 more lines)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ edit src/dispatch_sub.rs (8 → 39 lines)
+            use std::io::Write;
+            let _ = std::io::stdout().flush();
+            std::process::exit(code);
+  +     }
+  + }
+  + 
+  + /// Positional arguments after a verb (#982): flags, and the value a
+  + /// value-taking flag consumes (same `FLAGS_NEEDING_VALUES` parse_args uses),
+  + /// are not positional, so `version -v --model m` has none.
+  + fn positional_after_verb(rest: &[String]) -> Vec<&String> {
+  +     let mut skip = false;
+  +     let mut out = Vec::new();
+  +     for a in rest {
+  +         if std::mem::take(&mut skip) {
+  +             continue;
+  +         }
+  +         if a.starts_with('-') {
+  +             skip = crate::cli::FLAGS_NEEDING_VALUES.contains(&a.as_str());
+  +         } else {
+  +             out.push(a);
+  ... (16 more lines)
+ ✓ (20.6s)
+            use std::io::Write;
+            let _ = std::io::stdout().flush();
+            std::process::exit(code);
+  +     }
+  + }
+  + 
+  + /// Positional arguments after a verb (#982): flags, and the value a
+  + /// value-taking flag consumes (same `FLAGS_NEEDING_VALUES` parse_args uses),
+  ... (13 more lines)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 2m 52s (2 ✓)
+
+Now the arms.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (34 lines) ✓ (13.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cargo test --test integration zero_arg_verbs 2>&1 | tail -15; for a in "status z… ✓ (197ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 26.6s (2 ✓)
+
+Positive control (serial, atomic, marked):
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/dispatch_sub.rs /tmp/ds.bak && python3 - <<'EOF' (9 lines) ✓ (24.2s)
+
+Control red by name on ["status","zzz"], restored green. Now size register and full checks.
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ wc -l src/dispatch_sub.rs; sed -n 400,411p tests/module_size.rs ✓ (4ms)
+  ▶ $ python3 - <<'EOF' (11 lines) ✓ (7m 37s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 7m 50s (2 ✓)
+
+All green. Docs check and the residue census over other shell verbs:
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n 'yoyo status\|yoyo version\|yoyo security\|yoyo permissions\|yoyo evolut… ✓ (367ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Add one docs sentence, then commit.
+  ╭─ Turn 27 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (9 lines) ✓ (23ms)
+  ▶ $ cat > /tmp/msg <<'EOF' (53 lines) ✓ (23ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 20.5s (2 ✓)
+
+Now the one comment on #982:
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ $ cat > /tmp/c <<'EOF' (19 lines) ✓ (873ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Let me check docs zzz before leaving that claim up, because docs takes a crate name.
+  ╭─ Turn 30 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd $(mktemp -d); timeout 20 /home/runner/work/yoyo-evolve/yoyo-evolve/target/deb… ✓ (91ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+zzz turns out to be a real crate on docs.rs, so docs doesn't belong on the residue list. I'll fix the comment in place:
+  ╭─ Turn 31 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (7 lines) ✓ (886ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The commit body has the same wrong docs claim. The commit is local and unpushed, so I'll correct it:
+  ╭─ Turn 32 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (12 lines) ✓ (32ms)
+
+The amend changed the sha, so the comment needs the new one:
+  ╭─ Turn 33 ────────────────────────────────────────────────────────────╮
+  ▶ $ sed -i 's/45b47c8b/51031de7/g' /tmp/c && gh api -X PATCH repos/yologdev/yoyo-evo… ✓ (1.0s)
+
+I committed it as 51031de7 (Part of #982). Four verbs that take no arguments now refuse a stray one, and a fifth refuses a bad count. memories stays as it was on purpose.
+
+What changed (src/dispatch_sub.rs):
+• yoyo status zzz, version zzz, permissions zzz and security zzz now print unexpected argument 'zzz' for \yoyo <verb>\ and a usage line on stderr, print nothing on stdout, and exit 2. Before, they printed their normal output and exited 0.
+• Flags still work: version -v --provider x --model y and permissions --trust-project --yes. Only positional words count as stray; flags, and the value after a flag that takes one, are skipped.
+• `evolution` takes one optional number. Before, evolution zzz quietly fell back to 10. Now evolution zzz and evolution 5 6 exit 2, and evolution 5 still runs. This only applies from the shell; /evolution zzz inside a session is unchanged.
+• `memories` is not changed. memories zzz is a real search for "zzz", so 0 is correct. The commit title still lists it because I used the title as given; the commit body says it wasn't changed.
+
+Other tools disagree: cargo version zzz and rustup show zzz exit 1 with an error, while git version zzz, gh version zzz and rustc --version zzz ignore it and exit 0. So refusing was my call. I used exit 2 because yoyo's other usage errors already exit 2.
+
+Checks: The new test is zero_arg_verbs_refuse_a_stray_argument_with_exit_two in tests/integration.rs. It runs the real binary in a temp dir and checks six refused cases, six bare-verb and flag cases that must still succeed, and that evolution 5 gets past the refusal. As a sanity check, I removed the refusal from status: the test failed on ["status","zzz"], and passed again once I put it back. fmt, clippy (-D warnings), build and the full test suite all pass. I raised the size limit for dispatch_sub.rs in tests/module_size.rs from 2457 to 2503 lines, and added one sentence about this to docs/src/usage/commands.md.
+
+Comment on #982: I posted one comment with the before/after table, the comparison with other tools, and what's left. The first version wrongly listed docs zzz as ignoring its argument, but zzz is a real crate on docs.rs, so it was working correctly. I fixed that in the comment and in the commit message (amended before any push, which is why the sha changed), and the comment now points at 51031de7.
+
+Still open in this class: doctor zzz, help zzz, init zzz and update zzz still ignore the stray argument and exit 0, and init zzz still writes a YOYO.md file. health zzz exits 1, but only because there's no project; it ignores the argument too.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     Surprises (not predicted): src/dispatch_sub.rs

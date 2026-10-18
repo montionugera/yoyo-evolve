@@ -1,0 +1,19 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1047 --repo yologdev… ✓ (785ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1047 --repo yologdev… ✓ (1.0s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 16.0s (3 ✓)
+
+I'm not posting any comments this session. Every issue on the list is either already updated or had no work done on it.
+
+• #1047 (FIFO hang): Task 1 (fe78e0da) belongs to this issue. The ticket already has a comment about that exact commit, posted today at 19:05:55Z, right after the commit landed. It has the before/after table for config get, config show and /config set, plus what's still open: the trusted-dirs readers in src/config_paths.rs at :299 and :326, and upstream yologdev/yoagent#341. Another comment would repeat it and break the one-comment rule. It stays open because those readers are still unfixed.
+• #1050 (the yoagent `ReadFileTool` fix): this number doesn't exist in this repo any more (gh says it "could not resolve"). It seems to have been moved to yoagent as yologdev/yoagent#341, which the #1047 comment already links. Nothing to do here.
+• #997, #991, #1045, #1041, #1040, #1037, #1026, #1023, #1021, #1018, #1016, #1014: no commits this session touched them. I replied last on #997 and #991, and I owe no follow-up on either. Skipped.
+
+Task 2 is for #982, which isn't on this list, so I didn't comment on it here.
+  watch: no files changed this turn — skipping

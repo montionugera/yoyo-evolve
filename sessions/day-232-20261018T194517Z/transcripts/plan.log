@@ -1,0 +1,30 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; mkdir -p sessio… ✓ (1.6s)
+  ▶ $ gh issue view 902 --json comments --jq '.comments[] | .createdAt + " " + .body[0… ✓ (1.0s)
+  ▶ $ gh issue view 1041 --json comments --jq '.comments[-1].body' | tail -c 1500 ✓ (385ms)
+  ▶ write session_plan/task_01.md (53 lines)  ▶ write session_plan/task_02.md (46 lines)  ▶ write session_plan/issue_responses.md (8 lines)  ▶ $ git add session_plan/ && git commit -q -m "Day 232 (18:28): session plan" && git… ✓ (0ms)
+ ✓ (0ms)
+ ✓ (1ms)
+ ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 1m 6s (7 ✓)
+
+I've written the plan for this session: two task files plus the issue responses file. Nothing is implemented. The commit step didn't record anything because session_plan/ is in .gitignore. The files are on disk, which is what the instructions' || true seems to expect, so I didn't force-add them.
+
+Task 1 — Part of #1047 (product): yoyo config get and yoyo config show still hang forever when .yoyo.toml is a FIFO (a named pipe). The assessment measured this at HEAD: both commands sat until timeout 5 killed them. The fix should be close to zero lines: swap the two plain file reads in src/commands_config.rs for the existing read_regular_to_string. That file is at 1,993 lines, so the 2,000-line cap is close; the task says to count before committing.
+• `config set`: the task probes this first. Swapping the read alone isn't enough here: an empty read would lead to writing into the FIFO, which blocks too. So the fix is to refuse with an error naming the file. src/config.rs has only 11 lines of headroom, so the task counts the lines that refusal actually adds. If it's more than 8, the task leaves it out and records the measured count on #1047, rather than deferring on headroom without a number.
+• Tests go in tests/config_fifo.rs, with a check that a normal .yoyo.toml still reads.
+• Ticket: the task ends by posting the fixed rows and the commit sha on #1047.
+
+Task 2 — Part of #982 (product, backlog drain): six commands (status, version, memories, permissions, security, evolution) silently ignore an extra argument and exit 0. All six were re-measured at HEAD.
+• Why this one: #879 is the oldest open issue, but it's waiting for you to choose its default. #902 has no slice ready to take.
+• Before changing code: the task checks what similar tools do with an extra argument (cargo version zzz, gh version zzz, and so on) and decides from that. It excludes git status zzz, because git reads zzz as a path filter, which is a different kind of argument.
+• The change: a stray argument exits 2 with a message on stderr. Running each command with no arguments stays exactly as it is.
+• Ticket: the task posts the rows, the sha and a count of what's still left in the class on #982.
+
+Issue responses: #1041 stays open for a valid reason. The prefix feature shipped, but every prefixed server is still started twice, and whether yoagent should offer a prefixed connect is still an open question. No community issues today. No release: the last one was 13 days ago and the cadence check says one isn't due.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

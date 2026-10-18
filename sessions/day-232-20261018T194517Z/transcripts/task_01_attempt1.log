@@ -1,0 +1,93 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git log a270ad5f..HEAD --oneline… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 495,535p src/commands_con… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo build 2>&1 | tail -1; B=$P… ✓ (10.2s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1670,1730p src/config.rs ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 80,140p src/non_regular_r… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1,14p tests/config_fifo.r… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (71 lines) ✓ (10.4s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test --test config_fifo co… ✓ (176ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (36 lines) ✓ (11.3s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -rn "handle_config_show()" … ✓ (10ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 650,680p src/dispatch_sub… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (11 lines) ✓ (31ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  12 tools completed in 2m 16s (12 ✓)
+
+Now the config set writers. Add a helper in non_regular_read.rs so config.rs stays at net 0 lines.
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (59 lines) ✓ (28ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt && cargo test --test c… ✓ (44.2s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 53.1s (2 ✓)
+
+Now positive controls, serially, each atomic mutate→test→restore.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/commands_config.rs /tmp/c… ✓ (21.1s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/comma… (2 lines) ✗ (2m 0s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n NEUTERED src/commands_co… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp /tmp/nr.bak src/non_regular_r… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (27 lines) ✓ (1m 42s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "let set\|let allow\|ass… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && pkill -f "yo… (30 lines) ✓ (34.0s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/non_regular_read.rs /tmp/… ✓ (41.6s)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 6m 16s (7 ✓, 1 ✗)
+
+Writer control red by name, restored. Now the show-only control:
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/commands_config.rs /tmp/c… ✓ (21.7s)
+
+Both swaps proven. Full gate:
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && wc -l src/commands_config.rs src… ✓ (4m 20s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -E "FAILE… ✓ (3m 20s)
+  2 tools completed in 7m 52s (2 ✓)
+
+Doc line is now false; fix it.
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (9 lines) ✓ (42ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status -… (33 lines) ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 290,330p src/config_paths… ✓ (650ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue com… (14 lines) ✓ (985ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue view 982 --json state -… ✓ (1.3s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 37.5s (5 ✓)
+
+yoyo config get model and yoyo config show no longer hang when .yoyo.toml is a FIFO. The REPL's /config set now refuses one with an error naming the file. Committed as fe78e0da, part of #1047. fmt, clippy (-D warnings) and the full cargo test all passed.
+
+Before and after (fresh dir, mkfifo .yoyo.toml, timeout 5):
+• `yoyo config get model`: used to hang until killed (exit 124). Now it exits 0 with the same config file skipped warning that startup prints, and reports the key as unset.
+• `yoyo config show`: used to hang (exit 124). Now it exits 0 and prints Failed to read config file .yoyo.toml: … (FIFO). That line now goes to stderr instead of stdout.
+• `/config set` and saving an "always allow" choice: the two writers in config.rs would have blocked on the read, and the old empty-default read would then have blocked again on the write into the pipe. They now return an error naming the file and leave the FIFO alone. yoyo config set from the shell already refused with exit 2 (it needs a session), so this fix applies to the REPL.
+
+File sizes: no net lines added to either capped file (config.rs stays at 4851, commands_config.rs at 1993). The new helper read_for_rewrite and its unit tests are in non_regular_read.rs.
+
+Tests:
+• tests/config_fifo.rs runs the real binary for config get and config show with a 10-second deadline.
+• The near-miss test asserts the exact output model = m  (.yoyo.toml). The task's guess of plain m was wrong; that line is what the binary actually prints.
+• The writer tests run on a thread with a timeout.
+• I broke each of the three fixes one at a time and each test failed by name, then passed again once restored.
+• One mistake along the way: my first writer control hung the test suite instead of failing, because the writer test had no timeout yet. Adding the thread-and-timeout fixed that. The control file was restored and no neutered code remains.
+
+Docs: common-issues.md said config get and config show still hang; I replaced that with what they do now.
+
+Still open, posted on #1047:
+• The trusted-dirs store in config_paths.rs (~:299 and ~:326) still uses raw reads; the second has the same read-then-write pattern as config set.
+• Upstream #1050 is still open.
+• yoyo config show still exits 0 when it can't read the file. I added this to #982 (commands that exit 0 after reporting a failure); fixing it means changing dispatch_sub.rs, which this task didn't touch.
+  watch: no files changed this turn — skipping
