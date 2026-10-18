@@ -1676,7 +1676,7 @@ pub fn write_config_value_to(
     }
 
     // Read existing content or start fresh
-    let existing = std::fs::read_to_string(path).unwrap_or_default();
+    let existing = crate::non_regular_read::read_for_rewrite(path)?;
 
     let new_content = set_toml_key(&existing, key, value);
 
@@ -1711,7 +1711,7 @@ pub fn append_allow_pattern_to(
         }
     }
 
-    let existing = std::fs::read_to_string(path).unwrap_or_default();
+    let existing = crate::non_regular_read::read_for_rewrite(path)?;
 
     // Parse existing permissions to check for duplicates
     let current = parse_permissions_from_config(&existing);

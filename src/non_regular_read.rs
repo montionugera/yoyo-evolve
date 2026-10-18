@@ -71,6 +71,17 @@ pub(crate) fn read_config_or_warn(path: &Path) -> Option<String> {
     }
 }
 
+/// The `/config set` writers' reader (#1047): the file's text, `""` when it is
+/// missing or unreadable (the old `unwrap_or_default`), and `Err` naming the
+/// file when it is a FIFO or device. Refusing matters twice there: the read
+/// would block, and the write that follows would block on a FIFO too.
+pub(crate) fn read_for_rewrite(path: &Path) -> Result<String, String> {
+    match read_regular_to_string(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => Err(e.to_string()),
+        r => Ok(r.unwrap_or_default()),
+    }
+}
+
 /// The bytes twin of [`read_regular_to_string`] (used by `/add` for images).
 pub(crate) fn read_regular(path: &Path) -> std::io::Result<Vec<u8>> {
     refuse_non_regular(path)?;
@@ -127,6 +138,53 @@ pub(crate) mod tests {
             .map(|s| s.success())
             .unwrap_or(false);
         ok.then_some(p)
+    }
+
+    /// `/config set` and the allow-persist writer refuse a FIFO `.yoyo.toml`
+    /// with an error naming it, and return instead of blocking (the read, and
+    /// then the write, would each wait forever for a peer).
+    #[test]
+    fn config_writers_refuse_a_fifo_and_name_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let Some(fifo) = make_fifo(dir.path()) else {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        };
+        assert!(std::fs::metadata(&fifo).unwrap().file_type().is_fifo());
+        // Run on a thread so a regression fails by name instead of hanging the suite.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let f = fifo.clone();
+        std::thread::spawn(move || {
+            let set = crate::config::write_config_value_to("model", "x", &f);
+            let allow = crate::config::append_allow_pattern_to("ls *", &f);
+            let _ = tx.send((set, allow));
+        });
+        let (set, allow) = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("config writers blocked on a FIFO .yoyo.toml (#1047)");
+        let set = set.unwrap_err();
+        assert!(set.contains("pipe.txt") && set.contains("FIFO"), "{set}");
+        let allow = allow.unwrap_err();
+        assert!(
+            allow.contains("pipe.txt") && allow.contains("FIFO"),
+            "{allow}"
+        );
+        // Still a FIFO: nothing replaced it with a regular file.
+        assert!(std::fs::metadata(&fifo).unwrap().file_type().is_fifo());
+    }
+
+    /// Near-miss: a missing file still starts empty, and a regular one is read.
+    #[test]
+    fn read_for_rewrite_keeps_missing_and_regular_behaviour() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("absent.toml");
+        assert_eq!(read_for_rewrite(&missing), Ok(String::new()));
+        let regular = dir.path().join("real.toml");
+        std::fs::write(&regular, "model = \"m\"\n").unwrap();
+        assert_eq!(
+            read_for_rewrite(&regular),
+            Ok("model = \"m\"\n".to_string())
+        );
     }
 
     #[test]

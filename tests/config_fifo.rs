@@ -21,8 +21,14 @@ const DEADLINE: Duration = Duration::from_secs(10);
 /// Run `yoyo permissions` in `cwd` with HOME/XDG pointed at `home`, and
 /// return its output, or panic if it is still running after `DEADLINE`.
 fn permissions(cwd: &Path, home: &Path) -> Output {
+    run_yoyo(&["permissions"], cwd, home)
+}
+
+/// Run `yoyo <args>` like [`permissions`]: panics (rather than hanging the
+/// suite) if it is still running after `DEADLINE`.
+fn run_yoyo(args: &[&str], cwd: &Path, home: &Path) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_yoyo"))
-        .arg("permissions")
+        .args(args)
         .current_dir(cwd)
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", home.join(".config"))
@@ -41,7 +47,9 @@ fn permissions(cwd: &Path, home: &Path) -> Output {
         if start.elapsed() > DEADLINE {
             let _ = child.kill();
             let _ = child.wait();
-            panic!("yoyo permissions still running after {DEADLINE:?}: a FIFO .yoyo.toml hung it (#1047)");
+            panic!(
+                "yoyo {args:?} still running after {DEADLINE:?}: a FIFO .yoyo.toml hung it (#1047)"
+            );
         }
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -131,4 +139,51 @@ fn fifo_project_config_falls_through_to_user_config() {
         "stdout={stdout:?} stderr={:?}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+/// Near-miss for the `config get` row: a regular `.yoyo.toml` is still read,
+/// and the value and its source are printed exactly (`key = value  (source)`). Without this, the FIFO test below could
+/// pass against a `config get` that never opens the file.
+#[test]
+fn config_get_reads_a_regular_project_config() {
+    let proj = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    std::fs::write(proj.path().join(".yoyo.toml"), "model = \"m\"\n").unwrap();
+    let out = run_yoyo(&["config", "get", "model"], proj.path(), home.path());
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        "model = m  (.yoyo.toml)",
+        "stderr={:?}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!stderr.contains("not a regular file"), "stderr={stderr:?}");
+}
+
+/// `yoyo config get` and `yoyo config show` against a FIFO `.yoyo.toml`
+/// exit on their own (run_yoyo panics if not) and name the file. Both used
+/// to block in `read_to_string` until killed (exit 124 under `timeout 5`).
+#[test]
+fn config_get_and_show_do_not_hang_on_a_fifo_project_config() {
+    for args in [&["config", "get", "model"][..], &["config", "show"][..]] {
+        let proj = tempfile::tempdir().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let fifo = proj.path().join(".yoyo.toml");
+        if !mkfifo(&fifo) {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        }
+        let out = run_yoyo(args, proj.path(), home.path());
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            out.status.code().is_some(),
+            "{args:?} was killed by a signal: {:?}",
+            out.status
+        );
+        assert!(stderr.contains(".yoyo.toml"), "{args:?} stderr={stderr:?}");
+        assert!(
+            stderr.contains("not a regular file"),
+            "{args:?} stderr={stderr:?}"
+        );
+    }
 }

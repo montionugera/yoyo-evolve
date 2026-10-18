@@ -508,13 +508,13 @@ pub fn handle_config_show() {
     let chain = existing_config_paths();
     let path = chain.first().cloned();
     let config = match path.as_ref() {
-        Some(p) => match std::fs::read_to_string(p) {
+        Some(p) => match crate::non_regular_read::read_regular_to_string(p) {
             Ok(content) => {
                 crate::config_syntax::warn_config_syntax_once(&p.display().to_string(), &content);
                 crate::cli::parse_config_file(&content)
             }
             Err(e) => {
-                println!(
+                eprintln!(
                     "{RED}  Failed to read config file {}: {e}{RESET}",
                     p.display()
                 );
@@ -871,12 +871,12 @@ pub fn handle_config_get_status(input: &str) -> i32 {
     // Read from the detected config file
     let path = detect_loaded_config_path();
     let config = match path.as_ref() {
-        Some(p) => match std::fs::read_to_string(p) {
-            Ok(content) => {
+        Some(p) => match crate::non_regular_read::read_config_or_warn(p) {
+            Some(content) => {
                 crate::config_syntax::warn_config_syntax_once(&p.display().to_string(), &content);
                 crate::cli::parse_config_file(&content)
             }
-            Err(_) => std::collections::HashMap::new(),
+            None => std::collections::HashMap::new(),
         },
         None => std::collections::HashMap::new(),
     };
