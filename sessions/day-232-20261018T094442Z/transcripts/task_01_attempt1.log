@@ -1,0 +1,165 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (12ms)
+  ▶ read src/tools.rs:380..690 ✓ (2ms)
+  ▶ read src/tools.rs:478..640 ✓ (2ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; env | grep -c API_KEY; grep -n "to… ✓ (38ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | tail -2; env | … ✓ (158ms)
+  ▶ $ cd /tmp && rm -rf repro && mkdir repro && cd repro && git init -q . ; start=$(da… ✓ (34.5s)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src; ls tools; grep -n "wait_with_outp… ✓ (5ms)
+  ▶ $ cd ~/.cargo/registry/src/*/yoagent-0.25.7/src; sed -n 185,300p tools/bash.rs ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "StreamingBashTool::defaul… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 2525,2600p src/tools.rs; gr… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn test_streaming_bash.*\… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "GroupKill\|pid_alive\|pr… ✓ (24ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "tempfile\|libc" Cargo.tom… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  13 tools completed in 1m 25s (13 ✓)
+
+Group-kill tests live in src/tools_group_kill_tests.rs — the right home for these new tests.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l src/tools_group_kill_tests.r… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 80,146p src/tools_group_kil… ✓ (4ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1175,1200p src/main.rs; gre… ✓ (5ms)
+  ▶ edit src/tools.rs (2 → 21 lines)
+  -         // Wait for the reader to finish consuming remaining buffered output
+  -         let _ = tokio::time::timeout(Duration::from_secs(2), reader_handle).await;
+  +         // Wait for the reader to finish consuming remaining buffered output.
+  +         // On the 2s timeout the reader is ABORTED, not merely dropped (#1049):
+  +         // `bash` has exited, so a reader still waiting means something it
+  +         // backgrounded (`(sleep 30 &)`, `server &`) holds our stdout/stderr
+  +         // pipe open. Dropping the JoinHandle would detach the task, which
+  +         // keeps reading that pipe for as long as the orphan lives, and kept
+  +         // `yoyo -p` from exiting until it did. Aborting drops our read ends,
+  +         // so the orphan's NEXT write to them gets EPIPE/SIGPIPE — the same
+  +         // thing that happens to it when yoyo exits. Output already read is
+  +         // in `accumulated` and is kept; the orphan itself is not killed.
+  +         let mut reader_handle = reader_handle;
+  +         if tokio::time::timeout(Duration::from_secs(2), &mut reader_handle)
+  +             .await
+  +             .is_err()
+  +         {
+  +             reader_handle.abort();
+  +             // Wait for the abort to land so the pipe read ends are closed
+  +             // before the result goes back (abort is cooperative; the reader
+  ... (3 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo build 2>&1 | grep -E "^(erro… ✓ (4m 15s)
+  -         // Wait for the reader to finish consuming remaining buffered output
+  -         let _ = tokio::time::timeout(Duration::from_secs(2), reader_handle).await;
+  +         // Wait for the reader to finish consuming remaining buffered output.
+  +         // On the 2s timeout the reader is ABORTED, not merely dropped (#1049):
+  +         // `bash` has exited, so a reader still waiting means something it
+  +         // backgrounded (`(sleep 30 &)`, `server &`) holds our stdout/stderr
+  +         // pipe open. Dropping the JoinHandle would detach the task, which
+  +         // keeps reading that pipe for as long as the orphan lives, and kept
+  ... (13 more lines)
+ ✓ (4m 15s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 5m 3s (5 ✓)
+
+Fix measured: 34.5s → 6.6s wall, orphan sleep still alive afterwards. Now the tests (in the existing group-kill test file, which is where tools.rs's spawn tests live for the size gate).
+  ╭─ Turn 18 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat >> src/too… (108 lines) ✓ (35.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test --bin yoyo … ✓ (4.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 46.1s (2 ✓)
+
+Green with the fix. Positive control — restore HEAD's line atomically, run, restore:
+  ╭─ Turn 20 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/tools.r… (9 lines) ✓ (39.3s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Positive control reddened exactly the mechanism test; fix restored. Now fmt, clippy, full suite, and the docs check.
+  ╭─ Turn 21 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && git diff --stat && wc…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo clippy --all-tar… ✓ (2.7s)
+ ✓ (21.2s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 178,192p docs/src/troublesh… ✓ (3ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 29.9s (3 ✓)
+
+The docs don't mention this hang, but the fix has one user-visible side effect worth writing down: an unredirected background job dies at its next write. Adding a short note:
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ edit docs/src/troubleshooting/common-issues.md (1 → 7 lines)
+    If a tool execution is hanging, Ctrl+C will abort it.
+  + 
+  + ## Background jobs started by the bash tool
+  + 
+  + When a bash command finishes, yoyo keeps reading its output for up to 2 more seconds, then stops. Anything the command started in the background (`server &`, `(sleep 30 &)`) keeps running, and yoyo does not wait for it. Before this fix, a background job still writing to the tool's output kept `yoyo -p` from exiting until the job ended.
+  + 
+  + If such a job writes to that output after those 2 seconds, the write fails and the job will usually die of `SIGPIPE`. So to keep a server running, send its output somewhere else: `npm run dev >dev.log 2>&1 &`.
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test 2>&1 | grep… ✓ (4ms)
+    If a tool execution is hanging, Ctrl+C will abort it.
+  + 
+  + ## Background jobs started by the bash tool
+  + 
+  + When a bash command finishes, yoyo keeps reading its output for up to 2 more seconds, then stops. Anything the command started in the background (`server &`, `(sleep 30 &)`) keeps running, and yoyo does not wait for it. Before this fix, a background job still writing to the tool's output kept `yoyo -p` from exiting until the job ended.
+  + 
+  + If such a job writes to that output after those 2 seconds, the write fails and the job will usually die of `SIGPIPE`. So to keep a server running, send its output somewhere else: `npm run dev >dev.log 2>&1 &`.
+ ✓ (3m 52s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; timeout 590 cargo test > /tmp/test… ✓ (3m 19s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 7m 19s (3 ✓)
+
+All 20 test binaries pass, and the size gate is green with tools.rs at 5240 lines, so no register edit is needed. One last check: does any doc still claim the old reader behaviour?
+  ╭─ Turn 25 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "reader_handle\|remaining … ✓ (10ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+No doc makes a claim about the reader handle. Before committing with "Fixes", I'll check #1049's body for anything scoped out:
+  ╭─ Turn 26 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1049 --json state,ti… ✓ (277ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "BashTool::default\|BashT… ✓ (13ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1725,1750p src/tools.rs ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue creat… (10 lines) ✓ (942ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add -A && … (45 lines) ✓ (20ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 37.5s (5 ✓)
+
+Fixed and committed as c09255ec. With the reproduction from #1049, yoyo -p now exits in 6.6s instead of 34.5s, and the backgrounded sleep keeps running after it exits. Format, clippy and the full test suite all pass.
+
+The cause was the one #1049 suspected. After bash exited, the tool gave its output reader 2 seconds to finish. When that ran out, the code dropped the reader's handle, which leaves the task running in the background instead of stopping it. That task kept reading the pipe the orphan held open, and -p didn't exit until the orphan did. Now, when the 2 seconds run out, the reader is stopped and its end of the pipe closed before the result goes back, and output already read is kept. The reader only does async reads, so stopping it was enough. I didn't find out why a leftover async task blocked process exit; only this one change sits between the two measurements.
+
+Measured with the real provider (anthropic, claude-opus-5-5) against target/debug/yoyo:
+• Before: 34.5s wall.
+• After: 6.6s wall.
+
+One behaviour change: a background job whose output isn't redirected now dies with SIGPIPE the next time it writes after those 2 seconds. Before, its output went into a buffer nobody read, and -p never exited. Jobs started like server >log 2>&1 & are unaffected. I added a short section about this to docs/src/troubleshooting/common-issues.md.
+
+Tests: five real-spawn tests, in src/tools_group_kill_tests.rs next to the existing process-group tests rather than in tools.rs's own test module:
+• The #1049 command returns hi in under 10s, and the orphan is still alive afterwards.
+• A write from the orphan after the tool returns must fail. As a positive control I put back the old line, and only this test failed; then I restored the fix.
+• Three cases that must not change: a redirected orphan gives exactly the same result, slow output from commands that all exit keeps both lines, and orphan output arriving within the 2 seconds is kept.
+
+tools.rs is now 5240 lines, which the size gate still accepts, so its register entry didn't need editing.
+
+scripts/evolve.sh runs yoyo -p under timeout for every phase, so my own loop is affected; this can only make those runs finish sooner.
+
+Not fixed here: sub-agents use yoagent's own bash tool (src/tools.rs:1744), not this one. From reading yoagent 0.25.7, it waits for both pipes to close before checking whether bash exited. With the same command it would probably wait until its timeout and then kill the orphan. I haven't run it, and I filed it as #1051 with the upstream label.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/tools.rs

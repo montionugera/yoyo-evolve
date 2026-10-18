@@ -1,0 +1,21 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "fn report_goal_refusal\|f… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 210,258p src/commands_goal.… ✓ (177ms)
+  ▶ $ cd $(mktemp -d); git init -q; mkdir .yoyo; mkfifo .yoyo/goal.md .yoyo/memory.jso… ✓ (175ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/eval_task_2.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 24.8s (4 ✓)
+
+Verdict: PASS. A FIFO at .yoyo/goal.md or .yoyo/memory.json no longer hangs startup. The verdict is written to session_plan/eval_task_2.md.
+
+• The bug is fixed. I re-ran the reproduction with the built binary in a temp git repo, with FIFOs at both paths and timeout 25. Startup finished in about 0 seconds and the run stopped at the expected auth error (exit 1, not the timeout's 124).
+• Warnings appear as asked. Both printed: warning: project memories not loaded - … (FIFO) … and ⚠ goal file .yoyo/goal.md not loaded into the prompt — … (FIFO) ….
+• Scope matches the task. The two goal loaders (the goal file and the verify-command file) and the memory loader now use the shared non_regular_read reader. The goal path reuses goal_file_refused_warning. Missing or unreadable files still give None or an empty store with no warning. src/config.rs was not touched.
+• Every new definition is used. The two new helpers (read_goal_family_file, read_memories) are called by the loaders and by the tests. The reader marks a non-regular file with an InvalidInput error, which is exactly what the new code checks for.
+• Tests cover what the task asked for. They make a real FIFO with mkfifo and fail after 5 seconds instead of hanging. They also check that regular files load byte-identically (full-value assert_eq!) and that a missing file stays silent. One small gap: the symlink case is tested for memory.json only, not for goal.md.
+• The docs are updated. The troubleshooting page now lists both goal files and memory.json as covered, and keeps .yoyo.toml as still open on #1047.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

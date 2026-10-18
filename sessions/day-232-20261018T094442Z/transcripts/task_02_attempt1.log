@@ -1,0 +1,79 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh…  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 260,360p src/commands_goal.… ✓ (15ms)
+ ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 185,260p src/commands_goal.… ✓ (8ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "commands_goal\|\"memory\|… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "2000\|2500\|3000\|cap\b\|… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "load_goal_in\|load_goal(… ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 450,475p src/context.rs; gr… ✓ (5ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 46.7s (7 ✓)
+
+Now write the goal changes.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (66 lines) ✓ (24ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "mod tests\|#\[cfg" src/co… ✓ (4ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cat >> src/com… (74 lines) ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (16 lines) ✓ (20ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 33.6s (4 ✓)
+
+Now memory.rs.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (90 lines) ✓ (25ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (15 lines) ✓ (20.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test --bin yoyo non_regular … ✓ (30.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 2s (3 ✓)
+
+Now the positive controls, serially and atomically.
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/command… (10 lines) ✓ (35.7s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/memory.… (10 lines) ✓ (36.3s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 1m 24s (2 ✓)
+
+Controls redden by name, restored with zero markers. Full checks now, then the live reproduction.
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt -- --check && cargo clip… ✓ (4m 23s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&… (2 lines) ✓ (3m 27s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -i "fifo" docs/src/trouble… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (34 lines) ✓ (40ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 8m 27s (4 ✓)
+
+A FIFO at .yoyo/goal.md or .yoyo/memory.json no longer hangs startup. It's committed as 31c0cd46, titled "Part of #1047", because .yoyo.toml is still open.
+
+Re-running the reproduction (temp git repo, timeout 25 yoyo -p "Reply with exactly: PONG" </dev/null):
+• FIFO at .yoyo/goal.md: exit 0 in 2.0s (the assessment saw a hang and exit 124). It prints ⚠ goal file .yoyo/goal.md not loaded into the prompt — ./.yoyo/goal.md is not a regular file (FIFO): ….
+• FIFO at .yoyo/memory.json: exit 0 in 1.7s, with warning: project memories not loaded - … (FIFO) ….
+
+What changed:
+• `src/commands_goal.rs`: load_goal_in and load_verify_command now share one helper, read_goal_family_file, which reads through non_regular_read::read_regular_to_string. If the file is a FIFO, device or socket, it prints a warning and carries on as if the file were absent. For goal.md the warning comes from the existing goal_file_refused_warning; goal_verify.md gets its own "verify command … not loaded" line. A missing, blank or unreadable file behaves exactly as before, with no warning.
+• `src/memory.rs`: load_memories_from goes through the same reader, so a non-regular memory.json gets a warning and an empty store. Missing or unparseable files still give an empty store silently, as before.
+• Docs: the FIFO entry in common-issues.md now lists the goal and memory files as covered; only .yoyo.toml is still named as hanging.
+
+Tests (unix only, using a real mkfifo):
+• The FIFO tests run each loader on a thread with recv_timeout(5s), so a regression fails by name instead of hanging the suite. They cover goal.md, goal_verify.md and memory.json.
+• A regular goal.md and verify file load to exact trimmed values. Regular and symlinked memory.json load identically, compared with assert_eq! on the entries. A missing or blank file gives None or an empty store with no warning.
+• I didn't add a separate goal-symlink test: an existing test fixture already loads a symlinked goal.md and still passes.
+• Positive controls, run one at a time, each as a single break-run-restore command: switching each loader back to plain std::fs::read_to_string (marked NEUTERED) made the two goal FIFO tests and the memory FIFO test time out and fail by name. After restoring, everything passed and no markers were left.
+
+cargo fmt --check, cargo clippy --all-targets -- -D warnings, cargo build and the full cargo test all pass. The commit body notes that .yoyo.toml (src/config.rs) is left on #1047 because of its size-gate headroom, and points to #1050 as the upstream report.
+  watch: no files changed this turn — skipping
