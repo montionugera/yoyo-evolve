@@ -3812,6 +3812,52 @@ fn config_unknown_subcommand_refusal_exits_two() {
 }
 
 #[test]
+fn zero_arg_verbs_refuse_a_stray_argument_with_exit_two() {
+    // #982: `yoyo status zzz` (and version/permissions/security) printed their
+    // normal output and exited 0, so a typo'd or misplaced argument was
+    // silently ignored. `evolution` takes one optional numeric count, so a
+    // non-number is the stray argument there. `memories <query>` is a real
+    // search and is deliberately NOT in this table.
+    let dir = tempfile::tempdir().expect("tempdir");
+    for args in [
+        &["status", "zzz"][..],
+        &["version", "zzz"][..],
+        &["permissions", "zzz"][..],
+        &["security", "zzz"][..],
+        &["evolution", "zzz"][..],
+        &["evolution", "5", "6"][..],
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+        assert!(stdout.is_empty(), "{args:?} printed to stdout: {stdout}");
+        let stray = args.last().unwrap();
+        assert!(
+            stderr.contains(args[0]) && stderr.contains(&format!("'{stray}'")),
+            "{args:?}: stderr must name the verb and the stray arg: {stderr}"
+        );
+    }
+    // Near-misses: bare verbs, and the flags each arm reads, still succeed
+    // and still print their normal output.
+    for args in [
+        &["status"][..],
+        &["version"][..],
+        &["version", "-v", "--provider", "ollama", "--model", "m"][..],
+        &["permissions"][..],
+        &["permissions", "--trust-project", "--yes"][..],
+        &["security"][..],
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(0), "{args:?}: stdout={stdout} stderr={stderr}");
+        assert!(!stdout.is_empty(), "{args:?} printed nothing on stdout");
+    }
+    // A numeric count is still accepted: it gets past the refusal and reaches
+    // evolution's own not-a-git-repo exit (1), not the usage code.
+    let (code, _, stderr) = yoyo_plain_in(dir.path(), &["evolution", "5"]);
+    assert_eq!(code, Some(1), "evolution 5: stderr={stderr}");
+    assert!(!stderr.contains("'5'"), "evolution 5 was refused: {stderr}");
+}
+
+#[test]
 fn unknown_skill_goal_todo_and_bare_ast_exit_two_through_the_binary() {
     // #982: these printed a usage/unknown-subcommand message and exited 0.
     // The status helpers are unit-tested in commands_skill.rs and

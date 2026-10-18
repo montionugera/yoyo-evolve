@@ -408,7 +408,9 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // decision itself lives in setup.rs (`setup_stdin_refusal`), pasted.
     // Day 231 (#982): 2336 -> 2457 (+121): +56 of earlier unrecorded drift, plus the
     // goal/todo/ast unknown-verb exit-2 helpers and their test, pasted.
-    ("src/dispatch_sub.rs", 2457),
+    // Day 232 (#982): 2457 -> 2503 (+46: `positional_after_verb`,
+    // `refuse_stray_arg` and the five arm calls; the test lives in tests/integration.rs), pasted.
+    ("src/dispatch_sub.rs", 2503),
     // Day 209: 3439 -> 3455 (+16, within the drift band, pasted rather than left to absorb).
     // #937 option 1: nine lines of doc above `builtin_model_pricing` naming both ignored
     // audit commands (deliverable 4 — an alarm nobody can find is the #745/#767/#769

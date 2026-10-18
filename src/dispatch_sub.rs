@@ -134,6 +134,37 @@ fn exit_if_nonzero(code: i32) {
     }
 }
 
+/// Positional arguments after a verb (#982): flags, and the value a
+/// value-taking flag consumes (same `FLAGS_NEEDING_VALUES` parse_args uses),
+/// are not positional, so `version -v --model m` has none.
+fn positional_after_verb(rest: &[String]) -> Vec<&String> {
+    let mut skip = false;
+    let mut out = Vec::new();
+    for a in rest {
+        if std::mem::take(&mut skip) {
+            continue;
+        }
+        if a.starts_with('-') {
+            skip = crate::cli::FLAGS_NEEDING_VALUES.contains(&a.as_str());
+        } else {
+            out.push(a);
+        }
+    }
+    out
+}
+
+/// Refuse a stray argument with the usage-error code 2 (#982): `yoyo status
+/// zzz` used to print its normal output and exit 0, ignoring the typo.
+/// Nothing reaches stdout, since the refusal runs before the arm's handler.
+fn refuse_stray_arg(usage: &str, stray: Option<&String>) {
+    if let Some(a) = stray {
+        let a = crate::cli::sanitize_for_display(a);
+        eprintln!("{YELLOW}  unexpected argument '{a}' for `yoyo {usage}`{RESET}");
+        eprintln!("{DIM}  usage: yoyo {usage}{RESET}");
+        exit_if_nonzero(2);
+    }
+}
+
 /// Build a `/command ...` string from shell args by plain space-join — no
 /// re-quoting. For handlers that take the remainder VERBATIM (`/todo add`,
 /// `/goal set`, `/memories <query>`): those never call `tokenize_quoted`, so
@@ -362,6 +393,10 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "version" => {
+                refuse_stray_arg(
+                    "version [-v]",
+                    positional_after_verb(&args[2..]).first().copied(),
+                );
                 let verbose = args.iter().any(|a| a == "-v" || a == "--verbose");
                 if verbose {
                     let (file_config, _) = load_config_file();
@@ -420,6 +455,10 @@ pub(crate) fn try_dispatch_subcommand_in(
                 // non-interactively — but it had no CLI door, so `yoyo security`
                 // reached only the bare-word near-miss guard telling the caller to
                 // start a REPL. It takes no arguments, so nothing is forwarded.
+                refuse_stray_arg(
+                    "security",
+                    positional_after_verb(&args[2..]).first().copied(),
+                );
                 crate::commands_lint::handle_security();
                 return Some(None);
             }
@@ -623,6 +662,7 @@ pub(crate) fn try_dispatch_subcommand_in(
             "status" => {
                 // Bare subcommand: no active session, so show what we can
                 // without agent state (version, git branch, cwd).
+                refuse_stray_arg("status", positional_after_verb(&args[2..]).first().copied());
                 let cwd = std::env::current_dir()
                     .map_or_else(|_| "?".into(), |p| p.display().to_string());
                 println!("{DIM}  yoyo v{VERSION}");
@@ -651,6 +691,10 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "evolution" => {
+                // One optional numeric count; a non-number or a second one is stray.
+                let pos = positional_after_verb(&args[2..]);
+                let numeric = pos.first().is_some_and(|a| a.parse::<usize>().is_ok());
+                refuse_stray_arg("evolution [N]", pos.get(usize::from(numeric)).copied());
                 let input = quote_args_as_command(args);
                 exit_if_nonzero(crate::commands_info::handle_evolution_status(&input));
                 return Some(None);
@@ -685,6 +729,8 @@ pub(crate) fn try_dispatch_subcommand_in(
             "permissions" => {
                 // Load permission config from config file (same as parse_args does)
                 // so the user can inspect their effective permissions from the shell.
+                let stray = positional_after_verb(&args[2..]).first().copied();
+                refuse_stray_arg("permissions [--trust-project] [--yes]", stray);
                 let (_, raw_config) = load_config_file();
                 let raw_permissions = crate::config::parse_permissions_from_config(&raw_config);
                 // #749 item 3: route through the same gate parse_args uses, so
