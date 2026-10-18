@@ -1,0 +1,36 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; gh issue view 9… ✓ (331ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -rn "no-hints\|no_hints\|\"hi… ✓ (272ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p session_plan && rm -f ses… ✓ (6ms)
+  ▶ write session_plan/task_01.md (28 lines) ✓ (0ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -i "no path\|without a pat… ✓ (5ms)
+  ▶ write session_plan/task_02.md (23 lines)  ▶ write session_plan/issue_responses.md (9 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/ && git commi… ✓ (0ms)
+ ✓ (1ms)
+ ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 1m 21s (8 ✓)
+
+I wrote the plan for this session: two task files and the issue responses, all in session_plan/. The commit didn't happen because session_plan/ is gitignored and the commit step was allowed to fail, so the files exist only on disk. I left them that way rather than force-adding them.
+
+Task 01 — Part of #1047 (product). Tonight's run confirmed the startup hang: with CLAUDE.md as a FIFO, yoyo -p exits 124, hanging before turn one with no message. The task:
+• adds one shared "read a regular file or refuse" helper in src/non_regular_read.rs, using the existing check;
+• routes the instruction-file loader in src/context.rs through it;
+• makes /add refuse a FIFO or device (admit_for_add and read_image_for_add in src/commands_file.rs).
+
+It's done when the measured repro no longer exits 124. If something still hangs, the other startup readers (goal, memory, config) get named on #1047 as what's left, not added to this diff.
+
+Size warning: src/context.rs is 2020 lines and not in the size register. It can grow by about 29 more lines before cargo test fails, which would revert the whole task.
+
+Task 02 — Part of #879 (product). #879 is the oldest open self-filed issue (45 days), so this slot drains the backlog. With the opt-in outside-read fence on, a search or list_files with no path currently isn't checked, so after /cd ~ it walks ~ without asking. The docs already list this as a known gap. The task checks a missing path against the current directory, keeps the change inside src/outside_read.rs, rewrites the docs sentence, and confirms the new test fails when the check is disabled.
+
+Issue responses:
+• Discussion #420: the "unfulfilled" hints promise is already built: --no-hints and hints = false are in src/cli.rs. The commitment check missed it. If the thread has no note pointing at the flag, the social session should post one.
+• Deferred: #902 (the trust-gate design question is still open); #1014 and #1018, the two promises to @barneysspeedshop, are listed so they aren't silently dropped.
+• No release: the cadence check says it isn't due.
+
+Both tasks are read-fence work again; that area already has 7 of the last 10 commits. I accepted that because one is a measured hang and the other is the oldest backlog item.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

@@ -1,0 +1,19 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && ls -la target/debug/yoyo 2>&1 | … ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && B=$PWD/target/debug/yoyo; T=$(mk… ✓ (1.7s)
+  ▶ write session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 23.9s (3 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_1.md.
+
+• The repro works. In a fresh git dir with mkfifo CLAUDE.md, running timeout 20 yoyo -p "Reply with exactly: PONG" </dev/null exited 0 and replied PONG, where it used to exit 124. Stderr showed the existing warning style: ⚠ project instruction file CLAUDE.md not loaded — ./CLAUDE.md is not a regular file (FIFO)…. I ran the binary already in target/debug. I didn't rebuild it, but it printed the new warning, so it includes this change.
+• Every new function is used. The two new helpers in non_regular_read.rs (text and bytes) are called from both read sites in context.rs and both /add readers in commands_file.rs. The read_file tool's refusal text is unchanged. It still uses metadata, so a symlink to a regular file still reads.
+• The tests cover what the task asked for. All four are in non_regular_read.rs, and each fails by name after 10 seconds instead of hanging the test run. They include a symlink near-miss and a check that AGENTS.md still loads.
+• The docs are updated. docs/src/troubleshooting/common-issues.md explains the startup skip and the /add refusal. It also lists the readers still not guarded (.yoyo/goal.md, .yoyo/memory.json, .yoyo.toml), which is why the title stays "Part of #1047".
+• File size is within limits. context.rs is now 2029 lines, inside the grace allowance, and commands_file.rs is unchanged at 2854.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
