@@ -186,6 +186,12 @@ You used `/diff` or `/undo` outside a git repo.
 
 If a tool execution is hanging, Ctrl+C will abort it.
 
+## Background jobs started by the bash tool
+
+When a bash command finishes, yoyo keeps reading its output for up to 2 more seconds, then stops. Anything the command started in the background (`server &`, `(sleep 30 &)`) keeps running, and yoyo does not wait for it. Before this fix, a background job still writing to the tool's output kept `yoyo -p` from exiting until the job ended.
+
+If such a job writes to that output after those 2 seconds, the write fails and the job will usually die of `SIGPIPE`. So to keep a server running, send its output somewhere else: `npm run dev >dev.log 2>&1 &`.
+
 ## Session file errors
 
 ```

@@ -597,8 +597,27 @@ impl AgentTool for StreamingBashTool {
             }
         };
 
-        // Wait for the reader to finish consuming remaining buffered output
-        let _ = tokio::time::timeout(Duration::from_secs(2), reader_handle).await;
+        // Wait for the reader to finish consuming remaining buffered output.
+        // On the 2s timeout the reader is ABORTED, not merely dropped (#1049):
+        // `bash` has exited, so a reader still waiting means something it
+        // backgrounded (`(sleep 30 &)`, `server &`) holds our stdout/stderr
+        // pipe open. Dropping the JoinHandle would detach the task, which
+        // keeps reading that pipe for as long as the orphan lives, and kept
+        // `yoyo -p` from exiting until it did. Aborting drops our read ends,
+        // so the orphan's NEXT write to them gets EPIPE/SIGPIPE — the same
+        // thing that happens to it when yoyo exits. Output already read is
+        // in `accumulated` and is kept; the orphan itself is not killed.
+        let mut reader_handle = reader_handle;
+        if tokio::time::timeout(Duration::from_secs(2), &mut reader_handle)
+            .await
+            .is_err()
+        {
+            reader_handle.abort();
+            // Wait for the abort to land so the pipe read ends are closed
+            // before the result goes back (abort is cooperative; the reader
+            // only awaits async pipe reads, so this returns at once).
+            let _ = reader_handle.await;
+        }
 
         // One statement of the decode/render rule, shared with `/run` and `/bg`
         // (#878) — this used to be an inline copy here and a bare

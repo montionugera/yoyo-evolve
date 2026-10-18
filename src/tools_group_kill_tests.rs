@@ -144,3 +144,108 @@ async fn test_streaming_bash_stdin_is_null_so_readers_get_eof() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// #1049: a backgrounded grandchild that keeps the output pipe open must not
+// keep the tool (or `yoyo -p`) waiting on it once `bash` has exited.
+// ---------------------------------------------------------------------------
+
+fn text_of(result: &yoagent::types::ToolResult) -> &str {
+    match &result.content[0] {
+        yoagent::types::Content::Text { text } => text,
+        _ => panic!("Expected text content"),
+    }
+}
+
+/// The #1049 shape: `(sleep &) ; echo hi`. The tool returns promptly with
+/// `hi`, and the deliberately backgrounded job is NOT killed (disarm rule).
+#[tokio::test]
+async fn test_streaming_bash_pipe_holding_orphan_returns_promptly_and_survives() {
+    let needle = "sleep 20.4104";
+    let tool = StreamingBashTool::default();
+    let params = serde_json::json!({ "command": format!("({needle} &) ; echo hi") });
+    let started = std::time::Instant::now();
+    let result = tool.execute(params, ctx()).await;
+    let elapsed = started.elapsed();
+    let alive = std::process::Command::new("pgrep")
+        .arg("-f")
+        .arg(needle)
+        .output()
+        .expect("pgrep runs");
+    reap(needle);
+    let result = result.unwrap();
+    assert_eq!(text_of(&result), "Exit code: 0\nhi");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "tool waited {elapsed:?} on an orphan holding its pipe"
+    );
+    assert!(
+        !alive.stdout.is_empty(),
+        "a job the command deliberately backgrounded must not be killed"
+    );
+}
+
+/// The mechanism #1049 turned on: after the 2s grace, the reader must let go
+/// of the pipe rather than be detached and keep reading it for as long as the
+/// orphan lives. Probe: the orphan writes AFTER the tool returned. With our
+/// read end closed, that write fails (EPIPE/SIGPIPE) and the marker is never
+/// touched; with a detached reader still draining, it succeeds.
+#[tokio::test]
+async fn test_streaming_bash_releases_pipe_after_grace_so_late_writes_fail() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let marker = dir.path().join("late-write-succeeded");
+    let tool = StreamingBashTool::default();
+    let params = serde_json::json!({
+        "command": format!(
+            "(sleep 4.4105; echo late && touch '{}') & echo hi",
+            marker.display()
+        )
+    });
+    let result = tool.execute(params, ctx()).await.unwrap();
+    assert_eq!(text_of(&result), "Exit code: 0\nhi");
+    // The orphan writes ~4s after start; the tool returned at ~2s.
+    tokio::time::sleep(Duration::from_millis(3500)).await;
+    reap("sleep 4.4105");
+    assert!(
+        !marker.exists(),
+        "the orphan's write after the tool returned succeeded: a detached \
+         reader is still holding the pipe (#1049)"
+    );
+}
+
+/// Near-miss: an orphan with its output redirected never held the pipe, so
+/// it returned promptly before the fix too. Pinned byte-for-byte.
+#[tokio::test]
+async fn test_streaming_bash_redirected_orphan_returns_promptly() {
+    let needle = "sleep 20.4106";
+    let tool = StreamingBashTool::default();
+    let params = serde_json::json!({
+        "command": format!("({needle} >/dev/null 2>&1 &) ; echo hi")
+    });
+    let started = std::time::Instant::now();
+    let result = tool.execute(params, ctx()).await;
+    let elapsed = started.elapsed();
+    reap(needle);
+    assert_eq!(text_of(&result.unwrap()), "Exit code: 0\nhi");
+    assert!(elapsed < Duration::from_secs(10), "took {elapsed:?}");
+}
+
+/// Near-miss: output that arrives slowly, from a tree that all exits, is
+/// never cut — the abort only fires on the post-exit grace timeout.
+#[tokio::test]
+async fn test_streaming_bash_slow_output_before_exit_is_kept() {
+    let tool = StreamingBashTool::default();
+    let params = serde_json::json!({ "command": "echo a; sleep 1; echo b" });
+    let result = tool.execute(params, ctx()).await.unwrap();
+    assert_eq!(text_of(&result), "Exit code: 0\na\nb");
+}
+
+/// Near-miss: an orphan's output that lands INSIDE the 2s post-exit grace is
+/// still read and kept; only what would arrive after the grace is dropped.
+#[tokio::test]
+async fn test_streaming_bash_orphan_output_within_grace_is_kept() {
+    let tool = StreamingBashTool::default();
+    let params = serde_json::json!({ "command": "(sleep 0.5; echo late) & echo hi" });
+    let result = tool.execute(params, ctx()).await.unwrap();
+    assert_eq!(text_of(&result), "Exit code: 0\nhi\nlate");
+}
