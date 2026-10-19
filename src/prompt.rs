@@ -24,6 +24,7 @@ mod stream_external_servers;
 mod stream_session_restored;
 pub(crate) use stream_session_restored::record_session_restored;
 mod turn_prefix;
+mod write_preview;
 use retry_after_partial::{retry_blocked_by_streamed_partial, RETRY_SKIPPED_AFTER_PARTIAL_NOTE};
 pub(crate) use turn_prefix::{
     apply_effort_hint, apply_external_failure_note_with, prepend_external_failure_block_with,
@@ -629,14 +630,13 @@ impl PromptEventState {
             // Show diff when overwriting an existing file
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
             let new_content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-            if !path.is_empty() && std::path::Path::new(path).exists() {
-                if let Ok(old_content) = std::fs::read_to_string(path) {
-                    let diff = format_edit_diff(&old_content, new_content);
-                    if !diff.is_empty() {
-                        let diff = truncate_diff_preview(&diff, 30);
-                        write_chrome("\n");
-                        write_chrome(&format!("{diff}\n"));
-                    }
+            // Never opens a FIFO/device: no preview for those (#1052 item 3).
+            if let Some(old_content) = write_preview::preview_old_content(path) {
+                let diff = format_edit_diff(&old_content, new_content);
+                if !diff.is_empty() {
+                    let diff = truncate_diff_preview(&diff, 30);
+                    write_chrome("\n");
+                    write_chrome(&format!("{diff}\n"));
                 }
             }
         }
