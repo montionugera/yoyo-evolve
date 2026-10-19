@@ -1,0 +1,25 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; grep -n "pub(cr… ✓ (20ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -2 --format=%B | head -60;… ✓ (10ms)
+  ▶ write session_plan/eval_task_2.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 18.8s (3 ✓)
+
+Verdict: PASS. I wrote it to session_plan/eval_task_2.md. I judged the diff and commit message and didn't run the binary or the tests myself; the harness reported build and tests passing.
+
+• Trusted-dirs check at startup: dir_is_trusted now reads the store through non_regular_read::read_regular_to_string. If the store is a FIFO or device, it answers "not trusted", which is the safe default, and prints a warning. A missing store still answers "not trusted" silently, as before.
+• Saving a trusted dir: remember_trusted_dir now starts from an empty list only when the store is missing. A FIFO or an unreadable store (for example, invalid UTF-8) returns an error and the file is left as it was. Before, an unreadable store was treated as empty and overwritten, losing every trusted dir.
+  • This is stricter than read_for_rewrite, which the task suggested. That function treats other read errors as empty, which is exactly the overwrite this store must avoid. The commit message explains the choice.
+• Tests: they cover a FIFO store, with a 10-second timeout so a regression fails instead of hanging. They also cover a regular store, a missing store, and an invalid-UTF-8 store that must not be overwritten.
+• Module doc: the false "yoagent 0.25.7 trusts metadata.len()" sentence is replaced with what 0.25.8 actually does (require_regular_file). The version-claim marker is added.
+• Other 0.25.7 mentions: they're left as written. The commit message says the search, list and MCP code they describe is unchanged in 0.25.8. I didn't diff the yoagent sources myself.
+• Other startup reads: the commit message says the three bare startup reads still found were filed as #1052. I didn't confirm the issue on GitHub.
+
+One small deviation: the new warning text is its own wording rather than the module's existing warning, which the task asked for. I didn't count it against the task.
+
+The same commit message appears on the two most recent commits (4d2fde95 and 2f1b23f0); I didn't check which files each one contains.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

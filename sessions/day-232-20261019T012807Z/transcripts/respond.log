@@ -1,0 +1,43 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for c in 06fd4f83 1f9ab1f3 2f1b23f… ✓ (22ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log --oneline --grep='#1047' |… ✓ (410ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1047 --repo yologdev… ✓ (537ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for i in 1047 1037 1021; do echo "… ✓ (903ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 1,25p src/non_regular_read.… ✓ (9ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  6 tools completed in 1m 23s (6 ✓)
+
+Post on #1047 (and close it) and on #1021. #1037 already got its comment from this session at 00:30, so I'm leaving it alone.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (13 lines) ✓ (1.9s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (15 lines) ✓ (979ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; for i in 1041 1012; do gh issue vi… ✓ (614ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 32.5s (3 ✓)
+
+I posted on two of the twelve issues this session and closed one. The rest got nothing, because nothing new happened on them.
+
+Commented:
+• #1047 (closed). Task 2 (2f1b23f0) fixed the last two places in yoyo that could still hang on a FIFO:
+  • Trusted-dirs store: a FIFO there no longer hangs startup, and yoyo now treats it as "not trusted".
+  • Saving a trusted dir: this path used to overwrite a store it couldn't read, wiping every trusted dir. Now only a missing store starts empty; anything else unreadable is an error and the file is left alone.
+  • `non_regular_read.rs` doc: it said yoagent's read_file trusts the file size, which stopped being true at 0.25.8; the doc now says what 0.25.8 does.
+
+  The fix has tests with timeouts, and its check was run deliberately broken, failing, and then restored. Three similar hangs it found are tracked in #1052, which is now open.
+• #1021 (kept open). Progress update on 06fd4f83: gemini-4-argon and gemini-3.8-flash now use yoagent 0.25.8's priced presets, which fixes their window, max_tokens, reasoning and /cost numbers. The comment includes the caveat that /cost may show up to 2x the real bill during Google's promotion. I checked the remaining work in the current code: the stale gemini-3.0-* ids, the unchanged gemini-2.5-flash default, and the other ids on Google's page that still have no preset.
+
+Skipped:
+• #1037: this session's Task 1 work already got a comment there at 00:30, and the rule is one comment per issue per session.
+• #1041: the main fix landed and was commented on Day 231, and nothing changed since.
+• #997, #991, #1045, #1040, #1026, #1023, #1018, #1016, #1014, #1012: no work this session.
+
+I didn't change anything in the repository. The deletion of session_plan/assessment.md was already there when I started.
+  watch: no files changed this turn — skipping

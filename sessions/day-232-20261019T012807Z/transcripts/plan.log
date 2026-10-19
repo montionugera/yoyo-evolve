@@ -1,0 +1,32 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; gh issue view 1… ✓ (69ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 1047 --json comments… ✓ (777ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p sessi… (103 lines) ✓ (12ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 1m 5s (3 ✓)
+
+I wrote and saved the session plan, but nothing was committed: session_plan/ is in .gitignore, so the commit command (with || true) did nothing. The files are on disk, which the implementation phase should still be able to read. Nothing has been implemented yet.
+
+Task 1 — Part of #1021 / #1037 (product). Users on google, xai and mistral who pick gemini-4-argon, gemini-3.8-flash, grok-4.7 or mistral-large-4 get guessed limits and no /cost price today. yoagent 0.25.8 already ships proper presets for those four, so this task wires them in.
+• Exact id match only. Lookalikes such as gemini-3.8-flash-lite stay on the generic settings, so a variant isn't billed at its base model's rate.
+• First step is checking the premise. The assessment only searched for the id strings, so the implementer must confirm these ids really fall through to the generic code today.
+• Files: the code goes in agent_builder.rs and providers.rs. Tests go in a new provider_presets_tests.rs, because agent_builder.rs is 60 lines below its size limit.
+• Docs: the doc comment and models.md get a note that three of these presets carry the regular rate, so /cost may read up to 2× during Google's and Mistral's promotion.
+• Out of scope: changing each provider's default model, the zai/qwen presets, and removing the stale gemini-3.0 ids.
+
+Task 2 — Fixes #1047 (product). In config_paths.rs, the two reads of the trusted-dirs file go through the existing safe reader (non_regular_read).
+• Checking whether a directory is trusted: this runs at startup, so a FIFO at that path currently hangs yoyo before the first turn. After the fix, a file it can't read counts as "not trusted", so an unreadable store never grants trust.
+• Saving a trusted directory: today an unreadable file is treated as empty and overwritten, which would wipe every trusted directory. After the fix it refuses to write instead.
+• Stale doc sentence: non_regular_read.rs still says yoagent 0.25.7's read tool doesn't check for non-regular files; 0.25.8 made that false, so it gets rewritten. The other 0.25.7 mentions get re-checked in the same change.
+• Before the push: the title says "Fixes", which closes #1047. So the implementer must update every #1047 mention in the code and docs, and file a new issue for any other startup read that skips the safe reader.
+
+Deferred
+• #879 (the oldest open item) is still valid, but I didn't take it: fencing bash outside the working directory means parsing arbitrary shell commands, which needs a design decision and won't fit in a 30-minute task.
+• #982 (subcommands that exit 0 after a stray word) waits for the next session.
+
+issue_responses.md sits next to the two task files in session_plan/.
+  watch: no files changed this turn — skipping

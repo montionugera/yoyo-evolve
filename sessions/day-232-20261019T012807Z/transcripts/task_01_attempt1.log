@@ -1,0 +1,145 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (15ms)
+  ▶ $ sed -n 785,1060p src/agent_builder.rs; grep -n "preset_tests" src/agent_builder.…  ▶ $ Y=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.8); grep -n "pub fn gemini_4_argo… ✓ (8ms)
+ ✓ (8ms)
+  ▶ $ Y=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.8); sed -n 1774,1815p $Y/src/prov… ✓ (18ms)
+  ▶ $ sed -n 40,400p src/openai_preset_tests.rs; grep -rn "openai_preset\|anthropic_pr… ✓ (18ms)
+  ▶ $ Y=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.8); sed -n 2329,2350p $Y/src/prov… ✓ (9ms)
+  ▶ $ sed -n 85,115p src/format/cost.rs; sed -n 365,385p src/format/cost.rs; sed -n 72… ✓ (10ms)
+  ▶ $ sed -n 940,976p src/agent_builder.rs; grep -n "OPENAI_BASE_FALLBACK_PROVIDERS" -… ✓ (8ms)
+  ▶ $ Y=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.8); sed -n 1715,1736p $Y/src/prov… ✓ (10ms)
+  ▶ $ Y=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.8); awk 'NR>=1722 && NR<=1792' $Y… ✓ (11ms)
+  ▶ $ Y=$(ls -d ~/.cargo/registry/src/*/yoagent-0.25.8); python3 -… (4 lines) ✓ (22ms)
+  ▶ $ cat > /tmp/probe.rs <<'EOF' (12 lines) ✓ (30.9s)
+  ▶ $ cargo test --bin yoyo step0_probe_today -- --nocapture 2>&1 | grep PROBE | cat -… ✓ (149ms)
+  ▶ $ sed -n 2p /tmp/p.txt; echo ---; sed -n 3p /tmp/p.txt  ▶ $ sed -n 4p /tmp/p.txt; echo ===; sed -n 5p /tmp/p.txt; echo ===; sed -n 6p /tmp/p… ✓ (4ms)
+ ✓ (5ms)
+  ▶ $ python3 - <<'EOF' (5 lines) ✓ (21ms)
+  ▶ write src/provider_presets_tests.rs (223 lines) ✓ (16.5s)
+  ▶ $ sed -n 8,12p src/openai_preset_tests.rs | cat -A | cut -c1-150 ✓ (4ms)
+  ▶ $ sed -n 13,17p src/openai_preset_tests.rs | cat -A | cut -c1-150 ✓ (4ms)
+  ▶ $ sed -n 14p src/openai_preset_tests.rs; sed -n 15p src/openai_preset_tests.rs; se… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  20 tools completed in 3m 11s (20 ✓)
+
+Imports match. Now the production side in agent_builder.rs.
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ edit src/agent_builder.rs (1 → 36 lines)
+  + /// yoagent 0.25.8 presets for Google, xAI and Mistral ids (#1021, #1037), by
+  + /// EXACT `(provider, id)` match: `gemini-3.8-flash-lite` must not get Flash's
+  + /// price (#1003), and a `grok-4.7` on OpenRouter is not xAI's endpoint.
+  + /// Argon, 3.8 Flash and Mistral Large 4 are priced at the REGULAR rate, so
+  + /// `/cost` may read up to 2x the bill while a vendor promotion runs.
+  + pub fn vendor_preset(provider: &str, model: &str) -> Option<ModelConfig> {
+  +     ensure_bundled_prices();
+  +     match (provider, model) {
+  +         ("google", "gemini-4-argon") => Some(ModelConfig::gemini_4_argon()),
+  +         ("google", "gemini-3.8-flash") => Some(ModelConfig::gemini_3_8_flash()),
+  +         ("xai", "grok-4.7") => Some(ModelConfig::grok_4_7()),
+  +         ("mistral", "mistral-large-4") => Some(ModelConfig::mistral_large_4()),
+  +         _ => None,
+  +     }
+  + }
+  + 
+  + /// [`vendor_preset`] for the id-only readers (`/cost`, `/model` info window):
+  + /// these four ids are unique to their vendor.
+  + pub(crate) fn vendor_preset_by_id(model: &str) -> Option<ModelConfig> {
+  +     ["google", "xai", "mistral"]
+  ... (16 more lines)
+  ▶ $ python3 - <<'EOF' (52 lines) ✓ (3m 2s)
+  + /// yoagent 0.25.8 presets for Google, xAI and Mistral ids (#1021, #1037), by
+  + /// EXACT `(provider, id)` match: `gemini-3.8-flash-lite` must not get Flash's
+  + /// price (#1003), and a `grok-4.7` on OpenRouter is not xAI's endpoint.
+  + /// Argon, 3.8 Flash and Mistral Large 4 are priced at the REGULAR rate, so
+  + /// `/cost` may read up to 2x the bill while a vendor promotion runs.
+  + pub fn vendor_preset(provider: &str, model: &str) -> Option<ModelConfig> {
+  +     ensure_bundled_prices();
+  +     match (provider, model) {
+  ... (13 more lines)
+ ✗ (3m 2s)
+    │ Command timed out after 120s
+  ▶ $ git diff --stat; cargo clippy --all-targets -- -D warnings 2>&1 | tail -20 ✓ (19.5s)
+  ▶ $ cargo test --bin yoyo provider_presets_tests 2>&1 | tail -25 ✓ (152ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ python3 - <<'EOF' (30 lines) ✓ (33.3s)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 4m 12s (4 ✓, 1 ✗)
+
+Positive control, atomic mutate→run→restore:
+  ╭─ Turn 23 ────────────────────────────────────────────────────────────╮
+  ▶ $ cp src/agent_builder.rs /tmp/ab.bak; python3 - <<'EOF' (6 lines) ✓ (31.6s)
+
+Control reddens 5 tests on grok alone, restored (0 markers). Now docs, then full suite.
+  ╭─ Turn 24 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n -i "preset\|gemini\|grok\|mistral" docs/src/configuration/models.md | he… ✓ (3ms)
+  ▶ $ sed -n 108,116p docs/src/configuration/models.md ✓ (3ms)
+  ▶ edit docs/src/configuration/models.md (1 → 11 lines)
+    price, not `gpt-6-sol`'s). Other ids keep the generic OpenAI defaults.
+  + 
+  + The same holds for four more exact ids on their own provider: `gemini-4-argon` and `gemini-3.8-flash`
+  + (`google`: 1,048,576-token window, 65,536 `max_tokens`, which is also the declared output maximum),
+  + `grok-4.7` (`xai`: 500,000-token window, 64K default `max_tokens`, and the whole-request rate at
+  + 200K prompt tokens and above) and `mistral-large-4` (`mistral`: 1,000,000-token window, 32K default
+  + `max_tokens`). xAI and Mistral publish no output maximum, so yoyo does not warn about a higher
+  + `max_tokens` there. Gemini 4 Argon, Gemini 3.8 Flash and Mistral Large 4 are priced at the vendor's
+  + **regular** rate, so while an introductory or launch price is running `/cost` can read up to twice
+  + the actual bill. Near-miss ids (`gemini-3.8-flash-lite`, `grok-4.7-mini`, `mistral-large-latest`)
+  + keep the generic defaults.
+  ▶ $ cargo fmt && cargo clippy --all-targets -- -D warnings 2>&1 | tail -3 && cargo t… ✓ (1ms)
+    price, not `gpt-6-sol`'s). Other ids keep the generic OpenAI defaults.
+  + 
+  + The same holds for four more exact ids on their own provider: `gemini-4-argon` and `gemini-3.8-flash`
+  + (`google`: 1,048,576-token window, 65,536 `max_tokens`, which is also the declared output maximum),
+  + `grok-4.7` (`xai`: 500,000-token window, 64K default `max_tokens`, and the whole-request rate at
+  + 200K prompt tokens and above) and `mistral-large-4` (`mistral`: 1,000,000-token window, 32K default
+  + `max_tokens`). xAI and Mistral publish no output maximum, so yoyo does not warn about a higher
+  + `max_tokens` there. Gemini 4 Argon, Gemini 3.8 Flash and Mistral Large 4 are priced at the vendor's
+  ... (3 more lines)
+ ✓ (4m 25s)
+  ▶ $ cargo test 2>&1 | grep -E "test result" | grep -v " 0 failed" ; wc -l src/agent_… ✓ (3m 17s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 8m 9s (5 ✓)
+
+All green. agent_builder.rs is at 4949 lines (cap 4969). Committing:
+  ╭─ Turn 28 ────────────────────────────────────────────────────────────╮
+  ▶ $ cat > /tmp/msg.txt <<'EOF' (40 lines) ✓ (27ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the state comment on #1037, as the task asks ("Part of" carries no state):
+  ╭─ Turn 29 ────────────────────────────────────────────────────────────╮
+  ▶ $ gh issue view 1037 --json state,title 2>&1 | head -3; gh iss… (9 lines) ✓ (1.3s)
+
+I routed the four model ids to yoagent 0.25.8's presets and committed it as 06fd4f83. Clippy and the full cargo test run (size gate included) pass.
+
+What each id got before the change (measured with a throwaway probe that I then replaced with the real tests):
+• `google/gemini-4-argon`, `gemini-3.8-flash`: a 1M window, max_tokens capped at 8192, and reasoning off. /cost had no entry for Argon. For Flash it matched the generic "gemini-3" estimate of $0.15/$0.60 instead of the real $1.50/$7.50.
+• `xai/grok-4.7`, `mistral/mistral-large-4`: both were built from the generic OpenAI config, so they got a guessed 128K window, max_tokens 4096, and no price. /cost billed grok-4.7 at grok-4's $3/$15; the real price is $2/$6.
+
+None of the four was already routed to a preset, so all four stayed in the task.
+
+What changed:
+• `vendor_preset(provider, id)`: a new helper in src/agent_builder.rs that matches the exact provider and id. It copies the preset's window, max_tokens, price and reasoning setting onto the provider's existing config, so base URL, compat and headers stay as they were. This follows the existing OpenAI preset pattern, and production code grew by 40 lines (4949, cap 4969).
+• Places that now read the preset: /cost (including grok-4.7's higher rate for prompts of 200K tokens and up), the /model context-window figure, the known-model lists, and the "guessed limits" warning. The output-limit warning applies only to Google, which publishes 65,536 as the real maximum. xAI and Mistral publish no maximum, so their max_tokens is treated as a default and no warning is given.
+• Docs: docs/src/configuration/models.md and the helper's doc comment say that Argon, 3.8 Flash and Mistral Large 4 are priced at the regular rate, so /cost can show up to twice the actual bill while the vendors' launch or introductory pricing runs.
+
+Tests: 9 new tests in src/provider_presets_tests.rs, declared in main.rs like the other preset test files. Every expected value is read from yoagent's own constructor rather than typed in. Near misses like gemini-3.8-flash-lite, grok-4.7-mini and mistral-large-latest keep their old values, and the same ids on another provider don't get the preset. As a check, I broke the grok-4.7 match on purpose: 5 of the 9 tests failed, and I restored it in the same command.
+
+The commit is local; this session's push is what puts it on main. I've already posted a comment on #1037 naming the four ids and the sha, since a "Part of" commit doesn't update the issue on its own.
+
+Still open on #1021/#1037: default models for google, xai and mistral; presets for zai glm-5.3 and qwen3.8; and the stale gemini-3.0 ids in commands.rs and commands_info.rs.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 1/2 changed files were in top-10 predictions (50.0% accuracy)
+     Predicted correctly: src/agent_builder.rs
+     Surprises (not predicted): src/provider_presets_tests.rs
