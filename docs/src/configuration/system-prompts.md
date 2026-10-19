@@ -67,7 +67,7 @@ To see the full system prompt (including project context, repo map, skills, and 
 yoyo --print-system-prompt
 ```
 
-This prints the complete prompt to stdout and exits — useful for debugging or understanding exactly what context the model receives. It works with other flags:
+This prints the complete prompt to stdout and exits — useful for debugging or understanding exactly what context the model receives. It never calls a model, so it works without an API key. It works with other flags:
 
 ```bash
 # See what the prompt looks like with a custom system prompt

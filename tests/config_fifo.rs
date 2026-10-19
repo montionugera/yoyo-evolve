@@ -32,14 +32,23 @@ fn run_yoyo(args: &[&str], cwd: &Path, home: &Path) -> Output {
 
 /// [`run_yoyo`] with extra environment variables (same deadline).
 fn run_yoyo_env(args: &[&str], cwd: &Path, home: &Path, env: &[(&str, &str)]) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_yoyo"))
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_yoyo"));
+    // Strip every inherited provider key so results do not depend on the
+    // runner (the evolve runner exports keys, GitHub CI exports none). The
+    // explicit `env` is applied AFTER, so tests that need a key still get it.
+    for (name, _) in std::env::vars() {
+        if name == "API_KEY" || name.ends_with("_API_KEY") {
+            cmd.env_remove(name);
+        }
+    }
+    let mut child = cmd
         .args(args)
-        .envs(env.iter().copied())
         .current_dir(cwd)
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", home.join(".config"))
         .env_remove("MODEL")
         .env_remove("YOYO_MODEL")
+        .envs(env.iter().copied())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -291,4 +300,31 @@ fn missing_continue_session_file_still_reports_no_session() {
         "stderr={stderr:?}"
     );
     assert!(!stderr.contains("not a regular file"), "stderr={stderr:?}");
+}
+
+/// `--print-system-prompt` never calls a model, so it must not demand an API
+/// key: with no key anywhere it prints the prompt and exits 0. (CI has no
+/// keys; this is the case that turned main red after d0a30f13.)
+#[test]
+fn print_system_prompt_needs_no_api_key() {
+    let proj = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let out = run_yoyo(&["--print-system-prompt"], proj.path(), home.path());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!stderr.contains("No API key found"), "stderr={stderr:?}");
+    assert_eq!(out.status.code(), Some(0), "stderr={stderr:?}");
+    assert!(!stdout.trim().is_empty(), "empty system prompt on stdout");
+}
+
+/// Near-miss: the carve-out is scoped to the diagnostic flag. A real prompt
+/// with no key still refuses exactly as before.
+#[test]
+fn prompt_mode_without_key_still_refuses() {
+    let proj = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let out = run_yoyo(&["-p", "hi"], proj.path(), home.path());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_ne!(out.status.code(), Some(0), "stderr={stderr:?}");
+    assert!(stderr.contains("No API key found"), "stderr={stderr:?}");
 }

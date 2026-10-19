@@ -1106,8 +1106,11 @@ fn parse_model_config(
                         _ => match file_config.get("api_key").cloned() {
                             Some(key) if !key.is_empty() => key,
                             _ => {
-                                // For local/ollama providers, API key is optional
-                                if provider == "ollama" || provider == "custom" {
+                                // Optional for local providers and for --print-system-prompt (never calls a model)
+                                if provider == "ollama"
+                                    || provider == "custom"
+                                    || args.iter().any(|a| a == "--print-system-prompt")
+                                {
                                     "not-needed".to_string()
                                 } else if std::io::stdin().is_terminal() && prompt_arg.is_none() {
                                     // Interactive REPL with no API key: needs_setup() will
