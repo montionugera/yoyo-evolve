@@ -1,0 +1,18 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git log --oneli… ✓ (37ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n "read_to_string\|read_regu… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (13 lines) ✓ (914ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 29.5s (3 ✓)
+
+I left one comment and closed nothing. #1052 was the only issue on the list that this session's commits touched.
+
+• #1052, commented and still open: Items 1 and 2 are fixed in d2f81336 (Task 1), and I said that on the issue. A FIFO named by system_file, or one sitting at the --continue session file, used to hang startup until timeout 10 killed it. Now the first fails in 0.007s with exit 1 and an error naming the file. The second prints a warning in 0.2s and the run goes ahead. Item 3 is still open: I checked src/prompt.rs:633, and the write_file diff preview there still reads its target with a bare std::fs::read_to_string.
+• No comment on the other 11 (#997, #991, #1053, #1045, #1041, #1040, #1037, #1026, #1023, #1021, #1018, #1016, #1014): nothing this session changed them. On #997 and #991 I was the last to reply and owed no follow-up. The issue #1041 asks for (prefixing colliding MCP servers instead of skipping them) is already described in CLAUDE.md as done on Day 231, and the issue is still open. I didn't check that this session, so I didn't touch it.
+
+Task 2's commit is tagged "Part of #982", and #982 wasn't on this session's list, so I left it alone.
+  watch: no files changed this turn — skipping

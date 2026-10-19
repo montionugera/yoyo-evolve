@@ -1,0 +1,118 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git log --oneline -3 && git show… ✓ (17ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 130,170p src/dispatch_sub… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 360,455p src/dispatch_sub… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "env::args\|fn handle_in… ✓ (27ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn command_help\|fn hel… ✓ (16ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "CommandRoute::Help" src… ✓ (11ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1100,1200p src/help.rs; s… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn command_help" src/*.… ✓ (198ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  8 tools completed in 54.3s (8 ✓)
+
+Measured: all six exit 0 today, and init zzz wrote YOYO.md. Bare doctor exits 0. Writing the test first.
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ edit tests/integration.rs (4 → 55 lines)
+        let (code, _, stderr) = yoyo_plain_in(dir.path(), &["evolution", "5"]);
+        assert_eq!(code, Some(1), "evolution 5: stderr={stderr}");
+        assert!(!stderr.contains("'5'"), "evolution 5 was refused: {stderr}");
+  + }
+  + 
+  + #[test]
+  + fn init_doctor_update_and_help_refuse_what_they_do_not_accept() {
+  +     // #982 residue of the test above, measured on f6fe3d3e: `doctor zzz`,
+  +     // `update zzz`, `help zzz` and `init zzz` all exited 0, and `init zzz`
+  +     // WROTE YOYO.md. The refusal must run before init touches the disk, and
+  +     // before update touches the network.
+  +     let dir = tempfile::tempdir().expect("tempdir");
+  +     for args in [
+  +         &["init", "zzz"][..],
+  +         &["doctor", "zzz"][..],
+  +         &["update", "zzz"][..],
+  +     ] {
+  +         let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+  +         assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+  +         assert!(stdout.is_empty(), "{args:?} printed to stdout: {stdout}");
+  ... (35 more lines)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn yoyo_plain_in" -A15 … ✓ (2m 17s)
+        let (code, _, stderr) = yoyo_plain_in(dir.path(), &["evolution", "5"]);
+        assert_eq!(code, Some(1), "evolution 5: stderr={stderr}");
+        assert!(!stderr.contains("'5'"), "evolution 5 was refused: {stderr}");
+  + }
+  + 
+  + #[test]
+  + fn init_doctor_update_and_help_refuse_what_they_do_not_accept() {
+  +     // #982 residue of the test above, measured on f6fe3d3e: `doctor zzz`,
+  ... (13 more lines)
+ ✗ (2m 17s)
+    │ Command timed out after 120s
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn yoyo_plain_in" tests… ✓ (6ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 2m 29s (2 ✓, 1 ✗)
+
+Now the production edits.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (46 lines) ✓ (23ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 405,418p tests/module_siz… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (10 lines) ✓ (12.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 24.1s (3 ✓)
+
+Passing. Positive control on the init refusal (atomic mutate → run → restore):
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/dispa… (4 lines) ✓ (10.5s)
+
+Red by name, restored, no marker left. Now docs, then the full gate.
+  ╭─ Turn 15 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git show 51031de7 -- docs/src/us… ✓ (7ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (12 lines) ✓ (22ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt -- --check && cargo cl… ✓ (4m 18s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && timeout 580 cargo test 2>&1 | gr… ✓ (6m 33s)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 11m 12s (4 ✓)
+
+All green. A quick look at the real output:
+  ╭─ Turn 19 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd $(mktemp -d) && B=/home/runner/work/yoyo-evolve/yoyo-evolve/target/debug/yoyo… ✓ (14ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status -… (42 lines) ✓ (25ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && gh issue vie… (13 lines) ✓ (1.8s)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 28.9s (3 ✓)
+
+yoyo init, doctor, update and help now refuse arguments they don't accept, with exit 2. yoyo init zzz no longer creates YOYO.md. It's committed as e34811da, titled "Part of #982".
+
+What I measured first (fresh temp dir, stdin from /dev/null): doctor zzz, update zzz, help zzz and init zzz all exited 0, and init zzz wrote YOYO.md. Bare doctor exits 0, so that's the near-miss I pinned.
+
+What changed (in src/dispatch_sub.rs, using Day 232's refuse_stray_arg and positional_after_verb, not a second code path):
+• `init`: a stray argument is refused before anything is written. Bare yoyo init still writes YOYO.md.
+• `doctor`: only reads --provider and --model. Those still work, and anything else positional exits 2.
+• `update`: takes no argument. The refusal happens before any network call, so the test never goes online.
+• `help`: the shell yoyo help took no argument, but the REPL has /help <command>. Refusing every argument would have turned yoyo help status from exit 0 into exit 2. So yoyo help <command> now prints the same text as /help <command>, and an unknown topic like yoyo help zzz exits 2 and names it, as git help zzz and cargo help zzz also reject it. One difference from the REPL: the shell version doesn't look up custom commands.
+
+Tests: init_doctor_update_and_help_refuse_what_they_do_not_accept in tests/integration.rs runs the real binary in a temp dir:
+• init zzz, doctor zzz and update zzz exit 2 with nothing on stdout, and YOYO.md is absent afterwards.
+• help zzz exits 2, and help status exits 0.
+• Bare help, bare doctor and doctor with its flags still exit 0, and bare init still writes the file.
+
+For a positive control I temporarily removed init's refusal. The test failed on ["init","zzz"] (exit 0, expected 2), and passed again once I put it back. Build, the full test suite, clippy with -D warnings and fmt are all green.
+
+Also updated: the size register in tests/module_size.rs (src/dispatch_sub.rs 2503 → 2521) and two spots in docs/src/usage/commands.md: the exit-code paragraph and the yoyo help [command] table row.
+
+Still open on #982: config show still exits 0 when .yoyo.toml can't be read, and health zzz still ignores its argument. I listed both, with the sha, in a comment on #982. The issue stays open.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

@@ -1,0 +1,86 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (13ms)
+  ▶ $ sed -n 990,1030p src/cli.rs; sed -n 1110,1145p src/main.rs; grep -n "RestoreErro…  ▶ $ sed -n 80,200p tests/config_fifo.rs; grep -n "fn restore_\|fn continue_session\|… ✓ (9ms)
+ ✓ (11ms)
+  ▶ $ grep -n "fn continue_session_path" -A12 src/commands_session.rs; grep -n "resolv… ✓ (155ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 17.5s (4 ✓)
+
+Probe both items on the current binary before changing anything.
+  ╭─ Turn 4 ─────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "AUTO_SAVE_SESSION_PATH\|DEFAULT_SESSION_PATH" src/c… (4 lines) ✓ (10.0s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ grep -rn "const AUTO_SAVE_SESSION_PATH\|const DEFAULT_SESSION_PATH" src/ ; grep … ✓ (9ms)
+  ▶ $ sed -n 1370,1395p src/main.rs; B=$PWD/target/debug/yoyo; T=$… (2 lines) ✓ (10.0s)
+  ▶ $ sed -n 1150,1190p src/main.rs ✓ (3ms)
+  ▶ $ wc -l src/main.rs src/cli.rs; grep -n "main.rs\|cli.rs\|const .*CAP\|DEFAULT" te… ✓ (5ms)
+  ▶ $ grep -n "const [A-Z_]*: usize" tests/module_size.rs; grep -n '"src/main.rs"' tes… ✓ (5ms)
+  ▶ $ grep -n "mod non_regular_read" src/*.rs; sed -n 80,100p src/non_regular_read.rs;… ✓ (11ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 1m 11s (7 ✓)
+
+Now write the tests first.
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cat >> tests/config_fifo.rs <<'EOF' (122 lines) ✓ (10.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Both new FIFO tests hit the deadline, so they're red for the right reason. Now the swaps:
+  ╭─ Turn 12 ────────────────────────────────────────────────────────────╮
+  ▶ $ python3 - <<'EOF' (43 lines) ✓ (27ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cargo fmt && cargo build 2>&1 | grep -E "^(warning|error)" | head; cargo test --… ✓ (12.9s)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 23.1s (2 ✓)
+
+Green in 0.36s. Hand probes, then the positive control (one atomic command, revert → test → restore):
+  ╭─ Turn 14 ────────────────────────────────────────────────────────────╮
+  ▶ $ B=$PWD/target/debug/yoyo; T=$(mktemp -d); H=$(mktemp -d); (c… (3 lines) ✓ (239ms)
+  ▶ $ cp src/cli.rs /tmp/cli.rs.bak && python3 -c " (3 lines) ✓ (21.4s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 29.9s (2 ✓)
+
+The positive control did what it should: only the item-1 test went red, at the deadline panic (line 56). The swap is restored. Now the full gate:
+  ╭─ Turn 16 ────────────────────────────────────────────────────────────╮
+  ▶ $ cargo fmt -- --check && cargo clippy --all-targets -- -D warnings 2>&1 | tail -2… ✓ (4m 37s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+All green. Checking whether any doc lists the routed readers and would now be wrong:
+  ╭─ Turn 17 ────────────────────────────────────────────────────────────╮
+  ▶ $ grep -n "1052" ARCHITECTURE.md src/non_regular_read.rs docs -r | head; grep -n "… ✓ (8ms)
+  ▶ $ python3 - <<'EOF' (32 lines) ✓ (86ms)
+  ▶ $ gh issue view 1052 --json state,title -q '.state+" "+.title'… (9 lines) ✓ (1.3s)
+  3 tools completed in 30.6s (3 ✓)
+
+I fixed items 1 and 2 of #1052 and committed as d2f81336 (Part of #1052). I posted a comment on #1052 naming both as fixed with the sha, and saying item 3 is still open.
+
+Measured before the fix: in a fresh repo with system_file = "sp" in .yoyo.toml and sp a FIFO, both --print-system-prompt and -p hung until timeout 10 killed them (exit 124). I also probed item 2, which had only been found by reading the code: a FIFO at yoyo-session.json hangs --continue -p the same way.
+
+Change: both reads now go through non_regular_read::read_regular_to_string, the reader #1047 already uses. In src/cli.rs that's a call swap (net +1 line, inside the size-gate headroom). In src/main.rs there's a new RestoreError::NotRegular variant, and every match on that enum is updated.
+
+After the fix: item 1 now fails in 0.007s, and item 2 finishes in 0.2s.
+
+Where I went against the plan, and why: the plan said a FIFO system_file should warn and carry on "as if the file weren't there". But today a missing system_file is a hard error (it names the file and exits 1), so those two instructions conflict. I sent the FIFO down that same error path. Carrying on would run the session under a system prompt the config didn't ask for. For --continue, a FIFO gets a yellow warning that gives the reason, rather than the dim "no previous session found", because a FIFO isn't a missing session. --continue-strict exits 1. A missing file behaves exactly as before on both, and a near-miss test pins that. --system-file <path> on the command line is untouched, as #1052 asked.
+
+Tests (`tests/config_fifo.rs`): four new tests. Two check that a FIFO doesn't hang (item 1, and item 2 with both --continue and --continue-strict). Two near-misses check that a regular system_file is still read and a missing session file still gives the old message. Both FIFO tests failed by hitting the deadline before the swap.
+
+Positive control: in one command, I reverted the cli.rs swap, ran the suite and restored the file. Only fifo_config_system_file_does_not_hang_and_is_named failed, by deadline.
+
+Checks: cargo fmt --check, clippy -D warnings, build and the full cargo test all pass. I added a Day-233 note to the existing #1047 entry in ARCHITECTURE.md. Item 3 (the write_file diff preview in `src/prompt.rs`) is not part of this task.
+  watch: no files changed this turn — skipping

@@ -1,0 +1,38 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "fn refuse_stray_arg\|fn… ✓ (9ms)
+  ▶ $ cd /tmp && rm -rf evt && mkdir evt && cd evt && B=/home/runner/work/yoyo-evolve/… ✓ (54ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/eval_task_2.md (6 lines)
+  + Verdict: PASS
+  + Reason: I ran the built binary in an empty temp dir. `init zzz`, `doctor zzz`, `update zzz` and `help zzz` each exit 2 with nothing on stdout and a stderr line naming the stray argument, and `init zzz` left no YOYO.md behind. `help status` and `help /status` exit 0 and print that command's help, while bare `help` and bare `init` exit 0 and bare `init` writes YOYO.md.
+  + Checked: intent_alignment: PASS: The diff reuses Day 232's `refuse_stray_arg` and `positional_after_verb` helpers rather than adding new ones. The init refusal runs before handle_init and the update refusal runs before handle_update, so no file write or network call happens first. Help takes an optional topic, looks it up with help_data::command_help, and refuses an unknown topic or a second argument. The doctor refusal comes after its --provider/--model flags are parsed, and I confirmed with th… [yoyo: 245 more bytes elided — diff lines are capped at 500 bytes]
+  + Checked: forgotten_touchpoints: PASS: The diff adds no new fn, variant or variable. It only calls the existing refuse_stray_arg, positional_after_verb and help_data::command_help (pub, src/help_data.rs:10). The module_size register was raised from 2503 to 2521, which matches the +18 production lines, and dispatch_sub.rs gained no tests.
+  + Checked: doc_sync: PASS: In docs/src/usage/commands.md, the subcommand table now shows `yoyo help [command]`, and the #982 exit-codes paragraph now covers init, doctor, update and help: the refusal comes before any write or network call, doctor's flags still work, and an unknown help topic exits 2.
+  + Checked: product_surface: N/A: This is a product-kind task, so the opt-in rule for evolve-kind changes (#448) does not apply. The change is a CLI usage-error exit code, and the help/init/doctor paths users rely on were checked and still behave as before.
+ ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 20.8s (3 ✓)
+
+The task passes, and the verdict is written to session_plan/eval_task_2.md.
+
+I ran the built binary in an empty temp directory:
+
+| Command | Exit code | Result |
+|---|---|---|
+| init zzz | 2 | Refused on stderr, nothing on stdout, and no YOYO.md was created |
+| doctor zzz | 2 | Refused, with a message naming zzz |
+| update zzz | 2 | Refused, with a message naming zzz |
+| help zzz | 2 | Refused, with a message naming zzz |
+| help status extra | 2 | Refused, naming extra |
+| help status or help /status | 0 | Prints that command's help |
+| bare help | 0 | Prints the full help as before |
+| bare init | 0 | Still writes YOYO.md |
+
+• Ordering: in the code, the init refusal runs before the file is written and the update refusal runs before the network call. doctor's --provider and --model flags are skipped as flag values rather than treated as stray arguments; the integration test checks that doctor --provider ollama --model m still exits 0.
+• No forgotten touchpoints: the diff adds no new definitions. It only reuses the Day 232 helpers and the existing help_data::command_help.
+• Size and placement: the size limit for dispatch_sub.rs went from 2503 to 2521, matching the 18 added lines, and no tests were put in that file.
+• Docs and tests: the new test is in tests/integration.rs and checks that YOYO.md is absent after init zzz. docs/src/usage/commands.md now documents all four commands.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

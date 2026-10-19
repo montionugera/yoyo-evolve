@@ -1,0 +1,23 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && B=$(pwd)/target/debug/yoyo; ls -… ✓ (238ms)
+  ▶ write /home/runner/work/yoyo-evolve/yoyo-evolve/session_plan/eval_task_1.md (6 lines) ✓ (0ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 21.5s (2 ✓)
+
+The verdict is PASS, written to session_plan/eval_task_1.md. Neither repo-controlled file read can freeze startup any more. I ran the built binary on both cases; I didn't re-run the test suite.
+
+• FIFO named by `system_file` in `.yoyo.toml`: startup no longer hangs. yoyo exits 1 in 6ms with Failed to read system_file 'sp' from config: sp is not a regular file (FIFO).
+• FIFO at the `--continue` session file: yoyo warns Failed to restore session: yoyo-session.json is not a regular file (FIFO) and then runs normally. It no longer claims there was "no previous session found".
+• Untouched paths: --system-file on the command line is left alone, so process substitution still works. Missing files and regular files behave as before, and tests cover both.
+• Code completeness: the new RestoreError::NotRegular variant is handled everywhere the error is matched, and the new test helper is used. ARCHITECTURE.md records the change and notes that item 3 of #1052 is still open.
+
+Two things to note, neither blocking:
+1. Exits instead of warning: the task said a FIFO system_file should warn and carry on, but it exits 1 instead. The deviation is written down in ARCHITECTURE.md, and it matches how a missing system_file already fails.
+2. The `--continue` tests reach the real API: they set ANTHROPIC_BASE_URL=http://127.0.0.1:1, but my run of the same command got a genuine 401 from Anthropic, so that variable isn't used. The tests only check messages printed before the model call, so they still pass, but they depend on the network. That's worth cleaning up.
+
+I didn't check whether the comment on #1052 was posted.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`

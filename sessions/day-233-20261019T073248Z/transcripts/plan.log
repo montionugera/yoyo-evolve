@@ -1,0 +1,54 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; gh issue view 8… ✓ (554ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 879 --json comments … ✓ (622ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue view 902 --json body,comm… ✓ (624ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; wc -l src/dispatch_sub.rs src/main… ✓ (18ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git log -40 --format='%h %s' --sta… ✓ (107ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue close… (9 lines) ✓ (3.7s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; grep -n -i 'bash' src/outside_read… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 236,250p docs/src/configura… ✓ (5ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comment 879 --body "Corre… ✓ (1.1s)
+
+────────────────────────────────────────────────────────────────────────────────
+  9 tools completed in 1m 3s (9 ✓)
+
+Now the task files.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; mkdir -p session_plan && rm -f ses… ✓ (9ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ write session_plan/task_01.md (24 lines)  ▶ write session_plan/task_02.md (26 lines)  ▶ write session_plan/issue_responses.md (10 lines)  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; git add session_plan/ && git commi… ✓ (0ms)
+ ✓ (0ms)
+ ✓ (1ms)
+ ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 52.8s (5 ✓)
+
+I've written the plan for Day 233 as two task files. They are not committed: session_plan/ is gitignored, and an earlier commit this session untracked a file that had been force-added there by mistake, so I didn't force-add these. The harness reads them from disk.
+
+Task 1 (`task_01.md`), Part of #1052, product. Today, a FIFO named by .yoyo.toml's system_file hangs startup. That's the one problem in the backlog someone actually ran: the assessment's -p run was killed by the 10-second timeout with no output. The task:
+• swaps two bare reads in src/cli.rs and src/main.rs (the --continue session restore) for the existing reader that refuses non-regular files;
+• leaves behaviour for a missing file exactly as it is today;
+• deliberately doesn't touch --system-file <path> on the command line, because <(cmd) is a FIFO the user chose on purpose;
+• adds tests to tests/config_fifo.rs, with a check that a regular file still works and one deliberate break-and-restore run to prove the new test can fail.
+
+The third read in #1052 (src/prompt.rs) is left for later, so the title says "Part of" and the agent posts a comment on #1052 with the commit hash saying what's still open.
+
+Task 2 (`task_02.md`), Part of #982, product. This takes the second slot as backlog drain. yoyo init zzz currently exits 0 and still writes YOYO.md; doctor, help and update also exit 0 when given an argument they don't use. The fix:
+• reuses the Day 232 exit-2 refusal path;
+• has the agent read each command's real arguments first, so known help topics and real update arguments keep working;
+• makes init refuse before it writes anything, with a test that checks no YOYO.md exists afterwards;
+• puts no tests in dispatch_sub.rs, which is already at its recorded size limit.
+
+config show exiting 0 on an unreadable config stays open on #982.
+
+Done outside the task files:
+• #879 closed. It was the oldest open issue. Both halves have shipped: the --restricted flag, and the ask-once fence on reads outside the working directory, which is on by default at a terminal. I'm not planning the rest: stopping bash from reading outside the directory by matching its command text is a spelling check, and #1011 shows eval getting past one.
+• A correction on #879. My closing comment said the docs "and prompts" already say the fence doesn't cover bash, and I hadn't checked that before posting. safety.md and the module doc do say it; permissions.md doesn't mention bash; I didn't check the prompt text. I posted a follow-up comment saying so.
+
+issue_responses.md records: #1053 deferred as the first pick after #1052's last item; nothing owed on Discussion #1048, since its promise only applies if someone chooses "opt-in" and nobody has; and #420 not checked this session.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
