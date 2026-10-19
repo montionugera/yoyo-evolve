@@ -1119,6 +1119,9 @@ enum RestoreError {
     Unreadable(String),
     /// The file was read but is not a session the agent accepts.
     Unparsable(String),
+    /// The path is a FIFO, device or socket: refused unopened, since reading
+    /// it could block startup forever (#1052). Not "no session".
+    NotRegular(String),
 }
 
 /// Pure-ish seam: load `path` into `agent`, returning the restored message count.
@@ -1126,8 +1129,13 @@ fn restore_session_result(
     agent: &mut Agent,
     path: &std::path::Path,
 ) -> Result<usize, RestoreError> {
-    let json =
-        std::fs::read_to_string(path).map_err(|e| RestoreError::Unreadable(e.to_string()))?;
+    let json = non_regular_read::read_regular_to_string(path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::InvalidInput {
+            RestoreError::NotRegular(e.to_string())
+        } else {
+            RestoreError::Unreadable(e.to_string())
+        }
+    })?;
     agent
         .restore_messages(&json)
         .map_err(|e| RestoreError::Unparsable(e.to_string()))?;
@@ -1140,6 +1148,7 @@ fn continue_strict_refusal(path: &str, err: &RestoreError) -> String {
     let reason = match err {
         RestoreError::Unreadable(e) => format!("no session file ({e})"),
         RestoreError::Unparsable(e) => format!("unparsable session ({e})"),
+        RestoreError::NotRegular(e) => e.clone(),
     };
     format!(
         "error: --continue-strict: could not restore {}: {}",
@@ -1170,7 +1179,8 @@ fn restore_session(agent: &mut Agent, strict: bool) {
             eprintln!("{}", continue_strict_refusal(session_path, &e));
             std::process::exit(1);
         }
-        Err(RestoreError::Unparsable(e)) => {
+        Err(RestoreError::Unparsable(e)) | Err(RestoreError::NotRegular(e)) => {
+            let e = cli::sanitize_for_display(&e);
             eprintln!("{YELLOW}warning:{RESET} Failed to restore session: {e}")
         }
         Err(RestoreError::Unreadable(_)) => {

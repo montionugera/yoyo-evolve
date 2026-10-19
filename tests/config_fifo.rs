@@ -27,8 +27,14 @@ fn permissions(cwd: &Path, home: &Path) -> Output {
 /// Run `yoyo <args>` like [`permissions`]: panics (rather than hanging the
 /// suite) if it is still running after `DEADLINE`.
 fn run_yoyo(args: &[&str], cwd: &Path, home: &Path) -> Output {
+    run_yoyo_env(args, cwd, home, &[])
+}
+
+/// [`run_yoyo`] with extra environment variables (same deadline).
+fn run_yoyo_env(args: &[&str], cwd: &Path, home: &Path, env: &[(&str, &str)]) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_yoyo"))
         .args(args)
+        .envs(env.iter().copied())
         .current_dir(cwd)
         .env("HOME", home)
         .env("XDG_CONFIG_HOME", home.join(".config"))
@@ -47,9 +53,7 @@ fn run_yoyo(args: &[&str], cwd: &Path, home: &Path) -> Output {
         if start.elapsed() > DEADLINE {
             let _ = child.kill();
             let _ = child.wait();
-            panic!(
-                "yoyo {args:?} still running after {DEADLINE:?}: a FIFO .yoyo.toml hung it (#1047)"
-            );
+            panic!("yoyo {args:?} still running after {DEADLINE:?}: a FIFO hung it (#1047, #1052)");
         }
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -186,4 +190,105 @@ fn config_get_and_show_do_not_hang_on_a_fifo_project_config() {
             "{args:?} stderr={stderr:?}"
         );
     }
+}
+
+/// Near-miss for #1052 item 1: a regular `system_file` named by the project
+/// `.yoyo.toml` is still read, and its text is the system prompt.
+#[test]
+fn regular_config_system_file_is_still_read() {
+    let proj = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    std::fs::write(proj.path().join(".yoyo.toml"), "system_file = \"sp\"\n").unwrap();
+    std::fs::write(proj.path().join("sp"), "SYSFILE_TOKEN_1052\n").unwrap();
+    let out = run_yoyo(&["--print-system-prompt"], proj.path(), home.path());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("SYSFILE_TOKEN_1052"),
+        "stdout={stdout:?} stderr={:?}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// #1052 item 1: a FIFO named by the project config's `system_file` used to
+/// block startup in `read_to_string` (exit 124 under `timeout 10`). It now
+/// fails like any other unreadable `system_file`: an error naming the file,
+/// exit 1, before any model call.
+#[test]
+fn fifo_config_system_file_does_not_hang_and_is_named() {
+    let proj = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    std::fs::write(proj.path().join(".yoyo.toml"), "system_file = \"sp\"\n").unwrap();
+    let fifo = proj.path().join("sp");
+    if !mkfifo(&fifo) {
+        eprintln!("mkfifo unavailable; skipping");
+        return;
+    }
+    {
+        use std::os::unix::fs::FileTypeExt;
+        assert!(std::fs::metadata(&fifo).unwrap().file_type().is_fifo());
+    }
+    let out = run_yoyo(&["--print-system-prompt"], proj.path(), home.path());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "stderr={stderr:?}");
+    assert!(stderr.contains("system_file 'sp'"), "stderr={stderr:?}");
+    assert!(stderr.contains("not a regular file"), "stderr={stderr:?}");
+}
+
+/// #1052 item 2: a FIFO at the `--continue` session path used to block in
+/// `read_to_string` (exit 124 under `timeout 10`). The lenient restore now
+/// warns, names the reason, and carries on; `--continue-strict` refuses.
+/// The model call afterwards fails fast against a closed local port.
+#[test]
+fn fifo_continue_session_file_does_not_hang() {
+    for (flag, strict) in [("--continue", false), ("--continue-strict", true)] {
+        let proj = tempfile::tempdir().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let fifo = proj.path().join("yoyo-session.json");
+        if !mkfifo(&fifo) {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        }
+        let out = run_yoyo_env(
+            &[flag, "-p", "hi"],
+            proj.path(),
+            home.path(),
+            &[
+                ("ANTHROPIC_API_KEY", "dummy"),
+                ("ANTHROPIC_BASE_URL", "http://127.0.0.1:1"),
+            ],
+        );
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("yoyo-session.json"), "{flag}: {stderr:?}");
+        assert!(stderr.contains("not a regular file"), "{flag}: {stderr:?}");
+        assert!(
+            !stderr.contains("no previous session found"),
+            "{flag}: a FIFO is not an absent session: {stderr:?}"
+        );
+        if strict {
+            assert_eq!(out.status.code(), Some(1), "{flag}: {stderr:?}");
+        }
+    }
+}
+
+/// Near-miss for item 2: a missing session file still reads as "no previous
+/// session found", byte-identical to before.
+#[test]
+fn missing_continue_session_file_still_reports_no_session() {
+    let proj = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let out = run_yoyo_env(
+        &["--continue", "-p", "hi"],
+        proj.path(),
+        home.path(),
+        &[
+            ("ANTHROPIC_API_KEY", "dummy"),
+            ("ANTHROPIC_BASE_URL", "http://127.0.0.1:1"),
+        ],
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("no previous session found (yoyo-session.json)"),
+        "stderr={stderr:?}"
+    );
+    assert!(!stderr.contains("not a regular file"), "stderr={stderr:?}");
 }

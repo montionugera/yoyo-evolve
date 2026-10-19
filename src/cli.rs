@@ -1002,7 +1002,8 @@ pub fn resolve_system_prompt(
     }
     // Config system_file wins over config system_prompt
     if let Some(path) = config_system_file {
-        match std::fs::read_to_string(&path) {
+        // #1052: a FIFO here is repo-authored and would block startup.
+        match crate::non_regular_read::read_regular_to_string(std::path::Path::new(&path)) {
             Ok(content) => return content,
             Err(e) => {
                 eprintln!(
