@@ -296,10 +296,26 @@ pub(crate) fn dir_is_trusted(dir: &std::path::Path) -> bool {
     let Some(path) = trusted_dirs_path() else {
         return false;
     };
-    let Ok(content) = std::fs::read_to_string(&path) else {
-        return false;
-    };
-    trusted_dirs_contains(&content, &dir)
+    store_lists_dir(&path, &dir)
+}
+
+/// Whether the trust store at `store` lists the (already canonical) `dir`.
+/// Read through `non_regular_read` (#1047): this runs at startup, before turn
+/// one, so a FIFO at the store's path would otherwise hang yoyo forever. A
+/// refused store is "not trusted" (fail closed) and says why on stderr; a
+/// missing or unreadable store stays the silent "not trusted" it always was.
+fn store_lists_dir(store: &std::path::Path, dir: &std::path::Path) -> bool {
+    match crate::non_regular_read::read_regular_to_string(store) {
+        Ok(content) => trusted_dirs_contains(&content, dir),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
+            let reason = crate::cli::sanitize_for_display(&e.to_string());
+            eprintln!(
+                "warning: trusted-dirs store ignored - {reason}; this directory is not trusted"
+            );
+            false
+        }
+        Err(_) => false,
+    }
 }
 
 /// Record `dir` in the user-level trust store, creating it if needed.
@@ -323,9 +339,27 @@ pub(crate) fn remember_trusted_dir(dir: &std::path::Path) -> std::io::Result<std
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let existing = std::fs::read_to_string(&path).unwrap_or_default();
-    std::fs::write(&path, append_trusted_dir(&existing, &dir))?;
+    append_to_store(&path, &dir)?;
     Ok(path)
+}
+
+/// Append `dir` to the store at `store`. Only a **missing** store starts empty
+/// (#1047): a FIFO or device is refused before it can block the read or the
+/// write, and a store that exists but cannot be read (permissions, invalid
+/// UTF-8) is an error rather than `""` — writing over it would silently drop
+/// every directory the user trusted before.
+fn append_to_store(store: &std::path::Path, dir: &std::path::Path) -> std::io::Result<()> {
+    let existing = match crate::non_regular_read::read_regular_to_string(store) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => {
+            return Err(std::io::Error::new(
+                e.kind(),
+                format!("not rewriting {}: {e}", store.display()),
+            ))
+        }
+    };
+    std::fs::write(store, append_trusted_dir(&existing, dir))
 }
 
 // === The interactive workspace-trust prompt (Day 178, #749 item 2) ===
@@ -1031,6 +1065,63 @@ mod tests {
         assert!(!dir_is_trusted(&p(
             "/nonexistent-yoyo-trust-probe/definitely/not/here"
         )));
+    }
+
+    /// Run `f` on a thread so a FIFO regression fails by name instead of
+    /// hanging the suite (the leaked thread dies with the test process).
+    #[cfg(unix)]
+    fn within_10s<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(f());
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(10))
+            .expect("trust store reader blocked on a FIFO (#1047)")
+    }
+
+    /// #1047: a FIFO trust store answers "not trusted" promptly (fail closed)
+    /// and `remember` refuses to write, leaving the FIFO in place.
+    #[cfg(unix)]
+    #[test]
+    fn test_fifo_trust_store_is_not_trusted_and_not_rewritten() {
+        use std::os::unix::fs::FileTypeExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let Some(fifo) = crate::non_regular_read::tests::make_fifo(tmp.path()) else {
+            eprintln!("mkfifo unavailable; skipping");
+            return;
+        };
+        assert!(std::fs::metadata(&fifo).unwrap().file_type().is_fifo());
+        let dir = std::fs::canonicalize(tmp.path()).unwrap();
+        let (f, d) = (fifo.clone(), dir.clone());
+        assert!(!within_10s(move || store_lists_dir(&f, &d)));
+        let (f, d) = (fifo.clone(), dir.clone());
+        let err = within_10s(move || append_to_store(&f, &d)).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("pipe.txt") && msg.contains("FIFO"), "{msg}");
+        assert!(std::fs::metadata(&fifo).unwrap().file_type().is_fifo());
+    }
+
+    /// Near miss for #1047: a regular store listing the dir still trusts it,
+    /// a missing store is not trusted and `remember` creates it exactly as
+    /// before, and an existing store it cannot read is not overwritten.
+    #[test]
+    fn test_trust_store_regular_missing_and_unreadable_keep_their_answers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = std::fs::canonicalize(tmp.path()).unwrap();
+        let store = tmp.path().join("trusted_dirs");
+        assert!(!store_lists_dir(&store, &dir));
+        append_to_store(&store, &dir).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&store).unwrap(),
+            format!("{}\n", dir.display())
+        );
+        assert!(store_lists_dir(&store, &dir));
+        // Invalid UTF-8: used to be read as "" and overwritten, losing it all.
+        let bad = tmp.path().join("bad_store");
+        std::fs::write(&bad, b"/kept\n\xff\n").unwrap();
+        assert!(!store_lists_dir(&bad, &dir));
+        assert!(append_to_store(&bad, &dir).is_err());
+        assert_eq!(std::fs::read(&bad).unwrap(), b"/kept\n\xff\n");
     }
 
     // === The interactive workspace-trust prompt (Day 178, #749 item 2) ===

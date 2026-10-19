@@ -1,12 +1,20 @@
 //! `read_file` refuses FIFOs, devices and sockets instead of hanging (#1047).
 //!
-//! yoagent 0.25.7's `ReadFileTool` trusts `metadata.len()` for its size check,
-//! and that is `0` for a FIFO, a tty or a character device, so the check passes
-//! and `read_to_string` runs: on a FIFO or tty it blocks forever, on
-//! `/dev/zero` it grows without bound. An unattended `-p` run just hangs until
-//! it is killed. Nobody who reaches that branch chose it, so the refusal is
-//! unconditional — it runs with or without `--allow-dir`/`--deny-dir`, because
-//! `GuardedTool`/`ArcGuardedTool` wrap every `read_file` unconditionally.
+//! A FIFO, a tty or a character device reports `metadata.len() == 0`, so a
+//! size check passes and `read_to_string` runs: on a FIFO or tty it blocks
+//! forever, on `/dev/zero` it grows without bound. yoagent 0.25.8 now refuses
+//! these upstream (`require_regular_file` in `tools/file.rs`, called by
+//! `read_file`, `write_file` and `edit_file`); before 0.25.8 its `ReadFileTool`
+//! trusted `metadata.len()` and hung. So for the model's tools yoyo's wrapper
+//! below is now a **second** check, kept so the refusal does not depend on the
+//! dependency's version. It is unconditional — it runs with or without
+//! `--allow-dir`/`--deny-dir`, because `GuardedTool`/`ArcGuardedTool` wrap every
+//! `read_file` unconditionally.
+//!
+//! For yoyo's **own** `std::fs` readers (startup config, instruction files,
+//! goal/memory, the trusted-dirs store, `/add`, `/config set`) yoagent offers
+//! nothing: `read_regular_to_string` and its siblings below are the only guard.
+//! <!-- yoagent-version-claim: 0.25 -->
 //!
 //! What it does NOT touch, so those paths stay byte-identical:
 //! - **Missing paths / metadata errors** → `None`; the inner tool reports its
