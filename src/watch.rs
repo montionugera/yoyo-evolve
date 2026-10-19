@@ -2020,7 +2020,7 @@ pub(crate) fn handle_watch_in(dir: &std::path::Path, input: &str) -> i32 {
                 println!(
                     "{DIM}  (to set '{custom_cmd}' as a custom watch command anyway, use the full command, e.g. /watch {custom_cmd} --flags){RESET}\n"
                 );
-                return 0;
+                return WATCH_USAGE_EXIT;
             }
             set_watch_command(custom_cmd);
             println!(
@@ -2953,7 +2953,11 @@ mod tests {
                 handle_watch_in(empty.path(), "/watch lint"),
                 WATCH_USAGE_EXIT
             );
-            assert!(get_watch_command().is_none(), "lint may install nothing");
+            // #982: a typo near-miss like `/watch of` refuses with usage exit 2
+            // and installs nothing.
+            clear_watch_command();
+            assert_eq!(handle_watch_in(empty.path(), "/watch of"), WATCH_USAGE_EXIT);
+            assert!(get_watch_command().is_none(), "typo may install nothing");
 
             // Every other path keeps 0, even from the undetected dir.
             for input in ["/watch status", "/watch off", "/watch make check"] {

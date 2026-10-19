@@ -3976,3 +3976,74 @@ fn config_get_model_keeps_exit_zero() {
     assert_eq!(code, Some(0), "stdout={stdout} stderr={stderr}");
     assert!(stdout.contains("model"), "stdout={stdout}");
 }
+
+#[test]
+fn tree_and_undo_usage_errors_exit_two_through_the_binary() {
+    // #982: `tree <bad arg>` and `undo <bad arg>` usage errors now exit 2,
+    // aligned with def/outline/grep/map/index/blame/watch/docs.
+    let dir = tempfile::tempdir().expect("tempdir");
+    for args in [
+        &["tree", "/nonexistent"][..],
+        &["tree", "zz"][..],
+        &["tree", "-1"][..],
+        &["undo", "zz"][..],
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+        assert!(
+            stdout.contains("usage:") || stderr.contains("usage:"),
+            "{args:?}: must print usage line: stdout={stdout} stderr={stderr}"
+        );
+    }
+    // Near-misses:
+    // 1. `undo 0` is a no-op, not a usage error — stays 0.
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["undo", "0"]);
+    assert_eq!(code, Some(0), "undo 0: stdout={stdout} stderr={stderr}");
+    // 2. `tree` outside a git repo exits 1 (the not-a-repo failure code, distinct from usage 2).
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["tree"]);
+    assert_eq!(
+        code,
+        Some(1),
+        "tree outside repo: stdout={stdout} stderr={stderr}"
+    );
+    assert!(
+        stdout.contains("not a git repository"),
+        "tree outside repo: {stdout}"
+    );
+}
+
+#[test]
+fn health_and_config_refuse_stray_args_with_exit_two() {
+    // #982: `health zzz`, `config show zzz`, `config get key extra` refuse
+    // stray positional arguments with exit 2.
+    let dir = tempfile::tempdir().expect("tempdir");
+    for (args, verb, stray) in [
+        (&["health", "zzz"][..], "health", "zzz"),
+        (&["config", "show", "zzz"][..], "config show", "zzz"),
+        (
+            &["config", "get", "model", "extra"][..],
+            "config get <key>",
+            "extra",
+        ),
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+        assert!(stdout.is_empty(), "{args:?} printed to stdout: {stdout}");
+        assert!(
+            stderr.contains(verb) && stderr.contains(stray),
+            "{args:?}: stderr must name '{verb}' and '{stray}': {stderr}"
+        );
+    }
+}
+
+#[test]
+fn watch_typo_near_miss_exits_two() {
+    // #982: a typo near-miss like `watch of` or `watch statu` refuses with exit 2.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (code, _stdout, stderr) = yoyo_plain_in(dir.path(), &["watch", "of"]);
+    assert_eq!(code, Some(2), "watch of: stderr={stderr}");
+    assert!(
+        stderr.contains("did you mean /watch off?"),
+        "stderr={stderr}"
+    );
+}

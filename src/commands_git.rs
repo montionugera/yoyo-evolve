@@ -1047,14 +1047,16 @@ pub(crate) fn parse_undo_arg(input: &str) -> UndoArg {
     }
 }
 
-/// `/undo` with an exit status for the shell door (`yoyo undo`, #982): 1 when
-/// the argument is unparseable (the usage line is printed, as before), 0 on
+pub(crate) const UNDO_USAGE_EXIT: i32 = 2;
+
+/// `/undo` with an exit status for the shell door (`yoyo undo`, #982): [`UNDO_USAGE_EXIT`] (2)
+/// when the argument is unparseable (the usage line is printed, as before), 0 on
 /// every other path. Deliberately narrow: a `--last-commit` / `--all` that
 /// runs and fails still reports 0 here. The REPL calls `handle_undo`, which
 /// has no status.
 pub(crate) fn handle_undo_status(input: &str, history: &mut TurnHistory) -> i32 {
     let code = if parse_undo_arg(input) == UndoArg::Usage {
-        1
+        UNDO_USAGE_EXIT
     } else {
         0
     };
@@ -2850,7 +2852,10 @@ mod tests {
         // #982: `yoyo undo zz` printed usage and exited 0. Both rows return
         // before any git call (usage, and the count-0 no-op), so this is pure.
         let mut history = TurnHistory::new();
-        assert_eq!(handle_undo_status("/undo zz", &mut history), 1);
+        assert_eq!(
+            handle_undo_status("/undo zz", &mut history),
+            UNDO_USAGE_EXIT
+        );
         // Near-miss: `undo 0` is a no-op, not a usage error — stays 0.
         assert_eq!(handle_undo_status("/undo 0", &mut history), 0);
     }

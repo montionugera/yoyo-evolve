@@ -198,6 +198,15 @@ fn config_get_and_show_do_not_hang_on_a_fifo_project_config() {
             stderr.contains("not a regular file"),
             "{args:?} stderr={stderr:?}"
         );
+        if *args == ["config", "show"] {
+            // #982: `config show` fails with exit 1 on unreadable config file.
+            assert_eq!(
+                out.status.code(),
+                Some(1),
+                "{args:?}: status={:?}",
+                out.status
+            );
+        }
     }
 }
 

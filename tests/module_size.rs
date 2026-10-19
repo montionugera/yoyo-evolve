@@ -259,7 +259,8 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // (`commit_args_from_argv`, `diff_options_from_argv`, their shared token cores)
     // and their unit tests. The argv seam had to sit beside the parsers it shares
     // flag classification with. Acknowledged, not absorbed.
-    ("src/commands_git.rs", 3679),
+    // Day 233 (#982): 3679 -> 3684 (+5: UNDO_USAGE_EXIT constant, handle_undo_status doc, test format).
+    ("src/commands_git.rs", 3684),
     // Day 174: +25 absorbed since Day 166.
     // +103 (Day 179, #832): the `/evolution` cargo shell-out was split into a
     // thin wrapper + injected resolvers so no `#[test]` spawns `cargo`, plus a
@@ -412,7 +413,8 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // `refuse_stray_arg` and the five arm calls; the test lives in tests/integration.rs), pasted.
     // Day 233 (#982): 2503 -> 2521 (+18: init/doctor/update refuse a stray arg,
     // `help <command>` prints REPL /help's text or refuses; test in tests/integration.rs), pasted.
-    ("src/dispatch_sub.rs", 2521),
+    // Day 233 (#982): 2521 -> 2527 (+6: health/config refuse stray args, config show checks status, update exits on error), pasted.
+    ("src/dispatch_sub.rs", 2527),
     // Day 209: 3439 -> 3455 (+16, within the drift band, pasted rather than left to absorb).
     // #937 option 1: nine lines of doc above `builtin_model_pricing` naming both ignored
     // audit commands (deliverable 4 — an alarm nobody can find is the #745/#767/#769

@@ -332,6 +332,10 @@ fn is_cargo_dev_build() -> bool {
                 || p.contains("/target/release/")
                 || p.contains("\\target\\debug\\")
                 || p.contains("\\target\\release\\")
+                || p.contains("/debug/")
+                || p.contains("/release/")
+                || p.contains("\\debug\\")
+                || p.contains("\\release\\")
         })
         .unwrap_or(false)
 }

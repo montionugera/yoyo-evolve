@@ -388,6 +388,7 @@ pub(crate) fn try_dispatch_subcommand_in(
             "health" => {
                 // handle_health takes no arguments — it auto-detects project type
                 // from the current directory and runs the appropriate checks.
+                refuse_stray_arg("health", positional_after_verb(&args[2..]).first().copied());
                 // #982: exits 1 when no recognized project was found.
                 exit_if_nonzero(crate::commands_dev::handle_health_status());
                 return Some(None);
@@ -649,6 +650,7 @@ pub(crate) fn try_dispatch_subcommand_in(
                 refuse_stray_arg("update", positional_after_verb(&args[2..]).first().copied());
                 if let Err(e) = crate::commands_update::handle_update() {
                     eprintln!("{RED}  {e}{RESET}");
+                    exit_if_nonzero(1);
                 }
                 return Some(None);
             }
@@ -723,9 +725,13 @@ pub(crate) fn try_dispatch_subcommand_in(
                 let sub2 = args.get(2).map(|s| s.as_str());
                 match sub2 {
                     None | Some("show") => {
-                        crate::commands_config::handle_config_show();
+                        let stray = positional_after_verb(&args[2..]).get(1).copied();
+                        refuse_stray_arg("config show", stray);
+                        exit_if_nonzero(crate::commands_config::handle_config_show_status());
                     }
                     Some("get") => {
+                        let pos = positional_after_verb(&args[2..]);
+                        refuse_stray_arg("config get <key>", pos.get(2).copied());
                         // Reconstruct as /config get <key>
                         let key = args.get(3).map(|s| s.as_str()).unwrap_or("");
                         let input = format!("/config get {key}");
