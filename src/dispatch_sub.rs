@@ -376,6 +376,10 @@ pub(crate) fn try_dispatch_subcommand_in(
                 let model = flag_value(args, &["--model"])
                     .or_else(|| file_config.get("model").cloned())
                     .unwrap_or_else(|| default_model_for_provider(&provider));
+                refuse_stray_arg(
+                    "doctor [--provider P] [--model M]",
+                    positional_after_verb(&args[2..]).first().copied(),
+                );
                 // No session, so no startup fence is built here (#1043 residue).
                 let no_fence = crate::config::DirectoryRestrictions::default();
                 crate::commands_dev::handle_doctor(&provider, &model, &no_fence);
@@ -389,7 +393,17 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "help" => {
-                print_help();
+                // `help <command>` is the shell twin of REPL `/help <command>`;
+                // an unknown topic exits 2 (#982), like `git`/`cargo help zzz`.
+                let pos = positional_after_verb(&args[2..]);
+                refuse_stray_arg("help [command]", pos.get(1).copied());
+                match pos.first().map(|t| t.trim_start_matches('/')) {
+                    None => print_help(),
+                    Some(t) => match crate::help_data::command_help(t) {
+                        Some(text) => println!("{text}"),
+                        None => refuse_stray_arg("help [command]", pos.first().copied()),
+                    },
+                }
                 return Some(None);
             }
             "version" => {
@@ -435,6 +449,8 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "init" => {
+                // Refused BEFORE any write: `init zzz` used to create YOYO.md (#982).
+                refuse_stray_arg("init", positional_after_verb(&args[2..]).first().copied());
                 match project {
                     None => crate::commands_project::handle_init(),
                     Some(p) => crate::commands_project::handle_init_in(p.dir),
@@ -629,6 +645,8 @@ pub(crate) fn try_dispatch_subcommand_in(
                 return Some(None);
             }
             "update" => {
+                // Refused before any network call (#982).
+                refuse_stray_arg("update", positional_after_verb(&args[2..]).first().copied());
                 if let Err(e) = crate::commands_update::handle_update() {
                     eprintln!("{RED}  {e}{RESET}");
                 }

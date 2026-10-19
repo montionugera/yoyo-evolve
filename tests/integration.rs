@@ -3858,6 +3858,57 @@ fn zero_arg_verbs_refuse_a_stray_argument_with_exit_two() {
 }
 
 #[test]
+fn init_doctor_update_and_help_refuse_what_they_do_not_accept() {
+    // #982 residue of the test above, measured on f6fe3d3e: `doctor zzz`,
+    // `update zzz`, `help zzz` and `init zzz` all exited 0, and `init zzz`
+    // WROTE YOYO.md. The refusal must run before init touches the disk, and
+    // before update touches the network.
+    let dir = tempfile::tempdir().expect("tempdir");
+    for args in [
+        &["init", "zzz"][..],
+        &["doctor", "zzz"][..],
+        &["update", "zzz"][..],
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(2), "{args:?}: stdout={stdout} stderr={stderr}");
+        assert!(stdout.is_empty(), "{args:?} printed to stdout: {stdout}");
+        assert!(
+            stderr.contains(args[0]) && stderr.contains("'zzz'"),
+            "{args:?}: stderr must name the verb and the stray arg: {stderr}"
+        );
+    }
+    assert!(
+        !dir.path().join("YOYO.md").exists(),
+        "`yoyo init zzz` was refused but still wrote YOYO.md"
+    );
+    // `help <topic>` is the shell twin of REPL `/help <command>`: an unknown
+    // topic fails and names it, a known one prints that command's help.
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["help", "zzz"]);
+    assert_eq!(code, Some(2), "help zzz: stdout={stdout} stderr={stderr}");
+    assert!(stderr.contains("'zzz'"), "help zzz must name it: {stderr}");
+    let (code, stdout, stderr) = yoyo_plain_in(dir.path(), &["help", "status"]);
+    assert_eq!(code, Some(0), "help status: stderr={stderr}");
+    assert!(stdout.contains("/status"), "help status: {stdout}");
+    // Near-misses: bare help and doctor (and doctor's flags) still exit 0 —
+    // measured, both 0 before this change — and bare init still writes.
+    for args in [
+        &["help"][..],
+        &["doctor"][..],
+        &["doctor", "--provider", "ollama", "--model", "m"][..],
+    ] {
+        let (code, stdout, stderr) = yoyo_plain_in(dir.path(), args);
+        assert_eq!(code, Some(0), "{args:?}: stdout={stdout} stderr={stderr}");
+        assert!(!stdout.is_empty(), "{args:?} printed nothing on stdout");
+    }
+    let (code, _, stderr) = yoyo_plain_in(dir.path(), &["init"]);
+    assert_eq!(code, Some(0), "bare init: stderr={stderr}");
+    assert!(
+        dir.path().join("YOYO.md").exists(),
+        "bare `yoyo init` no longer writes YOYO.md"
+    );
+}
+
+#[test]
 fn unknown_skill_goal_todo_and_bare_ast_exit_two_through_the_binary() {
     // #982: these printed a usage/unknown-subcommand message and exited 0.
     // The status helpers are unit-tested in commands_skill.rs and

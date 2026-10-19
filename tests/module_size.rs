@@ -410,7 +410,9 @@ const GRANDFATHERED_OVERSIZED_MODULES: &[(&str, usize)] = &[
     // goal/todo/ast unknown-verb exit-2 helpers and their test, pasted.
     // Day 232 (#982): 2457 -> 2503 (+46: `positional_after_verb`,
     // `refuse_stray_arg` and the five arm calls; the test lives in tests/integration.rs), pasted.
-    ("src/dispatch_sub.rs", 2503),
+    // Day 233 (#982): 2503 -> 2521 (+18: init/doctor/update refuse a stray arg,
+    // `help <command>` prints REPL /help's text or refuses; test in tests/integration.rs), pasted.
+    ("src/dispatch_sub.rs", 2521),
     // Day 209: 3439 -> 3455 (+16, within the drift band, pasted rather than left to absorb).
     // #937 option 1: nine lines of doc above `builtin_model_pricing` naming both ignored
     // audit commands (deliverable 4 — an alarm nobody can find is the #745/#767/#769
