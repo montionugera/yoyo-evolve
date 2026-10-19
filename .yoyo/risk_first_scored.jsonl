@@ -145,3 +145,4 @@
 {"day":231,"git_hash":"0cdf6f26","path":"src/mcp_prefix.rs","ts":"2026-10-17T11:23:27Z"}
 {"day":231,"git_hash":"e4109243","path":"src/outside_read.rs","ts":"2026-10-17T14:08:07Z"}
 {"day":231,"git_hash":"a740f920","path":"src/non_regular_read.rs","ts":"2026-10-17T23:05:08Z"}
+{"day":232,"git_hash":"f15cfee5","path":"src/provider_presets_tests.rs","ts":"2026-10-19T01:28:07Z"}
