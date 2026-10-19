@@ -1,0 +1,91 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git status --short && sed -n 108… ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1103,1128p src/cli.rs && … ✓ (6ms)
+  ▶ read src/cli.rs:1100..1130 ✓ (1ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && grep -n "print-system-prompt\|pr… ✓ (13ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  4 tools completed in 8.0s (4 ✓)
+
+Write the tests first.
+  ╭─ Turn 5 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 1,33p tests/config_fifo.r… ✓ (6ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (63 lines) ✓ (667ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 13.5s (2 ✓)
+
+The hardened fixture now reproduces CI's red even on this runner, which has a key. Now the fix:
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ edit src/cli.rs (2 → 2 lines)
+  -                                 // For local/ollama providers, API key is optional
+  -                                 if provider == "ollama" || provider == "custom" {
+  +                                 // Optional for local providers and for --print-system-prompt (never calls a model)
+  +                                 if provider == "ollama" || provider == "custom" || args.iter().any(|a| a == "--print-system-prompt") {
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo fmt && git diff --stat && … ✓ (4m 46s)
+  -                                 // For local/ollama providers, API key is optional
+  -                                 if provider == "ollama" || provider == "custom" {
+  +                                 // Optional for local providers and for --print-system-prompt (never calls a model)
+  +                                 if provider == "ollama" || provider == "custom" || args.iter().any(|a| a == "--print-system-prompt") {
+ ✗ (4m 46s)
+    │ Command timed out after 120s
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git diff --stat && env -u ANTHRO… ✓ (469ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 4m 52s (2 ✓, 1 ✗)
+
+All 12 pass with no keys in the environment. Positive control next, run as one atomic revert→run→restore step:
+  ╭─ Turn 9 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cp src/cli.rs /tmp/cli.fixed && … ✓ (12.9s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+The control went red on the same 3 tests (including print_system_prompt_needs_no_api_key), and the fix is back in place. Next: docs, then the full checks.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && sed -n 60,80p docs/src/configura… ✓ (3ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && python3 - <<… (8 lines) ✓ (4m 48s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && cargo test 2>&1 | grep -cE "FAIL… ✓ (6m 31s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  3 tools completed in 11m 34s (3 ✓)
+
+Everything is green: fmt, clippy, build, and the full cargo test with 0 failures. Committing:
+  ╭─ Turn 13 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve && git add -A &… (5 lines) ✓ (21ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+I've fixed the red CI on main, and it's committed as b34ab98e. All checks pass locally; GitHub CI hasn't run on the commit yet.
+
+Cause: yoyo --print-system-prompt exited 1 with "No API key found" when no key was set. That blocked anyone just inspecting their prompt, and it's why two config_fifo tests failed in CI. They passed on the evolve runner only because the test helper inherited that runner's ANTHROPIC_API_KEY.
+
+What changed:
+• `src/cli.rs`: with --print-system-prompt, a missing key now gets the same "not-needed" placeholder that ollama/custom already use. The key is never sent, because the process prints the prompt and exits. -p, the REPL, --print and everything else still fail with the same message. The edit adds 3 lines, which keeps the file inside the module-size gate's grace band.
+• `tests/config_fifo.rs`: the test helper run_yoyo_env now strips every inherited API_KEY / *_API_KEY before applying the test's own variables. Tests that set a key on purpose still get it.
+  • Once the helper stopped inheriting keys, CI's failure showed up on this runner too, even though it has a key.
+  • New test print_system_prompt_needs_no_api_key, plus a near-miss test prompt_mode_without_key_still_refuses that checks -p hi with no key still refuses.
+• Docs: one sentence in docs/src/configuration/system-prompts.md saying the flag works without an API key.
+
+Verification:
+• env -u ANTHROPIC_API_KEY -u API_KEY cargo test --test config_fifo gives 12 passed (it was 9 passed / 3 failed before the fix).
+• Positive control: I reverted cli.rs to HEAD, ran the tests and restored the fix in one step. The same 3 tests failed, including the new one, and cli.rs is back to the fix with no marker left in it.
+• cargo fmt --check, clippy with -D warnings, cargo build and the full cargo test all pass, with 0 failures.
+
+The commit also includes .yoyo/risk_weights.json, which already had uncommitted changes before I started; the instructed git add -A picked it up.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/cli.rs

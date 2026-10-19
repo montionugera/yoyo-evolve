@@ -1,0 +1,32 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ mkdir -p session_plan && rm -f session_plan/task_*.md; gh issue view 902 --json … ✓ (639ms)
+  ▶ $ gh issue view 1052 --json comments --jq '.comments[] | .createdAt + " " + .body[… ✓ (959ms)
+  ▶ $ cat > session_plan/task_01.md <<'EOF' (107 lines) ✓ (13ms)
+  ▶ $ ls -la session_plan ✓ (16ms)
+  ▶ $ ls session_plan; head -3 session_plan/task_01.md ✓ (4ms)
+
+────────────────────────────────────────────────────────────────────────────────
+  5 tools completed in 1m 14s (5 ✓)
+
+I wrote the session plan: two task files plus the issue responses, all in session_plan/. The commit step did nothing because session_plan/ is gitignored. The planned command ends in || true, so this is expected; the harness reads the files from disk. Nothing was implemented.
+
+Task 1: turn main green (product; src/cli.rs, tests/config_fifo.rs)
+• Why CI is red: two tests in tests/config_fifo.rs run yoyo --print-system-prompt. That flag fails with "No API key found" when no key is set. The tests pass on the evolve runner because it exports ANTHROPIC_API_KEY and the test helper passes it on; GitHub CI has no key.
+• Product fix: --print-system-prompt never calls a model, so it will stop requiring a key. Every other mode keeps today's refusal.
+• Test fix: the helper will remove every inherited *_API_KEY variable so results stop depending on the runner. Two new tests: the flag works with no key, and -p with no key is still refused.
+• How to check it: a plain cargo test passes here with or without the fix, so the task's check is env -u ANTHROPIC_API_KEY -u API_KEY cargo test --test config_fifo. It also asks for a check that undoing the fix makes the new test fail by name.
+
+Task 2: Fixes #1052, the last FIFO hang (product; src/prompt.rs plus one test file)
+• The write_file diff preview reads the target file with a plain read before the tool runs, so a FIFO target can hang it. The task is to measure the hang first, then route the read through non_regular_read.
+• A FIFO target gets no preview. Regular and missing files must render exactly as today.
+• New tests guard with a timeout so a regression fails instead of hanging the suite.
+• The task title closes the ticket. Items 1 and 2 already landed in d2f81336, and the one exclusion in the issue body (--system-file) has a stated reason, so "Fixes #1052" is accurate.
+
+Backlog and commitments:
+• Backlog slot: I didn't spend it on the oldest issue, #902. The remaining question there (refuse vs annotate instruction files from untrusted projects) is a design decision, not a 30-minute slice. Refusing would also stop this loop reading its own CLAUDE.md. I put the slot on #1052 because it closes a ticket outright.
+• Promise in Discussion #1048: I said I'd revert the outside-read fence to opt-in if @yuanhao picks opt-in. The last two comments there are my own corrections from 2026-10-18 and he hasn't answered, so there is nothing to do yet.
+• Deferred: #1053 moves to next session. #1041 stays open because the server is still spawned twice.
+  watch: no files changed this turn — skipping

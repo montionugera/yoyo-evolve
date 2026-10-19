@@ -1,0 +1,65 @@
+  yoyo (piped mode) — model: claude-opus-5-5
+  👀 Auto-watch: `cargo clippy --all-targets -- -D warnings && cargo test` (disable with auto_watch = false)
+
+── Thinking ────────────────────────────────────────────────────────────────
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve 2>/dev/null || pwd; git status --sh… ✓ (15ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 615,665p src/prompt.rs; ls … ✓ (12ms)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; sed -n 630,645p src/prompt.rs; sed… ✓ (9ms)
+  ▶ read src/prompt.rs:628..644  ▶ read src/prompt.rs:14..28 ✓ (1ms)
+ ✓ (2ms)
+  ▶ write src/prompt/write_preview.rs (102 lines) ✓ (2m 22s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (30 lines) ✓ (32.2s)
+
+────────────────────────────────────────────────────────────────────────────────
+  7 tools completed in 3m 34s (7 ✓)
+
+Before: the bare read blocks (the anti-vacuous test passes). Now a positive control: swap the helper back to the bare read, run, and restore in one command.
+  ╭─ Turn 7 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cp src/prompt/write_preview.rs /tm… ✓ (36.1s)
+
+Control reddened exactly the FIFO test by name; restored. Full checks now.
+  ╭─ Turn 8 ─────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo fmt && cargo fmt -- --check … ✓ (4m 29s)
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; cargo test 2>&1 | grep -E "^test r… ✓ (3m 23s)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  2 tools completed in 8m 6s (2 ✓)
+
+All green. ARCHITECTURE.md line 1379 says item 3 is still open, so I'm updating it in this same diff.
+  ╭─ Turn 10 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; python3 - <<'E… (29 lines) ✓ (263ms)
+
+── Thinking ────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+
+Now the comment on #1052 that the plan asked for:
+  ╭─ Turn 11 ────────────────────────────────────────────────────────────╮
+  ▶ $ cd /home/runner/work/yoyo-evolve/yoyo-evolve; gh issue comme… (8 lines) ✓ (1.6s)
+
+I've fixed the last open item on #1052: writing a file to a FIFO (a named pipe) no longer freezes yoyo's display. The fix is committed as 3281c288 with "Fixes #1052" in the title, so the issue closes when the commit is pushed.
+
+What was wrong: before the write_file tool runs, yoyo reads the target's current content to show a diff preview. That read only checked that the path exists, and a FIFO exists, so the read blocked forever. yoagent's own refusal for non-regular files never got a chance to run.
+
+Before the fix: I checked that the bug is real. A plain read of a FIFO did not return within 500 ms. A test (bare_read_of_the_fifo_fixture_blocks) now keeps that check in the suite, and it unblocks the pipe afterwards so it doesn't leave a stuck thread behind.
+
+The fix: a small helper, preview_old_content, now does the read through the existing safe reader, which won't open non-regular files. It lives in a new file, src/prompt/write_preview.rs, so src/prompt.rs stays at 3905 lines and under its size cap.
+• FIFOs and devices get no preview at all. Showing them as a "new file" diff would wrongly suggest a write that the tool is about to refuse. A comment in the code records this decision.
+• Regular, missing and directory targets behave exactly as before. A regular file returns its exact content, so its diff is unchanged.
+
+Tests: the FIFO case now returns immediately with no preview. It runs under a 5-second deadline, so a regression fails instead of hanging the suite. The regular-file and missing/empty/directory cases are also covered. These tests only run on Unix.
+
+Proving the test catches the bug: I put the old read back temporarily, and exactly the FIFO test failed on its deadline. I restored the code in the same command and confirmed the temporary change was gone.
+
+Checks: cargo fmt --check, cargo clippy --all-targets -- -D warnings, the full cargo test run and the module-size gate all pass.
+
+Also done:
+• ARCHITECTURE.md said item 3 was still open; I corrected that and added an entry for this fix in the same commit.
+• I commented on #1052 with the commit, the before/after measurements and the test result. The #1052 mentions in src/cli.rs and src/main.rs describe past fixes, not pending work, so I left them alone.
+• --system-file <path> still isn't routed through the safe reader. That's deliberate and stated in the issue: --system-file <(cmd) is a FIFO the user chose.
+  ✓ Watch passed: `cargo clippy --all-targets -- -D warnings && cargo test`
+  📊 Risk validation: 0/1 changed files were in top-10 predictions (0.0% accuracy)
+     📊 Emerging (anticipatory) accuracy: 0/1 (0.0%) — reactive was 0.0%
+     Surprises (not predicted): src/prompt/write_preview.rs
