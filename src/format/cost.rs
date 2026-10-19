@@ -98,6 +98,7 @@ fn builtin_model_pricing(model: &str) -> Option<(f64, f64, f64, f64)> {
     // confident measurement of a bill that is really unknown.
     if let Some(cost) = crate::agent_builder::anthropic_preset(model)
         .or_else(|| crate::agent_builder::openai_preset(model))
+        .or_else(|| crate::agent_builder::vendor_preset_by_id(model))
         .and_then(|preset| preset.cost)
     {
         return Some((
@@ -375,6 +376,7 @@ pub fn estimate_request_cost_with(
     let stripped = strip_router_prefix(model);
     let tiers = crate::agent_builder::anthropic_preset(stripped)
         .or_else(|| crate::agent_builder::openai_preset(stripped))
+        .or_else(|| crate::agent_builder::vendor_preset_by_id(stripped))
         .and_then(|preset| preset.cost)
         .filter(|cost| !cost.context_tiers.is_empty());
     let Some(cost) = tiers else {

@@ -74,6 +74,8 @@ pub fn known_models_for_provider(provider: &str) -> &'static [&'static str] {
             "o4-mini-high",
         ],
         "google" => &[
+            "gemini-4-argon",
+            "gemini-3.8-flash",
             "gemini-3.0-pro",
             "gemini-3.0-flash",
             "gemini-2.5-pro",
@@ -88,13 +90,21 @@ pub fn known_models_for_provider(provider: &str) -> &'static [&'static str] {
             "llama-3.1-8b-instant",
             "mixtral-8x7b-32768",
         ],
-        "xai" => &["grok-4", "grok-4-mini", "grok-3", "grok-3-mini", "grok-2"],
+        "xai" => &[
+            "grok-4.7",
+            "grok-4",
+            "grok-4-mini",
+            "grok-3",
+            "grok-3-mini",
+            "grok-2",
+        ],
         // `deepseek-flash` is the id the evolve loop actually runs on (2026-09-15);
         // `deepseek-v4-pro` remains the legacy id for the same routed backend.
         // Listed first because it is the current one — this slice is only used for
         // membership tests and "did you mean" suggestions, so order is cosmetic.
         "deepseek" => &["deepseek-flash", "deepseek-v4-pro", "deepseek-v4-flash"],
         "mistral" => &[
+            "mistral-large-4",
             "mistral-large-latest",
             "mistral-small-latest",
             "codestral-latest",
@@ -162,6 +172,7 @@ pub fn model_is_known_for_provider(provider: &str, model: &str) -> bool {
     }
     (provider == "anthropic" && crate::agent_builder::anthropic_preset(model).is_some())
         || (provider == "openai" && crate::agent_builder::openai_preset(model).is_some())
+        || crate::agent_builder::vendor_preset(provider, model).is_some()
 }
 
 /// Get the default model for a given provider.

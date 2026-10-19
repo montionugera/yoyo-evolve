@@ -63,7 +63,9 @@ pub(crate) fn unknown_model_limits_note(
     if user_max_tokens.is_some() || !OPENAI_BASE_FALLBACK_PROVIDERS.contains(&provider) {
         return None;
     }
-    if provider == "openai" && openai_preset(model).is_some() {
+    if (provider == "openai" && openai_preset(model).is_some())
+        || crate::agent_builder::vendor_preset(provider, model).is_some()
+    {
         return None;
     }
     let shown = crate::cli::sanitize_for_display(model);

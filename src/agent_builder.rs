@@ -872,6 +872,41 @@ pub fn openai_preset(model: &str) -> Option<ModelConfig> {
     }
 }
 
+/// yoagent 0.25.8 presets for Google, xAI and Mistral ids (#1021, #1037), by
+/// EXACT `(provider, id)` match: `gemini-3.8-flash-lite` must not get Flash's
+/// price (#1003), and a `grok-4.7` on OpenRouter is not xAI's endpoint.
+/// Argon, 3.8 Flash and Mistral Large 4 are priced at the REGULAR rate, so
+/// `/cost` may read up to 2x the bill while a vendor promotion runs.
+pub fn vendor_preset(provider: &str, model: &str) -> Option<ModelConfig> {
+    ensure_bundled_prices();
+    match (provider, model) {
+        ("google", "gemini-4-argon") => Some(ModelConfig::gemini_4_argon()),
+        ("google", "gemini-3.8-flash") => Some(ModelConfig::gemini_3_8_flash()),
+        ("xai", "grok-4.7") => Some(ModelConfig::grok_4_7()),
+        ("mistral", "mistral-large-4") => Some(ModelConfig::mistral_large_4()),
+        _ => None,
+    }
+}
+
+/// [`vendor_preset`] for the id-only readers (`/cost`, `/model` info window):
+/// these four ids are unique to their vendor.
+pub(crate) fn vendor_preset_by_id(model: &str) -> Option<ModelConfig> {
+    ["google", "xai", "mistral"]
+        .into_iter()
+        .find_map(|p| vendor_preset(p, model))
+}
+
+/// Copy a preset's limits, price and reasoning onto an arm's config, keeping
+/// the arm's own wire fields (base URL, compat, headers).
+fn apply_vendor_preset(config: &mut ModelConfig, provider: &str, model: &str) {
+    if let Some(preset) = vendor_preset(provider, model) {
+        config.context_window = preset.context_window;
+        config.max_tokens = preset.max_tokens;
+        config.cost = preset.cost;
+        config.reasoning = preset.reasoning;
+    }
+}
+
 /// The real maximum output a GPT-6 preset model accepts. yoagent's preset
 /// `max_tokens` (64K) is the request DEFAULT — its doc reads "defaults to 64K
 /// of the model's 128K max output" — so comparing a configured `max_tokens`
@@ -897,7 +932,9 @@ pub(crate) fn openai_compat_output_ceiling(p: &str, model: &str, max_tokens: u32
 pub(crate) fn declared_output_ceiling(p: &str, model: &str, max_tokens: u32) -> Option<u32> {
     match p {
         "anthropic" => anthropic_output_maximum(model),
-        "google" | "bedrock" => None,
+        // Gemini's 65,536 is a published cap; xAI/Mistral publish none.
+        "google" => vendor_preset(p, model).map(|c| c.max_tokens),
+        "bedrock" => None,
         _ => openai_compat_output_ceiling(p, model, max_tokens),
     }
 }
@@ -976,6 +1013,7 @@ pub fn create_model_config(provider: &str, model: &str, base_url: Option<&str>) 
         }
         "google" => {
             let mut config = ModelConfig::google(model, model);
+            apply_vendor_preset(&mut config, provider, model);
             if let Some(url) = base_url {
                 config.base_url = url.to_string();
             }
@@ -999,6 +1037,7 @@ pub fn create_model_config(provider: &str, model: &str, base_url: Option<&str>) 
             config.provider = "xai".into();
             config.base_url = base_url.unwrap_or("https://api.x.ai/v1").to_string();
             config.compat = Some(OpenAiCompat::xai());
+            apply_vendor_preset(&mut config, provider, model);
             config
         }
         "groq" => {
@@ -1037,6 +1076,7 @@ pub fn create_model_config(provider: &str, model: &str, base_url: Option<&str>) 
             config.provider = "mistral".into();
             config.base_url = base_url.unwrap_or("https://api.mistral.ai/v1").to_string();
             config.compat = Some(OpenAiCompat::mistral());
+            apply_vendor_preset(&mut config, provider, model);
             config
         }
         "cerebras" => {

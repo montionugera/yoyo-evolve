@@ -134,6 +134,8 @@ mod openai_preset_tests;
 mod output_ceiling_tests;
 mod outside_read;
 #[cfg(test)]
+mod provider_presets_tests;
+#[cfg(test)]
 mod tool_wrappers_cancel_tests;
 #[cfg(test)]
 mod tools_child_bash_tests;

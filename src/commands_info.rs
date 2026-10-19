@@ -731,6 +731,7 @@ pub fn handle_model_list(current_model: &str, current_provider: &str, filter: &s
 pub fn model_context_window(model: &str) -> Option<u64> {
     if let Some(preset) = crate::agent_builder::anthropic_preset(model)
         .or_else(|| crate::agent_builder::openai_preset(model))
+        .or_else(|| crate::agent_builder::vendor_preset_by_id(model))
     {
         return Some(u64::from(preset.context_window));
     }
