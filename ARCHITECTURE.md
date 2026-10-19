@@ -1568,3 +1568,43 @@ The parent agent's bash spawned `bash -o pipefail -c <cmd>` in yoyo's own proces
 **Also fixed:** the failed-build revert (`git checkout "$SESSION_START_SHA" -- src/ Cargo.toml`) left `Cargo.lock` out under a comment saying it was "gitignored/never tracked". It is tracked, so a session that changed the lock and broke the build kept the new lock. The pathspec now includes it.
 
 **Tests** (`tests/harness_logic.sh`): a temp git repo and a stub `cargo`. A passing update is committed with the named version change and marked verified, and only direct dependencies are passed to `cargo update`. A failing build or test rolls the lock back with no commit. No update, a failed `cargo update`, the disable flag and an already-edited lock each commit nothing. Source checks confirm Step 1 trusts the verified commit, the revert restores `Cargo.lock`, the update runs before the build check, and no crate is named. Positive control: removing the rollback fails the failing-tests case (lock left at the new version, tree dirty).
+
+### `scripts/skill_evolve.sh` cooldown and `scripts/evolve.sh` auto-label — 2026-10-19
+
+**The cooldown never applied in CI (found by skill-evolve itself, evt-0046).** Gate 2 read the last cycle's time from `.skill_evolve_last_run`, which is gitignored and not in the workflow cache. Every CI run therefore started with `last=0` and skipped the cooldown. That included the saturation tripling added on 2026-10-16: evt-0045 set `evolution_saturation: true` and predicted a pause until about 2026-10-20, and the next scheduled cycle came 24h later. Cycle frequency was set by the session counter alone. **Superseded, recorded:** this file's 2026-10-16 entry says the flag "is now read". It was read, and it had no effect in CI.
+
+**Fix:** when the file is missing, `journal_last_event_epoch` takes the newest usable `## <ISO8601> evt-NNNN` header in the tracked `skills/_journal.md`. The model writes those headers, not a clock (measured a few minutes ahead of their commits), so the function trusts them only so far:
+- every header is parsed with `fromisoformat` (minutes, seconds or offset form);
+- an unparseable one is skipped;
+- one more than an hour in the future is ignored, so a typo'd year cannot hold the cooldown until that date;
+- the newest of the rest wins, by time and not by text order.
+
+A present file still wins. The log names the timestamp used, and a fallback that finds nothing logs `the cooldown is NOT applied`, never silence. **Ruled out:** `git log -1 --format=%ct -- skills/_journal.md`, because with `fetch-depth: 50` the last journal commit can be out of reach (188 commits in 72h were measured).
+
+**Tests:**
+- the helper over six header shapes;
+- the real Gate 2 region in a temp checkout: file versus journal precedence, recent versus old, and saturation tripling from the journal alone.
+
+**Positive controls:**
+- letting the journal always win fails both precedence cases;
+- dropping the future-skip fails the typo case.
+
+**Auto-label at wrap-up (`evolve.sh`, `label_unlabelled_self_issues`).** The planner fetches issues only by label, so an issue the bot files without one is never planned. That happened six times even though the skill's example includes `--label agent-self`: #1005, #1015, #1020, #1030, #1045 (which had only `bug`) and #1053. Before the wrap-up commit, open bot issues created since `SESSION_START_ISO` whose labels are all generic (`bug enhancement documentation question`), or none, get `agent-self`.
+
+**Why it is an allow-list of generic labels and not a deny-list of planner labels:** `refresh_sponsors.py` files `Shoutout: @login` issues as the same bot with only `shoutout`, hourly, in its own concurrency group. A deny-list would have relabelled those, and every future bot-side label would have needed adding.
+
+**Other behaviour:**
+- the list uses `--author` with no `--search`, because the search index can lag an issue filed moments earlier;
+- `createdAt` is filtered in Python;
+- gh's stderr is printed on failure;
+- a one-line summary is always logged.
+
+It covers evolve sessions only.
+
+**Tests:**
+- the filter over eight shapes: none, bug, a planner label, mixed, upstream, shoutout, before-session, generic pair;
+- the wrapper with a fake `gh` on PATH: the right edit only, a list without `--search`, and a failed list labelling nothing while showing gh's error.
+
+**Positive controls:**
+- dropping the filter fails both label checks;
+- labelling `agent-input` fails the edit check.

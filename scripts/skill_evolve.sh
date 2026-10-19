@@ -2,7 +2,8 @@
 # scripts/skill_evolve.sh — One skill-evolution cycle.
 # Triggered by .github/workflows/skill-evolve.yml on cron, gated by:
 #   - .skill_evolve_counter ≥ SKILL_EVOLVE_THRESHOLD (default 5 sessions)
-#   - 24h cooldown via .skill_evolve_last_run timestamp file
+#   - 24h cooldown via .skill_evolve_last_run, or the newest skills/_journal.md
+#     event when that file is missing (every CI run: it is gitignored)
 #   - cargo build && cargo test pass on current main
 #
 # Exits 0 silently when gates fail (this is normal — most cron fires are no-ops).
@@ -168,10 +169,55 @@ if [ "$FORCE_RUN" != "true" ] && [ "$counter" -lt "$THRESHOLD" ]; then
 fi
 
 # ── Gate 2: 24h cooldown ───────────────────────────────────────────────
+# $LAST_RUN_FILE is gitignored and not cached, so every CI run starts without
+# it, and the cooldown (and the saturation tripling below) never applied in CI
+# (evt-0046: evt-0045's saturated cycle was followed by another 24h later).
+# When the file is missing, the last cycle's time comes from the newest
+# "## <ISO8601> evt-NNNN" header in the tracked skills/_journal.md, which every
+# completed cycle writes.
+journal_last_event_epoch() { # $1 = journal → "<epoch> <header timestamp>" of its newest usable event, or nothing
+    # The model writes these headers, not a clock, so: every header is parsed
+    # (any ISO 8601 form), one that cannot be parsed is skipped, and one more
+    # than an hour in the future is ignored, so a typo'd year cannot hold the
+    # cooldown until that date. The newest of the rest wins.
+    [ -r "$1" ] || return 0
+    python3 - "$1" <<'PY'
+import datetime, re, sys
+now = datetime.datetime.now(datetime.timezone.utc)
+best = None
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    m = re.match(r"## (\S+) evt-\d+", line)
+    if not m:
+        continue
+    try:
+        t = datetime.datetime.fromisoformat(m.group(1).replace("Z", "+00:00"))
+    except ValueError:
+        continue
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=datetime.timezone.utc)
+    if t > now + datetime.timedelta(hours=1):
+        continue
+    if best is None or t > best[0]:
+        best = (t, m.group(1))
+if best:
+    print(int(best[0].timestamp()), best[1])
+PY
+}
 now=$(date +%s)
 last=$(cat "$LAST_RUN_FILE" 2>/dev/null || echo 0)
 last=${last//[^0-9]/}
 last=${last:-0}
+if [ "$last" -eq 0 ]; then
+    journal_last=$(journal_last_event_epoch skills/_journal.md || true)
+    last=${journal_last%% *}
+    last=${last//[^0-9]/}
+    last=${last:-0}
+    if [ "$last" -gt 0 ]; then
+        echo "skill-evolve: no $LAST_RUN_FILE (fresh checkout); last cycle ${journal_last#* } from skills/_journal.md"
+    elif [ "$FORCE_RUN" != "true" ]; then
+        echo "skill-evolve: WARNING: no $LAST_RUN_FILE and no usable event timestamp in skills/_journal.md; the cooldown is NOT applied"
+    fi
+fi
 
 # Saturation: the skill-evolve spec marks the third NO-OP in a row with
 # `evolution_saturation: true`. While the newest journal event carries it there

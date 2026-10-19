@@ -1025,6 +1025,90 @@ if require "skill_evolve.sh latest_event_saturated extracted" "$SAT_FN"; then
     check "saturation: missing journal -> normal cooldown" \
         "$( eval "$SAT_FN"; latest_event_saturated /nonexistent/j && echo yes || echo no )" "no"
 fi
+# ── skill-evolve cooldown survives a fresh checkout (evt-0046) ───────────────
+# .skill_evolve_last_run is gitignored and uncached, so in CI the cooldown never
+# applied. With no file, the last cycle's time comes from the journal's newest
+# usable "## <ISO> evt-NNNN" header (headers are model-written: unparseable and
+# far-future ones are skipped).
+JE_FN=$(awk '/^journal_last_event_epoch\(\) \{/,/^\}/' "$SE")
+if require "skill_evolve.sh journal_last_event_epoch extracted" "$JE_FN"; then
+    je_case() { ( d=$(mktemp -d); printf "$1" > "$d/j"; eval "$JE_FN"; journal_last_event_epoch "$d/j"; rm -rf "$d" ) }
+    check "cooldown: newest event header gives the last cycle (minutes form)" \
+        "$(je_case '## 2026-10-17T12:30Z evt-0045 NO-OP\n- x\n## 2026-10-18T12:55Z evt-0046 meta-suggestion\n')" "1792328100 2026-10-18T12:55Z"
+    check "cooldown: seconds and offset forms parse; the newest wins wherever it sits" \
+        "$(je_case '## 2026-10-01T00:00Z evt-0001 NO-OP\n## 2026-10-18T12:55:30+00:00 evt-0046 NO-OP\n## 2026-10-02T00:00Z evt-0002 NO-OP\n')" "1792328130 2026-10-18T12:55:30+00:00"
+    check "cooldown: a far-future header (typo'd year) is ignored" \
+        "$(je_case '## 2026-10-18T12:55Z evt-0046 NO-OP\n## 2099-10-18T12:55Z evt-0047 NO-OP\n')" "1792328100 2026-10-18T12:55Z"
+    check "cooldown: an unparseable header is skipped, not fatal" \
+        "$(je_case '## 2026-10-18T12:55Z evt-0046 NO-OP\n## 2026-13-45T99:99Z evt-0047 NO-OP\n## evt-0000 init\n')" "1792328100 2026-10-18T12:55Z"
+    check "cooldown: a journal with no event header gives nothing" "$(je_case '# journal\n- x\n')" ""
+    check "cooldown: a missing journal gives nothing" \
+        "$( eval "$JE_FN"; journal_last_event_epoch /nonexistent/j )" ""
+fi
+# The real Gate 2 region, run in a temp checkout: which of file / journal wins,
+# and whether the saturation tripling now applies with no file.
+GATE2=$(awk '/^journal_last_event_epoch\(\) \{/{p=1} /^# ── Gate 3/{exit} p' "$SE")
+if require "skill_evolve.sh Gate 2 extracted" "$GATE2"; then
+    gate2_case() { # $1 = journal (printf fmt) or "-", $2 = last-run file content or "-" → run|skip
+        ( d=$(mktemp -d); cd "$d" || exit; mkdir skills
+          [ "$1" = "-" ] || printf "$1" > skills/_journal.md
+          [ "$2" = "-" ] || printf '%s' "$2" > .skill_evolve_last_run
+          FORCE_RUN=""; COOLDOWN=86400; LAST_RUN_FILE=.skill_evolve_last_run
+          ( eval "$GATE2"; echo run ) | tail -1 | grep -qx run && echo run || echo skip
+          cd /; rm -rf "$d" ) 2>/dev/null
+    }
+    hours_ago() { python3 -c "import datetime as d,sys;print((d.datetime.now(d.timezone.utc)-d.timedelta(hours=float(sys.argv[1]))).strftime('%Y-%m-%dT%H:%MZ'))" "$1"; }
+    G_NOW=$(date +%s)
+    check "cooldown gate: no file, journal event 2h old -> skip" "$(gate2_case "## $(hours_ago 2) evt-0046 NO-OP\n" -)" "skip"
+    check "cooldown gate: no file, journal event 30h old -> run"  "$(gate2_case "## $(hours_ago 30) evt-0046 NO-OP\n" -)" "run"
+    check "cooldown gate: no file, no journal -> run"            "$(gate2_case - -)" "run"
+    check "cooldown gate: a recent file wins over an old journal" "$(gate2_case "## $(hours_ago 30) evt-0046 NO-OP\n" "$((G_NOW-3600))")" "skip"
+    check "cooldown gate: an old file wins over a recent journal" "$(gate2_case "## $(hours_ago 2) evt-0046 NO-OP\n" "$((G_NOW-100000))")" "run"
+    check "cooldown gate: saturation tripling applies from the journal alone (30h < 72h)" \
+        "$(gate2_case "## $(hours_ago 30) evt-0046 NO-OP\n- evolution_saturation: true\n" -)" "skip"
+fi
+check "skill_evolve.sh: a cooldown that cannot be applied says so" \
+    "$(grep -c 'the cooldown is NOT applied' "$SE")" "1"
+
+# ── wrap-up auto-label: bot issues with only generic labels get agent-self ───
+UL_FN=$(awk '/^unlabelled_self_issues\(\) \{/,/^\}/' "$SCRIPT")
+if require "evolve.sh unlabelled_self_issues extracted" "$UL_FN"; then
+    GENERIC_ISSUE_LABELS=$(grep -m1 '^GENERIC_ISSUE_LABELS=' "$SCRIPT" | cut -d'"' -f2)
+    ul_out=$( eval "$UL_FN"; printf '%s' '[
+      {"number":1,"createdAt":"2026-10-19T01:00:00Z","labels":[]},
+      {"number":2,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"bug"}]},
+      {"number":3,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"agent-self"}]},
+      {"number":4,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"bug"},{"name":"agent-help-wanted"}]},
+      {"number":5,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"upstream"}]},
+      {"number":6,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"shoutout"}]},
+      {"number":7,"createdAt":"2026-10-18T23:00:00Z","labels":[]},
+      {"number":8,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"enhancement"},{"name":"documentation"}]}]' \
+      | unlabelled_self_issues 2026-10-19T00:00:00Z | tr '\n' ' ' )
+    check "auto-label: only this session's issues with generic or no labels (not shoutout/upstream/planner)" "$ul_out" "1 2 8 "
+fi
+LA_FN=$(awk '/^GENERIC_ISSUE_LABELS=/{p=1} p{print} p&&/^label_unlabelled_self_issues\(\) \{/{q=1} q&&/^\}/{exit}' "$SCRIPT")
+if require "evolve.sh label_unlabelled_self_issues extracted" "$LA_FN"; then
+    la_case() { # $1 = exit code of the list call; fake gh on PATH → "list args|edit calls|output"
+        ( set +e; d=$(mktemp -d)
+          printf '[{"number":7,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"bug"}]},{"number":8,"createdAt":"2026-10-19T01:00:00Z","labels":[{"name":"agent-self"}]}]' > "$d/fix"
+          printf '#!/bin/sh\ncase "$1 $2" in\n  "issue list") echo "$*" > "%s/list"; cat "%s/fix"; [ %s = 0 ] || echo "HTTP 401: Bad credentials" >&2; exit %s;;\n  "issue edit") echo "$*" >> "%s/edits";;\nesac\n' "$d" "$d" "$1" "$1" "$d" > "$d/gh"
+          chmod +x "$d/gh"; PATH="$d:$PATH"
+          refresh_gh_token() { :; }
+          REPO=o/r; BOT_LOGIN='yoyo[bot]'; SESSION_START_ISO=2026-10-19T00:00:00Z
+          eval "$LA_FN"; out=$(label_unlabelled_self_issues)
+          printf '%s|%s|%s' "$(cat "$d/list" 2>/dev/null)" "$(tr '\n' ';' < "$d/edits" 2>/dev/null)" "$(echo "$out" | tr '\n' ';')"
+          rm -rf "$d" ) 2>/dev/null
+    }
+    LA=$(la_case 0)
+    check "auto-label: only the generic-labelled issue gets agent-self" "$(echo "$LA" | cut -d'|' -f2)" "issue edit 7 --repo o/r --add-label agent-self;"
+    check "auto-label: lists the bot's open issues directly, not through search" \
+        "$(echo "$LA" | cut -d'|' -f1 | grep -cE -- '--state open --author yoyo\[bot\] ' | tr -d ' ')$(echo "$LA" | cut -d'|' -f1 | grep -c -- '--search')" "10"
+    check "auto-label: a failed list labels nothing and shows gh's error" \
+        "$(la_case 1 | cut -d'|' -f2-3 | grep -c '^|.*could not list.*HTTP 401')" "1"
+fi
+check "evolve.sh: the wrap-up runs the auto-label before its commit" \
+    "$(awk '/^label_unlabelled_self_issues$/{l=NR} /^commit_scope_gate "\$WRAPUP_SCOPE" wrapup$/{c=NR} END{print (l && c && l<c) ? "yes" : "no"}' "$SCRIPT")" "yes"
+
 check "skill_evolve.sh: diff-scope guard lists a retire by its attic path (-M)" \
     "$(grep -c 'CHANGED_FILES=$(git diff --name-only -M ' "$SE")" "1"
 

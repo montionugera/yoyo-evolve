@@ -4049,6 +4049,62 @@ if [ -x "$YOYO_BIN" ]; then
     fi
 fi
 
+# ── Issues yoyo filed this session without a planner label ──
+# The planner fetches issues only by label, so an issue the bot files without
+# one is invisible to every later session. The skill shows --label agent-self,
+# and it was still dropped six times (#1005, #1015, #1020, #1030, #1045 had
+# only "bug", #1053). An open issue the bot filed during this job whose labels
+# are all GENERIC (or none) gets agent-self. Any other label means some script
+# or phase chose it on purpose and the issue is left alone: the planner labels,
+# upstream (waiting for the creator), and shoutout (refresh_sponsors.py files
+# those as the same bot, hourly, in its own concurrency group). The list does
+# not go through the search index, which can lag an issue filed moments ago.
+GENERIC_ISSUE_LABELS="bug enhancement documentation question"
+unlabelled_self_issues() { # $1 = session start ISO; stdin: gh JSON [{number, createdAt, labels:[{name}]}] → numbers to label
+    python3 -c '
+import json, sys
+generic = set(sys.argv[1].split())
+since = sys.argv[2]
+for issue in json.load(sys.stdin):
+    names = {l["name"] for l in issue.get("labels", [])}
+    if issue.get("createdAt", "") >= since and names <= generic:
+        print(issue["number"])
+' "$GENERIC_ISSUE_LABELS" "$1"
+}
+label_unlabelled_self_issues() {
+    if [ -z "$SESSION_START_ISO" ] || [ -z "${BOT_LOGIN:-}" ] || ! command -v gh &>/dev/null; then
+        echo "  auto-label: skipped (no session start time, bot login or gh)."
+        return 0
+    fi
+    refresh_gh_token
+    local raw nums n err_f labelled=0
+    err_f=$(mktemp)
+    if ! raw=$(gh issue list --repo "$REPO" --state open --author "$BOT_LOGIN" \
+        --limit 100 --json number,createdAt,labels 2>"$err_f"); then
+        echo "  auto-label: could not list the bot's open issues; skipped:"
+        sed 's/^/    /' "$err_f"; rm -f "$err_f"
+        return 0
+    fi
+    if ! nums=$(printf '%s' "$raw" | unlabelled_self_issues "$SESSION_START_ISO" 2>"$err_f"); then
+        echo "  auto-label: could not read the issue list; skipped:"
+        sed 's/^/    /' "$err_f"; rm -f "$err_f"
+        return 0
+    fi
+    for n in $nums; do
+        if gh issue edit "$n" --repo "$REPO" --add-label agent-self >/dev/null 2>"$err_f"; then
+            echo "  auto-labelled #$n agent-self (filed without a planner label)"
+            labelled=$((labelled + 1))
+        else
+            echo "  auto-label: could not label #$n:"
+            sed 's/^/    /' "$err_f"
+        fi
+    done
+    rm -f "$err_f"
+    [ "$labelled" -gt 0 ] || echo "  auto-label: every issue the bot filed this session already has a label."
+    return 0
+}
+label_unlabelled_self_issues
+
 # Commit any remaining uncommitted changes (journal, etc.) — bookkeeping
 # only; anything else is refused by the scope gate (#951).
 commit_scope_gate "$WRAPUP_SCOPE" wrapup
